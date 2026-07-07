@@ -1,0 +1,324 @@
+# Plan Implementacji: AnkieterAI
+
+## Metadane
+- **Project:** AnkieterAI — Zautomatyzowany system wprowadzania ankiet papierowych (VLM)
+- **Stack:** Python 3.12, Streamlit, Ollama (llava:13b), Cloudflared Tunnel
+- **Hardware:** Windows, RTX 5070 Ti 16GB VRAM, 32GB RAM
+- **Hasło domyślne:** `ankieter2026`
+- **Model VLM:** `llava:13b`
+
+---
+
+## Struktura katalogów
+
+```
+C:\workspace\dev\surveys\
+├── docs/
+│   ├── sketch-master-prompt.md      # Pierwotne wytyczne
+│   └── implementation-plan.md       # Niniejszy plan
+├── src/
+│   ├── __init__.py
+│   ├── main.py                      # Entry point Streamlit + routing ekranów
+│   ├── config.py                    # AppConfig (Pydantic Settings)
+│   ├── schemas.py                   # Pydantic: MedicalSurvey, SurveyResult, SurveyGroup
+│   ├── state_manager.py             # Zarządzanie st.session_state
+│   ├── ui_components.py             # render_login(), render_upload(), render_verification()
+│   ├── ai_client.py                 # AIClient: async Ollama API + prompt builder
+│   └── data_handler.py              # Groupowanie plików, cache, CSV export
+├── scripts/
+│   ├── setup_env.ps1               # Python venv + pip install
+│   ├── setup_ollama.ps1            # Instalacja Ollamy + pull llava:13b + start serwera
+│   ├── run_dev.ps1                 # Start Streamlit + weryfikacja Ollamy
+│   ├── deploy_tunnel.ps1           # Cloudflared tunel na localhost:8501
+│   └── full_setup.ps1             # Orchestrator: wszystko od zera do tunelu
+├── .streamlit/
+│   └── config.toml                 # Port 8501, headless, theme
+├── requirements.txt
+├── .gitignore
+└── README.md
+```
+
+---
+
+## Sekcja 1 — Środowisko i zależności
+
+### `requirements.txt`
+```
+streamlit==1.38.0
+pydantic==2.9.0
+pydantic-settings==2.5.0
+Pillow==10.4.0
+httpx==0.27.2
+python-multipart==0.0.12
+```
+
+### `scripts/setup_env.ps1`
+- [ ] Sprawdza `python --version >= 3.12`
+- [ ] Tworzy wirtualne środowisko: `python -m venv .venv`
+- [ ] Aktywuje `.venv\Scripts\Activate.ps1`
+- [ ] `pip install --upgrade pip setuptools wheel`
+- [ ] `pip install -r requirements.txt`
+- [ ] Log do `setup_env.log`
+- [ ] Zwraca `$LASTEXITCODE = 0` jeśli OK
+
+### `.gitignore`
+```
+.venv/
+__pycache__/
+*.pyc
+.streamlit/secrets.toml
+*.log
+tunnel_url.txt
+uploads/
+cache_results.json
+wyniki.csv
+```
+
+### `.streamlit/config.toml`
+```toml
+[server]
+port = 8501
+headless = true
+
+[theme]
+primaryColor = "#1E88E5"
+backgroundColor = "#FAFAFA"
+secondaryBackgroundColor = "#EEEEEE"
+textColor = "#212121"
+font = "sans serif"
+```
+
+---
+
+## Sekcja 2 — Ollama
+
+### `scripts/setup_ollama.ps1`
+- [ ] Sprawdza `ollama --version`, jeśli brak:
+  - Download `OllamaSetup.exe` z `https://ollama.com/download`
+  - Cicha instalacja: `OllamaSetup.exe /S`
+- [ ] Sprawdza czy serwer działa (`curl http://localhost:11434`):
+  - Jeśli nie → startuje proces w tle: `ollama serve`
+- [ ] Pull modelu: `ollama pull llava:13b`
+- [ ] Weryfikacja: `ollama list` zawiera `llava:13b`
+- [ ] Test API: `curl -X POST http://localhost:11434/api/generate -d "{\"model\":\"llava:13b\",\"prompt\":\"test\"}"`
+- [ ] Log do `setup_ollama.log`
+
+---
+
+## Sekcja 3 — Aplikacja (moduły)
+
+### `src/config.py` — Konfiguracja
+- Klasa `AppConfig(BaseSettings)` z polami:
+  - `APP_PASSWORD: str = "ankieter2026"`
+  - `OLLAMA_URL: str = "http://localhost:11434"`
+  - `MODEL_NAME: str = "llava:13b"`
+  - `RESULTS_CSV: str = "wyniki.csv"`
+  - `CACHE_FILE: str = "cache_results.json"`
+  - `MAX_RETRIES: int = 3`
+  - `TIMEOUT_SEC: int = 120`
+- Singleton `config = AppConfig()`
+
+### `src/schemas.py` — Modele danych
+- `MedicalSurvey(BaseModel)`:
+  - `wiek: int` (validacja: 0-120)
+  - `plec: Literal["M", "K"]`
+  - `skala_bólu: int` (validacja: 1-5, z `Field(ge=1, le=5)`)
+  - `uczelnia: str`
+  - `pola_wyboru: dict[str, bool]` — dynamiczne pole wyboru
+  - `needs_review: dict[str, bool]` — per-pole flaga wątpliwości AI
+  - Metoda `to_csv_row() -> list` — kolejność kolumn do CSV
+  - Metoda `from_ai_json(data: dict) -> MedicalSurvey` — walidacja z API
+- `SurveyResult(BaseModel)`:
+  - `raw_response: str`
+  - `validated_data: MedicalSurvey`
+  - `confidence: float`
+- `SurveyGroup(BaseModel)`:
+  - `id: int`
+  - `files: list[Path]` (5 zdjęć)
+  - `result: SurveyResult | None`
+
+### `src/state_manager.py` — Stan sesji
+- Klasa `StateManager`:
+  - `init()` — inicjalizuje `st.session_state["ankieter"]` jako pusty słownik
+  - `is_authenticated() -> bool`
+  - `set_authenticated(password: str) -> bool`
+  - `get_current_index() -> int`
+  - `set_current_index(i: int)`
+  - `get_surveys() -> list[SurveyGroup]`
+  - `set_surveys(surveys: list[SurveyGroup])`
+  - `get_current_survey() -> SurveyGroup | None`
+  - `next_survey() -> bool` (False jeśli koniec)
+  - `set_ai_result(survey_id: int, result: SurveyResult)`
+  - `get_ai_results() -> dict[int, SurveyResult]`
+  - `get_progress() -> (current, total)`
+  - `clear_session()` — reset
+
+### `src/data_handler.py` — Dane i cache
+- `group_files_by_survey(files: list[UploadedFile]) -> list[SurveyGroup]`:
+  - Sortowanie alfabetyczne po nazwach plików
+  - Grupowanie po 5 plików (5 stron = 1 ankieta)
+  - Zwraca listę `SurveyGroup`
+- `save_survey_to_csv(data: MedicalSurvey, path: str)`:
+  - Nagłówek CSV z nazw pól `MedicalSurvey`
+  - Append wiersza (tryb `"a"`, encoding UTF-8 BOM dla Excela)
+  - Lock na zapis (przy współbieżności Streamlit)
+- `save_cache(results: dict[int, SurveyResult])`:
+  - Zapis do `config.CACHE_FILE` jako JSON (z `model_dump()`)
+- `load_cache() -> dict[int, SurveyResult]`:
+  - Odczyt z `config.CACHE_FILE`, deserializacja
+  - Zwraca pusty dict jeśli plik nie istnieje
+- `export_csv_path() -> str`:
+  - Zwraca `config.RESULTS_CSV`
+
+### `src/ai_client.py` — Komunikacja z Ollamą
+- Klasa `AIClient`:
+  - `__init__(model_name: str = config.MODEL_NAME, base_url: str = config.OLLAMA_URL)`
+  - `build_prompt() -> list[dict]` — generuje wiadomości dla `/api/chat`:
+    - System: "Jesteś asystentem odczytującym dane z medycznych ankiet papierowych. Zwróć JSON..."
+    - User: lista obrazów (base64) + instrukcja JSON
+  - `async analyze_survey(survey: SurveyGroup) -> SurveyResult`:
+    - Konwersja 5 obrazów do base64
+    - POST do `/api/chat` z `model: llava:13b, messages: [...], format: "json", stream: false`
+    - Timeout: 120s
+    - Parsowanie odpowiedzi, mapowanie do `MedicalSurvey`
+    - Dla pól z niską pewnością → `needs_review=true`
+    - Retry 3x jeśli JSON niepoprawny lub nie przechodzi walidacji Pydantic
+  - `async analyze_batch(surveys: list[SurveyGroup], progress_callback) -> list[SurveyResult]`:
+    - Przetwarza batch sekwencyjnie lub z ograniczonym `asyncio.Semaphore(2)`
+    - Wywołuje `progress_callback(completed, total)` po każdej ankiecie
+    - Zapisuje do cache po każdej udanej analizie
+
+### `src/ui_components.py` — Komponenty interfejsu
+- `render_login()`:
+  - `st.title("AnkieterAI")`
+  - `st.text_input("Hasło", type="password")`
+  - `st.button("Zaloguj")`
+- `render_upload()`:
+  - `st.file_uploader("Wybierz zdjęcia (jpg/png/webp)", accept_multiple_files=True, type=["jpg","png","webp"])`
+  - `st.button("Rozpocznij analizę")`
+  - `st.progress()` — pasek postępu podczas batcha AI
+  - `st.info("Przetworzono X/Y...")` — aktualizowany w trakcie
+- `render_verification(survey: SurveyGroup)`:
+  - `st.progress(current, total)` — u góry strony
+  - Dwie kolumny (`st.columns(2)`):
+    - **Lewa**: `render_image_viewer(survey.files)`
+      - 5 zakładek (`st.tabs(["Strona 1", ..., "Strona 5"])`)
+      - Każda zakładka: `st.image()` z zoomem
+      - Suwak zoom: `st.slider("Powiększenie", 1.0, 5.0, 1.0)` + CSS `transform: scale(zoom)` na obrazie
+    - **Prawa**: `render_form(survey)`
+      - Formularz (`st.form(key=f"form_{survey.id}")`)
+      - Pola generowane dynamicznie z `MedicalSurvey.__fields__`
+      - `st.number_input("Wiek")`, `st.selectbox("Płeć")` itp.
+      - Pola z `needs_review=True` otoczone `st.error()` (czerwona ramka)
+      - `st.form_submit_button("Zatwierdź i Następna (Spacja)")`
+  - Obsługa skrótu Spacja przez JS:
+    ```html
+    <script>
+    document.addEventListener('keydown', function(e) {
+      if (e.key === ' ' && e.target === document.body) {
+        e.preventDefault();
+        document.querySelector('button[data-testid="baseButton-primary"]')?.click();
+      }
+    });
+    </script>
+    ```
+- `render_complete()`:
+  - `st.balloons()`
+  - `st.success("Wszystkie ankiety przetworzone!")`
+  - `st.download_button("Pobierz CSV", data=csv_content, file_name="wyniki.csv")`
+
+### `src/main.py` — Główna aplikacja Streamlit
+- Konfiguracja strony: `st.set_page_config(layout="wide")`
+- Routing:
+  ```python
+  if "state_manager" not in st.session_state:
+      StateManager.init()
+
+  sm = StateManager()
+
+  if not sm.is_authenticated():
+      render_login()
+      st.stop()
+
+  surveys = sm.get_surveys()
+  if not surveys:
+      render_upload()
+      st.stop()
+
+  current_index = sm.get_current_index()
+  if current_index >= len(surveys):
+      render_complete()
+      st.stop()
+
+  survey = surveys[current_index]
+  render_verification(survey)
+  ```
+- Obsługa callbacków:
+  - Upload → `data_handler.group_files_by_survey()` → `asyncio.run(ai_client.analyze_batch())` → cache
+  - Zatwierdź → `data_handler.save_survey_to_csv()` → `sm.next_survey()` → `st.rerun()`
+
+---
+
+## Sekcja 4 — Deployment
+
+### `scripts/run_dev.ps1`
+- [ ] Sprawdza czy Ollama działa na porcie 11434 (jeśli nie → exit z błędem)
+- [ ] Sprawdza czy `.venv` istnieje (jeśli nie → `setup_env.ps1`)
+- [ ] Aktywuje venv: `.venv\Scripts\Activate.ps1`
+- [ ] `streamlit run src/main.py --server.port 8501`
+- [ ] Czeka na proces (Streamlit uruchomiony w foreground)
+
+### `scripts/deploy_tunnel.ps1`
+- [ ] Sprawdza `cloudflared --version`, jeśli brak:
+  - Download `cloudflared-windows-amd64.exe` z `https://github.com/cloudflare/cloudflared/releases/latest`
+  - Zapis do `C:\tools\cloudflared.exe`
+  - Dodanie `C:\tools` do PATH (na stałe lub na sesję)
+- [ ] Sprawdza czy `localhost:8501` odpowiada (Streamlit uruchomiony)
+- [ ] Uruchamia: `cloudflared tunnel --url http://localhost:8501`
+- [ ] Wyświetla URL (np. `https://xxxxx.trycloudflare.com`)
+- [ ] Zapisuje URL do `tunnel_url.txt`
+
+### `scripts/full_setup.ps1` — Orchestrator
+- [ ] Parametry: `-NoOllama`, `-NoTunnel`, `-NoEnv`, `-NoDev` (flagi do pomijania)
+- [ ] Kolejność:
+  1. `setup_env.ps1` (chyba że `-NoEnv`)
+  2. `setup_ollama.ps1` (chyba że `-NoOllama`)
+  3. `run_dev.ps1` (Start-Process w tle, chyba że `-NoDev`)
+  4. `deploy_tunnel.ps1` (chyba że `-NoTunnel`)
+- [ ] Cleanup: trap na Ctrl+C → Stop-Process Ollama/Streamlit/cloudflared
+- [ ] Wypisuje podsumowanie:
+  ```
+  === AnkieterAI — Gotowe! ===
+  Aplikacja lokalna:  http://localhost:8501
+  Tunel publiczny:    https://xxxxx.trycloudflare.com
+  Hasło:              ankieter2026
+  Model:              llava:13b
+  ==============================
+  ```
+
+---
+
+## Sekcja 5 — Harmonogram implementacji (fazy)
+
+| Faza | Opis | Pliki | Status |
+|------|------|-------|--------|
+| 0 | Środowisko: requirements.txt, .gitignore, config.toml | `requirements.txt`, `.gitignore`, `.streamlit/config.toml` | |
+| 1 | Skrypt środowiska | `scripts/setup_env.ps1` | |
+| 2 | Skrypt Ollama | `scripts/setup_ollama.ps1` | |
+| 3 | Fundament aplikacji | `src/config.py`, `src/state_manager.py`, `src/main.py` (szkielet + login) | |
+| 4 | Schemat i obsługa danych | `src/schemas.py`, `src/data_handler.py` | |
+| 5 | AI Client | `src/ai_client.py` | |
+| 6 | UI Components | `src/ui_components.py` | |
+| 7 | Spięcie logiki w main.py | `src/main.py` (pełna logika + routing) | |
+| 8 | Deployment scripts | `scripts/run_dev.ps1`, `scripts/deploy_tunnel.ps1`, `scripts/full_setup.ps1` | |
+| 9 | Testy i walidacja całego flow | Wszystkie moduły | |
+
+---
+
+## Uwagi techniczne
+
+1. **Streamlit + asyncio:** Streamlit działa na pętli synchronicznej. Do wywołania `analyze_batch()` używamy `asyncio.run()`. Do update'u progress bara w trakcie batcha — zapis do `st.session_state` w osobnym wątku lub callback.
+2. **Obrazy base64:** `PIL.Image` → `BytesIO` → base64. Maksymalny rozmiar payloadu: 5 obrazów × ~1-2MB = bezpieczne dla Ollamy.
+3. **Format JSON w Ollamie:** Używamy parametru `format: "json"` w `/api/chat` (wspierany od Ollama 0.12+), co wymusza odpowiedź w czystym JSON.
+4. **CSV z polskimi znakami:** Zapis z `encoding="utf-8-sig"` (BOM) dla poprawnego otwierania w Excelu.
+5. **Cloudflared na Windows:** Pobieramy plik wykonywalny, nie wymaga instalacji. Uruchamiamy jako podproces.
