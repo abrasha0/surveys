@@ -23,3 +23,12 @@
 - message ma być krótki, zwięzły i konkretnie mówić co zostało zrobione w ramach tego commita
 - przedstawiasz mi to do akceptacji i ewentualnego wprowadzenia zmian/przeiterowania
 - jak jasno zaakceptuję zmiany to robisz git push
+
+# ważne informacje
+
+jeżeli musisz przetestować kawałek kodu to musisz korzystać z wirtualnego środowiska:
+
+```ps1
+> .venv\Scripts\Activate.ps1
+> streamlit run src/main.py
+```
