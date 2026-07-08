@@ -3,8 +3,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$LogFile = Join-Path -Path $PSScriptRoot -ChildPath "..\setup_env.log" -Resolve:$false
 $ProjectRoot = Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..")
+$LogFile = Join-Path -Path $ProjectRoot -ChildPath "logs\setup_env.log"
 $VenvPath = Join-Path -Path $ProjectRoot -ChildPath ".venv"
 $RequirementsPath = Join-Path -Path $ProjectRoot -ChildPath "requirements.txt"
 

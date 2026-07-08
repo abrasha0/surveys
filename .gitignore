@@ -1,9 +1,10 @@
 .venv/
 __pycache__/
-pip_install.*
 *.pyc
 .streamlit/secrets.toml
+logs/
 *.log
+*.err
 tunnel_url.txt
 uploads/
 cache_results.json

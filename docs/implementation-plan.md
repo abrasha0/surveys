@@ -16,6 +16,7 @@ C:\workspace\dev\surveys\
 ├── docs/
 │   ├── sketch-master-prompt.md      # Pierwotne wytyczne
 │   └── implementation-plan.md       # Niniejszy plan
+├── logs/                            # Logi, errory, cache
 ├── src/
 │   ├── __init__.py
 │   ├── main.py                      # Entry point Streamlit + routing ekranów
@@ -58,7 +59,7 @@ python-multipart==0.0.12
 - [ ] Aktywuje `.venv\Scripts\Activate.ps1`
 - [ ] `pip install --upgrade pip setuptools wheel`
 - [ ] `pip install -r requirements.txt`
-- [ ] Log do `setup_env.log`
+- [ ] Log do `logs/setup_env.log`
 - [ ] Zwraca `$LASTEXITCODE = 0` jeśli OK
 
 ### `.gitignore`
@@ -67,7 +68,9 @@ python-multipart==0.0.12
 __pycache__/
 *.pyc
 .streamlit/secrets.toml
+logs/
 *.log
+*.err
 tunnel_url.txt
 uploads/
 cache_results.json
@@ -101,7 +104,7 @@ font = "sans serif"
 - [ ] Pull modelu: `ollama pull llava:13b`
 - [ ] Weryfikacja: `ollama list` zawiera `llava:13b`
 - [ ] Test API: `curl -X POST http://localhost:11434/api/generate -d "{\"model\":\"llava:13b\",\"prompt\":\"test\"}"`
-- [ ] Log do `setup_ollama.log`
+- [ ] Log do `logs/setup_ollama.log`
 
 ---
 
@@ -113,7 +116,7 @@ font = "sans serif"
   - `OLLAMA_URL: str = "http://localhost:11434"`
   - `MODEL_NAME: str = "llava:13b"`
   - `RESULTS_CSV: str = "wyniki.csv"`
-  - `CACHE_FILE: str = "cache_results.json"`
+  - `CACHE_FILE: str = "logs/cache_results.json"`
   - `MAX_RETRIES: int = 3`
   - `TIMEOUT_SEC: int = 120`
 - Singleton `config = AppConfig()`
@@ -276,7 +279,7 @@ font = "sans serif"
 - [ ] Sprawdza czy `localhost:8501` odpowiada (Streamlit uruchomiony)
 - [ ] Uruchamia: `cloudflared tunnel --url http://localhost:8501`
 - [ ] Wyświetla URL (np. `https://xxxxx.trycloudflare.com`)
-- [ ] Zapisuje URL do `tunnel_url.txt`
+- [ ] Zapisuje URL do `logs/tunnel_url.txt`
 
 ### `scripts/full_setup.ps1` — Orchestrator
 - [ ] Parametry: `-NoOllama`, `-NoTunnel`, `-NoEnv`, `-NoDev` (flagi do pomijania)
