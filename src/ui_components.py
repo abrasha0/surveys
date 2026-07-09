@@ -5,6 +5,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import streamlit as st
 
+import base64
+from io import BytesIO
+from PIL import Image
+
 from data_handler import export_csv_path
 from schemas import SurveyGroup
 from state_manager import StateManager
@@ -38,17 +42,31 @@ def render_upload():
 def render_verification(survey: SurveyGroup):
     sm = StateManager()
     current, total = sm.get_progress()
-    st.progress(current / total, text=f"Ankieta {current} z {total}")
+
+    pct = current / total
+    st.markdown(
+        f'<div class="header-row">'
+        f'<span class="header-label">Ankieta {current} z {total}</span>'
+        f'<div class="header-progress">'
+        f'<div class="header-progress-fill" style="width:{pct*100}%"></div>'
+        f'</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
     _space_shortcut()
+    _inject_verification_css()
 
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns(2, gap="small")
 
     with col1:
         _render_image_viewer(survey.files)
 
+    result = (False, None)
     with col2:
-        return _render_form(survey)
+        result = _render_form(survey)
+
+    return result
 
 
 def _space_shortcut():
@@ -69,24 +87,14 @@ def _space_shortcut():
 
 
 def _render_image_viewer(files: list[Path]):
-    zoom = st.slider("Powiększenie", 1.0, 5.0, 1.0, key="zoom_slider")
-
     tabs = st.tabs([f"Strona {i + 1}" for i in range(len(files))])
     for tab, file_path in zip(tabs, files):
         with tab:
-            st.image(str(file_path), width='stretch')
-            if zoom != 1.0:
-                st.markdown(
-                    f"""
-                    <style>
-                    div[data-testid="stImage"] > img {{
-                        transform: scale({zoom});
-                        transform-origin: top left;
-                    }}
-                    </style>
-                    """,
-                    unsafe_allow_html=True,
-                )
+            data_url = _image_to_data_url(file_path)
+            st.markdown(
+                f'<div class="image-wrap"><img src="{data_url}" /></div>',
+                unsafe_allow_html=True,
+            )
 
 
 # ─── Field definitions per page ────────────────────────────────────
@@ -151,6 +159,139 @@ _CESD_SKALA = [
     "Przeważnie lub cały czas (5-7 dni)",
 ]
 
+# ─── Compact field definitions for 2-column grid ─────────────────
+
+_PAGE1_FIELDS = [
+    ("plec", "Płeć", "select", ["Kobieta", "Mężczyzna"]),
+    ("wiek", "Wiek", "number", 18, 80),
+    ("miejsce_zamieszkania", "Miejsce zamieszkania", "select",
+     ["Wieś", "Miasto do 50 tys. mieszkańców", "Miasto 50-100 tys. mieszkańców",
+      "Miasto powyżej 100 tys. mieszkańców"]),
+    ("stan_cywilny", "Stan cywilny", "select",
+     ["Panna/kawaler", "W związku nieformalnym", "Mężatka/żonaty"]),
+    ("forma_zamieszkania", "Forma zamieszkania", "select",
+     ["Z rodziną", "W wynajmowanym mieszkaniu/pokoju", "Własne mieszkanie",
+      "We własnym mieszkaniu z partnerem", "z partnerem"]),
+    ("stopien_studiow", "Stopień studiów", "select",
+     ["Studia I stopnia", "Studia II stopnia"]),
+    ("uczelnia", "Uczelnia", "text"),
+    ("praca_status", "Praca w trakcie studiów?", "select",
+     ["Nie", "Tak, w zawodzie medycznym", "Tak, poza zawodem"]),
+    ("praca_system", "System pracy", "text"),
+    ("oddzial", "Rodzaj oddziału", "select",
+     ["", "Przychodnia", "Zabiegowym", "Zachowawczym", "Pracownia"]),
+    ("staz_pracy", "Staż pracy", "text"),
+    ("sen_godziny", "Średnia liczba godzin snu", "select",
+     ["Poniżej 5 godzin", "5-6 godzin", "7-8 godzin", "Powyżej 8 godzin"]),
+    ("ekran_godziny", "Godziny przed ekranem", "select",
+     ["1-3 godziny", "Powyżej 3 godzin"]),
+    ("kofeina", "Spożycie kofeiny", "select",
+     ["Nie", "Tak, 1-2 porcje dziennie", "Tak, 3 lub więcej porcji dziennie"]),
+]
+
+_ATHENS_FIELDS = [
+    ("zasypianie", "Zasypianie", "select",
+     ["szybkie", "nieznacznie opóźnione", "opóźnione",
+      "bardzo opóźnione lub bezsenność przez całą noc"]),
+    ("budzenie_noc", "Budzenie się w nocy", "select",
+     ["nie występuje", "sporadycznie", "często",
+      "bardzo często lub bezsenność przez całą noc"]),
+    ("budzenie_rano", "Wcześniejsze budzenie", "select",
+     ["o zamierzonej godzinie", "nieznacznie wcześniej", "znacznie wcześniej",
+      "dużo wcześniej lub bezsenność przez całą noc"]),
+    ("czas_snu", "Całkowity czas snu", "select",
+     ["wystarczający", "nieznacznie niewystarczający",
+      "wyraźnie niewystarczający",
+      "całkowicie niewystarczający lub bezsenność przez całą noc"]),
+    ("jakosc_snu", "Jakość snu", "select",
+     ["satysfakcjonująca", "nieznacznie niesatysfakcjonująca",
+      "wyraźnie niesatysfakcjonująca", "całkowicie niesatysfakcjonująca"]),
+    ("samopoczucie", "Samopoczucie nast. dnia", "select",
+     ["dobre", "nieznacznie gorsze", "wyraźnie gorsze"]),
+    ("sprawnosc", "Sprawność nast. dnia", "select",
+     ["niezaburzona", "nieznacznie zaburzona", "wyraźnie zaburzona"]),
+    ("sennosc", "Senność w ciągu dnia", "select",
+     ["nie zdarza się", "nieznaczna", "wyraźna", "bardzo nasilona"]),
+]
+
+_HEALTH_FIELDS = [
+    ("anemia", "Czy stwierdzono anemię?", "select", ["Tak", "Nie"]),
+    ("problemy_tarczyca", "Problemy z tarczycą?", "select", ["Tak", "Nie"]),
+    ("jaka_tarczyca", "Jakie problemy z tarczycą?", "text"),
+    ("inne_choroby", "Inne choroby", "text"),
+]
+
+
+# ─── Helpers ──────────────────────────────────────────────────────
+
+def _image_to_data_url(path: Path) -> str:
+    with Image.open(path) as img:
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        buffer = BytesIO()
+        img.save(buffer, format=img.format or "JPEG")
+        b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return f"data:image/jpeg;base64,{b64}"
+
+
+def _inject_verification_css():
+    st.markdown(
+        """
+<style>
+label { font-size: 0.8rem !important; margin-bottom: 0 !important; padding-bottom: 0 !important; }
+div[data-testid="stSelectbox"],
+div[data-testid="stTextInput"],
+div[data-testid="stNumberInput"] { padding-bottom: 2px !important; padding-top: 0 !important; }
+div[data-testid="stSelectbox"] > div,
+div[data-testid="stTextInput"] > div,
+div[data-testid="stNumberInput"] > div { min-height: 26px !important; }
+input { min-height: 26px !important; font-size: 0.8rem !important; }
+div[data-baseweb="select"] span { font-size: 0.8rem !important; }
+button[data-testid="baseButton-primary"] { margin-top: 4px; font-size: 0.85rem; padding: 0.25rem 1rem; }
+.header-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.header-label { font-size: 0.85rem; white-space: nowrap; }
+.header-progress { flex: 0 1 140px; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden; }
+.header-progress-fill { height: 100%; background: #1E88E5; border-radius: 3px; }
+div[data-testid="stProgress"] { margin-bottom: 0 !important; padding: 0 !important; }
+div[data-testid="stProgress"] > div { height: 6px !important; }
+.image-wrap { height: calc(100vh - 150px) !important; width: 100% !important; }
+.image-wrap img { object-fit: contain !important; width: 100% !important; height: 100% !important; }
+div[data-testid="column"]:has(.image-wrap) { height: calc(100vh - 80px) !important; overflow: hidden !important; }
+.stMainBlockContainer > [data-testid="stVerticalBlock"] { row-gap: 0 !important; gap: 0 !important; }
+div[data-testid="column"]:has(.image-wrap) div[data-testid="stVerticalBlock"] { row-gap: 0 !important; gap: 0 !important; }
+div[data-testid="column"]:has(.image-wrap) [data-testid="stTabs"] { margin-top: 4px !important; }
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_fields_grid(fields, needs_review, data, prefix, columns=2):
+    for i in range(0, len(fields), columns):
+        cols = st.columns(columns)
+        for j, field_def in enumerate(fields[i : i + columns]):
+            with cols[j]:
+                _render_single_field(field_def, needs_review, data, prefix)
+
+
+def _render_single_field(field_def, needs_review, data, prefix):
+    fn = field_def[0]
+    label = field_def[1]
+    if needs_review.get(fn):
+        label = f"\u26a0\ufe0f {label}"
+
+    kind = field_def[2]
+    if kind == "select":
+        options = field_def[3]
+        current = getattr(data, fn)
+        idx = options.index(current) if current in options else 0
+        st.selectbox(label, options, index=idx, key=f"{prefix}_{fn}")
+    elif kind == "text":
+        st.text_input(label, value=getattr(data, fn), key=f"{prefix}_{fn}")
+    elif kind == "number":
+        lo, hi = field_def[3], field_def[4]
+        st.number_input(label, lo, hi, value=getattr(data, fn), key=f"{prefix}_{fn}")
+
 
 def _render_form(survey: SurveyGroup):
     sm = StateManager()
@@ -183,195 +324,44 @@ def _render_form(survey: SurveyGroup):
 
     with page_tabs[0]:
         st.subheader("A. Dane demograficzne")
-        _rw("plec", needs_review)
-        st.selectbox(
-            "Płeć", ["Kobieta", "Mężczyzna"],
-            index=0 if data.plec != "Mężczyzna" else 1,
-            key=f"{p}_plec",
-        )
-        _rw("wiek", needs_review)
-        st.number_input("Wiek", 18, 80, value=data.wiek, key=f"{p}_wiek")
-        _rw("miejsce_zamieszkania", needs_review)
-        _sb(
-            "Miejsce zamieszkania",
-            ["Wieś", "Miasto do 50 tys. mieszkańców", "Miasto 50-100 tys. mieszkańców", "Miasto powyżej 100 tys. mieszkańców"],
-            data.miejsce_zamieszkania, f"{p}_mz",
-        )
-        _rw("stan_cywilny", needs_review)
-        _sb(
-            "Stan cywilny",
-            ["Panna/kawaler", "W związku nieformalnym", "Mężatka/żonaty"],
-            data.stan_cywilny, f"{p}_sc",
-        )
-        _rw("forma_zamieszkania", needs_review)
-        _sb(
-            "Forma zamieszkania w trakcie studiów",
-            ["Z rodziną", "W wynajmowanym mieszkaniu/pokoju", "Własne mieszkanie",
-             "We własnym mieszkaniu z partnerem", "z partnerem"],
-            data.forma_zamieszkania, f"{p}_fz",
-        )
-        _rw("stopien_studiow", needs_review)
-        _sb(
-            "Stopień studiów",
-            ["Studia I stopnia", "Studia II stopnia"],
-            data.stopien_studiow, f"{p}_ss",
-        )
-        _rw("uczelnia", needs_review)
-        st.text_input("Uczelnia", value=data.uczelnia, key=f"{p}_ucz")
-
+        _render_fields_grid(_PAGE1_FIELDS[:7], needs_review, data, p)
         st.subheader("B. Aktywność zawodowa")
-        _rw("praca_status", needs_review)
-        _sb(
-            "Czy pracujesz zawodowo w trakcie studiów?",
-            ["Nie", "Tak, w zawodzie medycznym", "Tak, poza zawodem"],
-            data.praca_status, f"{p}_ps",
-        )
-        _rw("praca_system", needs_review)
-        st.text_input(
-            "System pracy (jeśli dotyczy)", value=data.praca_system,
-            key=f"{p}_psy",
-        )
-        _rw("oddzial", needs_review)
-        _sb(
-            "Rodzaj oddziału",
-            ["", "Przychodnia", "Zabiegowym", "Zachowawczym", "Pracownia"],
-            data.oddzial, f"{p}_od",
-        )
-        _rw("staz_pracy", needs_review)
-        st.text_input(
-            "Staż pracy", value=data.staz_pracy, key=f"{p}_staz",
-        )
-
+        _render_fields_grid(_PAGE1_FIELDS[7:11], needs_review, data, p)
         st.subheader("C. Styl życia")
-        _rw("sen_godziny", needs_review)
-        _sb(
-            "Średnia liczba godzin snu na dobę",
-            ["Poniżej 5 godzin", "5-6 godzin", "7-8 godzin", "Powyżej 8 godzin"],
-            data.sen_godziny, f"{p}_sen",
-        )
-        _rw("ekran_godziny", needs_review)
-        _sb(
-            "Godziny przed ekranem dziennie",
-            ["1-3 godziny", "Powyżej 3 godzin"],
-            data.ekran_godziny, f"{p}_ekr",
-        )
-        _rw("kofeina", needs_review)
-        _sb(
-            "Spożycie kofeiny",
-            ["Nie", "Tak, 1-2 porcje dziennie", "Tak, 3 lub więcej porcji dziennie"],
-            data.kofeina, f"{p}_kof",
-        )
+        _render_fields_grid(_PAGE1_FIELDS[11:], needs_review, data, p)
 
     with page_tabs[1]:
-        st.subheader("Samopoczucie w ostatnim tygodniu (CES-D)")
+        st.subheader("Samopoczucie (CES-D)")
         st.markdown(
-            "Skala: Rzadko lub wcale (<1 dzień) / Przez niedługi czas (1-2 dni) / "
-            "Czasem lub przez umiarkowany okres (3-4 dni) / Przeważnie lub cały czas (5-7 dni)"
+            '<div style="font-size:0.75rem;margin-bottom:4px">Skala: &lt;1d / 1-2d / 3-4d / 5-7d</div>',
+            unsafe_allow_html=True,
         )
-        for fn, label in _CESD_FIELDS:
-            _rw(fn, needs_review)
-            _sb(
-                label,
-                _CESD_SKALA,
-                getattr(data, fn), f"{p}_{fn}",
-            )
+        cesd_defs = [(fn, label, "select", _CESD_SKALA) for fn, label in _CESD_FIELDS]
+        _render_fields_grid(cesd_defs, needs_review, data, p)
 
     with page_tabs[2]:
         st.subheader("Ateńska skala bezsenności")
-        _rw("zasypianie", needs_review)
-        _sb(
-            "Zasypianie",
-            ["szybkie", "nieznacznie opóźnione", "opóźnione",
-             "bardzo opóźnione lub bezsenność przez całą noc"],
-            data.zasypianie, f"{p}_zas",
-        )
-        _rw("budzenie_noc", needs_review)
-        _sb(
-            "Budzenie się podczas nocy",
-            ["nie występuje", "sporadycznie", "często",
-             "bardzo często lub bezsenność przez całą noc"],
-            data.budzenie_noc, f"{p}_bn",
-        )
-        _rw("budzenie_rano", needs_review)
-        _sb(
-            "Budzenie się rano wcześniej niż planowano",
-            ["o zamierzonej godzinie", "nieznacznie wcześniej", "znacznie wcześniej",
-             "dużo wcześniej lub bezsenność przez całą noc"],
-            data.budzenie_rano, f"{p}_br",
-        )
-        _rw("czas_snu", needs_review)
-        _sb(
-            "Całkowity czas snu",
-            ["wystarczający", "nieznacznie niewystarczający",
-             "wyraźnie niewystarczający",
-             "całkowicie niewystarczający lub bezsenność przez całą noc"],
-            data.czas_snu, f"{p}_cs",
-        )
-        _rw("jakosc_snu", needs_review)
-        _sb(
-            "Jakość snu",
-            ["satysfakcjonująca", "nieznacznie niesatysfakcjonująca",
-             "wyraźnie niesatysfakcjonująca", "całkowicie niesatysfakcjonująca"],
-            data.jakosc_snu, f"{p}_js",
-        )
-        _rw("samopoczucie", needs_review)
-        _sb(
-            "Samopoczucie następnego dnia",
-            ["dobre", "nieznacznie gorsze", "wyraźnie gorsze"],
-            data.samopoczucie, f"{p}_sam",
-        )
-        _rw("sprawnosc", needs_review)
-        _sb(
-            "Sprawność psychiczna i fizyczna następnego dnia",
-            ["niezaburzona", "nieznacznie zaburzona", "wyraźnie zaburzona"],
-            data.sprawnosc, f"{p}_sp",
-        )
-        _rw("sennosc", needs_review)
-        _sb(
-            "Senność w ciągu dnia",
-            ["nie zdarza się", "nieznaczna", "wyraźna", "bardzo nasilona"],
-            data.sennosc, f"{p}_sen2",
-        )
+        _render_fields_grid(_ATHENS_FIELDS, needs_review, data, p)
 
     with page_tabs[3]:
-        st.subheader("Skala zmęczenia MFIS (1-15)")
-        st.markdown("Skala: Nigdy / Rzadko / Czasami / Często / Prawie zawsze")
-        for fn, label in _MFIS_1_15:
-            _rw(fn, needs_review)
-            _sb(
-                label,
-                _OBJAWY_SKALA,
-                getattr(data, fn), f"{p}_{fn}",
-            )
+        st.subheader("Zmęczenie MFIS (1-15)")
+        st.markdown(
+            '<div style="font-size:0.75rem;margin-bottom:4px">Skala: Nigdy / Rzadko / Czasami / Często / Prawie zawsze</div>',
+            unsafe_allow_html=True,
+        )
+        mfis_defs = [(fn, label, "select", _OBJAWY_SKALA) for fn, label in _MFIS_1_15]
+        _render_fields_grid(mfis_defs, needs_review, data, p)
 
     with page_tabs[4]:
-        st.subheader("Skala zmęczenia MFIS (16-21)")
-        st.markdown("Skala: Nigdy / Rzadko / Czasami / Często / Prawie zawsze")
-        for fn, label in _MFIS_16_21:
-            _rw(fn, needs_review)
-            _sb(
-                label,
-                _OBJAWY_SKALA,
-                getattr(data, fn), f"{p}_{fn}",
-            )
-
+        st.subheader("Zmęczenie MFIS (16-21)")
+        st.markdown(
+            '<div style="font-size:0.75rem;margin-bottom:4px">Skala: Nigdy / Rzadko / Czasami / Często / Prawie zawsze</div>',
+            unsafe_allow_html=True,
+        )
+        mfis2_defs = [(fn, label, "select", _OBJAWY_SKALA) for fn, label in _MFIS_16_21]
+        _render_fields_grid(mfis2_defs, needs_review, data, p)
         st.subheader("Stan zdrowia")
-        _rw("anemia", needs_review)
-        _sb("Czy stwierdzono anemię?", ["Tak", "Nie"], data.anemia, f"{p}_an")
-        _rw("problemy_tarczyca", needs_review)
-        _sb(
-            "Czy stwierdzono problemy z tarczycą?", ["Tak", "Nie"],
-            data.problemy_tarczyca, f"{p}_tar",
-        )
-        _rw("jaka_tarczyca", needs_review)
-        st.text_input(
-            "Jakie problemy z tarczycą?", value=data.jaka_tarczyca,
-            key=f"{p}_jt",
-        )
-        _rw("inne_choroby", needs_review)
-        st.text_input(
-            "Inne choroby", value=data.inne_choroby, key=f"{p}_ich",
-        )
+        _render_fields_grid(_HEALTH_FIELDS, needs_review, data, p)
 
     # ── global submit button ─────────────────────────────────────
     submitted = st.button("Zatwierdź i Następna (Spacja)", type="primary", key=f"submit_{survey.id}")
@@ -386,16 +376,6 @@ def _render_form(survey: SurveyGroup):
         return submitted, kwargs
 
     return submitted, None
-
-
-def _rw(field_name: str, needs_review: dict):
-    if needs_review.get(field_name):
-        st.error(f"Pole — niska pewność odczytu")
-
-
-def _sb(label: str, options: list, current, key: str):
-    index = options.index(current) if current in options else 0
-    return st.selectbox(label, options, index=index, key=key)
 
 
 def render_complete():
