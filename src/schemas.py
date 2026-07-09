@@ -332,6 +332,7 @@ class MedicalSurvey(BaseModel):
             if field_name == "wiek":
                 raw = _extract_age(raw)
             kwargs[field_name] = _normalize_value(field_name, raw)
+        kwargs["needs_review"] = data.get("needs_review", {})
         return cls(**kwargs)
 
 
