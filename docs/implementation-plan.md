@@ -1,6 +1,7 @@
 # Plan Implementacji: AnkieterAI
 
 ## Metadane
+
 - **Project:** AnkieterAI — Zautomatyzowany system wprowadzania ankiet papierowych (VLM)
 - **Stack:** Python 3.12, Streamlit, Ollama (deepseek-ocr), Cloudflared Tunnel
 - **Hardware:** Windows, RTX 5070 Ti 16GB VRAM, 32GB RAM
@@ -44,6 +45,7 @@ C:\workspace\dev\surveys\
 ## Sekcja 1 — Środowisko i zależności
 
 ### `requirements.txt`
+
 ```
 streamlit==1.59.0
 pydantic==2.13.4
@@ -57,6 +59,7 @@ pytest-asyncio==0.24.0
 ```
 
 ### `scripts/setup_env.ps1`
+
 - [ ] Sprawdza `python --version >= 3.12`
 - [ ] Tworzy wirtualne środowisko: `python -m venv .venv`
 - [ ] Aktywuje `.venv\Scripts\Activate.ps1`
@@ -66,6 +69,7 @@ pytest-asyncio==0.24.0
 - [ ] Zwraca `$LASTEXITCODE = 0` jeśli OK
 
 ### `.gitignore`
+
 ```
 .venv/
 __pycache__/
@@ -81,6 +85,7 @@ wyniki.csv
 ```
 
 ### `.streamlit/config.toml`
+
 ```toml
 [server]
 port = 8501
@@ -99,6 +104,7 @@ font = "sans serif"
 ## Sekcja 2 — Ollama
 
 ### `scripts/setup_ollama.ps1`
+
 - [ ] Sprawdza `ollama --version`, jeśli brak:
   - Download `OllamaSetup.exe` z `https://ollama.com/download`
   - Cicha instalacja: `OllamaSetup.exe /S`
@@ -116,6 +122,7 @@ font = "sans serif"
 ## Sekcja 3 — Aplikacja (moduły)
 
 ### `src/config.py` — Konfiguracja
+
 - Klasa `AppConfig(BaseSettings)` z polami:
   - `app_password: str = "a"`
   - `ollama_url: str = "http://localhost:11434"`
@@ -131,16 +138,16 @@ font = "sans serif"
 
 `MedicalSurvey(BaseModel)` zawiera **67 pól** odwzorowujących rzeczywistą ankietę (plik `wyniki ankiety.csv`), podzielonych na sekcje:
 
-| Sekcja | Pola | Opis |
-|--------|------|------|
-| **A. Demografia** | 7 | `plec` (Kobieta/Mężczyzna), `wiek` (int 18-80), `miejsce_zamieszkania` (4 opcje), `stan_cywilny` (3), `forma_zamieszkania` (5), `stopien_studiow` (2), `uczelnia` (str) |
-| **B. Praca** | 4 | `praca_status` (3 opcje), `praca_system` (str), `oddzial` (5), `staz_pracy` (str) |
-| **C. Styl życia** | 3 | `sen_godziny` (4), `ekran_godziny` (2), `kofeina` (3) |
-| **D. Objawy (21)** | 21 | `objaw_*` — skala: Nigdy/Rzadko/Czasami/Często/Prawie zawsze |
-| **E. Zdrowie** | 4 | `anemia`, `problemy_tarczyca` (Tak/Nie), `jaka_tarczyca` (str), `inne_choroby` (str) |
-| **F. Jakość snu** | 8 | `zasypianie`, `budzenie_noc`, `budzenie_rano`, `czas_snu`, `jakosc_snu`, `samopoczucie`, `sprawnosc`, `sennosc` — każdy z 3-4 opcjami |
-| **G. CES-D (20)** | 20 | `cesd_*` — skala: <1d / 1-2d / 3-4d / 5-7d |
-| **H. Metadane AI** | 1 | `needs_review: dict[str, bool]` — flaga wątpliwości per-pole |
+| Sekcja             | Pola | Opis                                                                                                                                                                    |
+| ------------------ | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A. Demografia**  | 7    | `plec` (Kobieta/Mężczyzna), `wiek` (int 18-80), `miejsce_zamieszkania` (4 opcje), `stan_cywilny` (3), `forma_zamieszkania` (5), `stopien_studiow` (2), `uczelnia` (str) |
+| **B. Praca**       | 4    | `praca_status` (3 opcje), `praca_system` (str), `oddzial` (5), `staz_pracy` (str)                                                                                       |
+| **C. Styl życia**  | 3    | `sen_godziny` (4), `ekran_godziny` (2), `kofeina` (3)                                                                                                                   |
+| **D. Objawy (21)** | 21   | `objaw_*` — skala: Nigdy/Rzadko/Czasami/Często/Prawie zawsze                                                                                                            |
+| **E. Zdrowie**     | 4    | `anemia`, `problemy_tarczyca` (Tak/Nie), `jaka_tarczyca` (str), `inne_choroby` (str)                                                                                    |
+| **F. Jakość snu**  | 8    | `zasypianie`, `budzenie_noc`, `budzenie_rano`, `czas_snu`, `jakosc_snu`, `samopoczucie`, `sprawnosc`, `sennosc` — każdy z 3-4 opcjami                                   |
+| **G. CES-D (20)**  | 20   | `cesd_*` — skala: <1d / 1-2d / 3-4d / 5-7d                                                                                                                              |
+| **H. Metadane AI** | 1    | `needs_review: dict[str, bool]` — flaga wątpliwości per-pole                                                                                                            |
 
 - `CSV_HEADER: list[str]` — 68 nagłówków (z `Sygnatura czasowa` na pierwszej pozycji)
 - `_FIELD_TO_CSV: list[tuple]` — mapowanie nazw pól → nagłówki CSV
@@ -156,6 +163,7 @@ font = "sans serif"
   - `result: SurveyResult | None`
 
 ### `src/state_manager.py` — Stan sesji
+
 - Klasa `StateManager`:
   - `init()` — inicjalizuje `st.session_state["ankieter"]` jako pusty słownik
   - `is_authenticated() -> bool`
@@ -172,6 +180,7 @@ font = "sans serif"
   - `clear_session()` — reset
 
 ### `src/data_handler.py` — Dane i cache
+
 - `group_files_by_survey(files: list[UploadedFile]) -> list[SurveyGroup]`:
   - Sortowanie alfabetyczne po nazwach plików
   - Grupowanie po 5 plików (5 stron = 1 ankieta)
@@ -189,6 +198,7 @@ font = "sans serif"
   - Zwraca `config.results_csv`
 
 ### `src/ai_client.py` — Komunikacja z Ollamą
+
 - Klasa `AIClient`:
   - `__init__(model_name: str = config.model_name, base_url: str = config.ollama_url)`
   - `build_prompt() -> list[dict]` — generuje wiadomości dla `/api/chat`:
@@ -207,6 +217,7 @@ font = "sans serif"
     - Zapisuje do cache po każdej udanej analizie
 
 ### `src/ui_components.py` — Komponenty interfejsu
+
 - `render_login()`:
   - `st.title("AnkieterAI")`
   - `st.text_input("Hasło", type="password")`
@@ -236,12 +247,14 @@ font = "sans serif"
   - Obsługa skrótu Spacja przez JS:
     ```html
     <script>
-    document.addEventListener('keydown', function(e) {
-      if (e.key === ' ' && e.target === document.body) {
-        e.preventDefault();
-        document.querySelector('button[data-testid="baseButton-primary"]')?.click();
-      }
-    });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === " " && e.target === document.body) {
+          e.preventDefault();
+          document
+            .querySelector('button[data-testid="baseButton-primary"]')
+            ?.click();
+        }
+      });
     </script>
     ```
 - `render_complete()`:
@@ -250,8 +263,10 @@ font = "sans serif"
   - `st.download_button("Pobierz CSV", data=csv_content, file_name="wyniki.csv")`
 
 ### `src/main.py` — Główna aplikacja Streamlit
+
 - Konfiguracja strony: `st.set_page_config(layout="wide")`
 - Routing:
+
   ```python
   if "state_manager" not in st.session_state:
       StateManager.init()
@@ -275,6 +290,7 @@ font = "sans serif"
   survey = surveys[current_index]
   render_verification(survey)
   ```
+
 - Obsługa callbacków:
   - Upload → `data_handler.group_files_by_survey()` → `asyncio.run(ai_client.analyze_batch())` → cache
   - Zatwierdź → `data_handler.save_survey_to_csv()` → `sm.next_survey()` → `st.rerun()`
@@ -284,6 +300,7 @@ font = "sans serif"
 ## Sekcja 4 — Deployment
 
 ### `scripts/run_dev.ps1`
+
 - [ ] Parametr: `-Force` (nadpisuje istniejący `.venv`)
 - [ ] Sprawdza czy Ollama działa na porcie 11434 (jeśli nie → exit z błędem)
 - [ ] Sprawdza czy `.venv` istnieje (jeśli nie → `setup_env.ps1`)
@@ -292,6 +309,7 @@ font = "sans serif"
 - [ ] Czeka na proces (Streamlit uruchomiony w foreground)
 
 ### `scripts/deploy_tunnel.ps1`
+
 - [ ] Parametr: `-Stop` (zatrzymuje aktywny tunel i czyści plik URL)
 - [ ] Sprawdza `cloudflared --version`, jeśli brak:
   - Download `cloudflared-windows-amd64.exe` z `https://github.com/cloudflare/cloudflared/releases/latest`
@@ -303,6 +321,7 @@ font = "sans serif"
 - [ ] Zapisuje URL do `logs/tunnel_url.txt`
 
 ### `scripts/full_setup.ps1` — Orchestrator
+
 - [ ] Parametry: `-NoOllama`, `-NoTunnel`, `-NoEnv`, `-NoDev` (flagi do pomijania)
 - [ ] Kolejność:
   1. `setup_env.ps1` (chyba że `-NoEnv`)
@@ -325,6 +344,7 @@ font = "sans serif"
 ## Sekcja 5 — Testy
 
 ### `tests/` — 6 plików testowych
+
 - `conftest.py` — Fixture `sample_survey_data`, `sample_survey`, `ai_json_response` + autouse reset `st.session_state`
 - `test_schemas.py` — Testy `_extract_age`, `_normalize_value`, `MedicalSurvey.from_ai_json()`, `to_csv_row()`, `SurveyResult`, `SurveyGroup`
 - `test_data_handler.py` — Testy grupowania plików, zapisu CSV z BOM, cache roundtrip
@@ -333,6 +353,7 @@ font = "sans serif"
 - `test_csv_integrity.py` — Testy spójności: 68 kolumn, wszystkie nagłówki unikalne, mapowanie 1:1
 
 Uruchomienie:
+
 ```powershell
 .venv\Scripts\Activate.ps1
 pytest tests/
@@ -342,18 +363,18 @@ pytest tests/
 
 ## Sekcja 6 — Harmonogram implementacji (fazy)
 
-| Faza | Opis | Pliki | Status |
-|------|------|-------|--------|
-| 0 | Środowisko: requirements.txt, .gitignore, config.toml | `requirements.txt`, `.gitignore`, `.streamlit/config.toml` | |
-| 1 | Skrypt środowiska | `scripts/setup_env.ps1` | |
-| 2 | Skrypt Ollama | `scripts/setup_ollama.ps1` | |
-| 3 | Fundament aplikacji | `src/config.py`, `src/state_manager.py`, `src/main.py` (szkielet + login) | |
-| 4 | Schemat i obsługa danych | `src/schemas.py`, `src/data_handler.py` | |
-| 5 | AI Client | `src/ai_client.py` | |
-| 6 | UI Components | `src/ui_components.py` | |
-| 7 | Spięcie logiki w main.py | `src/main.py` (pełna logika + routing) | |
-| 8 | Deployment scripts | `scripts/run_dev.ps1`, `scripts/deploy_tunnel.ps1`, `scripts/full_setup.ps1` | |
-| 9 | Testy i walidacja całego flow | Wszystkie moduły | |
+| Faza | Opis                                                  | Pliki                                                                        | Status |
+| ---- | ----------------------------------------------------- | ---------------------------------------------------------------------------- | ------ |
+| 0    | Środowisko: requirements.txt, .gitignore, config.toml | `requirements.txt`, `.gitignore`, `.streamlit/config.toml`                   |        |
+| 1    | Skrypt środowiska                                     | `scripts/setup_env.ps1`                                                      |        |
+| 2    | Skrypt Ollama                                         | `scripts/setup_ollama.ps1`                                                   |        |
+| 3    | Fundament aplikacji                                   | `src/config.py`, `src/state_manager.py`, `src/main.py` (szkielet + login)    |        |
+| 4    | Schemat i obsługa danych                              | `src/schemas.py`, `src/data_handler.py`                                      |        |
+| 5    | AI Client                                             | `src/ai_client.py`                                                           |        |
+| 6    | UI Components                                         | `src/ui_components.py`                                                       |        |
+| 7    | Spięcie logiki w main.py                              | `src/main.py` (pełna logika + routing)                                       |        |
+| 8    | Deployment scripts                                    | `scripts/run_dev.ps1`, `scripts/deploy_tunnel.ps1`, `scripts/full_setup.ps1` |        |
+| 9    | Testy i walidacja całego flow                         | Wszystkie moduły                                                             |        |
 
 ---
 

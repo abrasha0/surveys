@@ -1,0 +1,7 @@
+1. zmiana zakładki na lewym panelu (zdjęcia) powinna skutkować zmianą zakładki na analogiczną na prawym panelu
+2. bardziej szczegółowe informowanie użytkownika co się dzieje w trakcie procesowania zdjęć
+3. A.D. 2 dodanie logów do debugowania: info co wpadło do modelu (które zdjęcie z którym promptem), czy model działa, jego bieżące zużycie zasobów, co model wypluł
+4. A.D. 3 logowanie tych informacji też do pliku
+5. usunięcie domyślnych wartości na formularzach, jeżeli model nic nie zwrócił to ma być po prostu puste pole, bez uzupełniania danych
+6. zaznaczanie użytkownikowi w ui pustych/źle wypełnionych/niewypełnionych pól -> po jego interakcji oznaczenie konkretnego pola znika
+7. zamiast sekcji A,B,C na podglądzie danych dla Strona 1 powinny być one analogicznie ponumerowane i ułożone jak na zdjęciu: kolumna 1: 1 (plec) - 7 (uczelnia); kolumna 2: 8 (czy pracujesz zawodowo w trakcie studiów) - 14 (czy pijesz napoje zawierające kofeinę)

@@ -18,11 +18,13 @@ Automatyczny system wprowadzania ankiet papierowych do formy cyfrowej z wykorzys
 ## Uruchomienie
 
 1. Przygotowanie środowiska:
+
    ```powershell
    .\scripts\setup_env.ps1
    ```
 
 2. Uruchomienie Ollamy:
+
    ```powershell
    .\scripts\setup_ollama.ps1
    ```
