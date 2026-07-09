@@ -1,5 +1,5 @@
 param(
-    [string]$Model = "llava:13b",
+    [string]$Model = "deepseek-ocr",
     [switch]$SkipPull,
     [switch]$ListModels,
     [switch]$Status
@@ -99,7 +99,16 @@ if (-not $SkipPull) {
         Write-Log "OK: $Model jest pobrany."
     } else {
         Write-Log "Pobieranie $Model (to moze chwile zajac)..."
+        
+        # TYMCZASOWA ZMIANA: Ignoruj stderr potraktowany jako błąd
+        $oldErrPref = $ErrorActionPreference
+        $ErrorActionPreference = "Continue" 
+        
         & $ollamaPath pull $Model 2>&1 | ForEach-Object { Write-Log "  $_" }
+        
+        # PRZYWRÓCENIE USTAWIENIA
+        $ErrorActionPreference = $oldErrPref
+
         if ($LASTEXITCODE -ne 0) { throw "Pull nieudany (exit: $LASTEXITCODE)" }
         Write-Log "OK: $Model pobrany."
     }

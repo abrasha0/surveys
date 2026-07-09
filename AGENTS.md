@@ -29,6 +29,8 @@
 jeżeli musisz przetestować kawałek kodu to musisz korzystać z wirtualnego środowiska:
 
 ```ps1
-> .venv\Scripts\Activate.ps1
-> streamlit run src/main.py
+.venv\Scripts\Activate.ps1
+streamlit run src/main.py
 ```
+
+jeżeli musisz testować modele ollama rób to z poziomu katalogu root aplikacji

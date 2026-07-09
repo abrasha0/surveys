@@ -2,10 +2,10 @@
 
 ## Metadane
 - **Project:** AnkieterAI — Zautomatyzowany system wprowadzania ankiet papierowych (VLM)
-- **Stack:** Python 3.12, Streamlit, Ollama (llava:13b), Cloudflared Tunnel
+- **Stack:** Python 3.12, Streamlit, Ollama (llava-llama3), Cloudflared Tunnel
 - **Hardware:** Windows, RTX 5070 Ti 16GB VRAM, 32GB RAM
 - **Hasło domyślne:** `ankieter2026`
-- **Model VLM:** `llava:13b`
+- **Model VLM:** `llava-llama3`
 
 ---
 
@@ -28,7 +28,7 @@ C:\workspace\dev\surveys\
 │   └── data_handler.py              # Groupowanie plików, cache, CSV export
 ├── scripts/
 │   ├── setup_env.ps1               # Python venv + pip install
-│   ├── setup_ollama.ps1            # Instalacja Ollamy + pull llava:13b + start serwera
+│   ├── setup_ollama.ps1            # Instalacja Ollamy + pull llava-llama3 + start serwera
 │   ├── run_dev.ps1                 # Start Streamlit + weryfikacja Ollamy
 │   ├── deploy_tunnel.ps1           # Cloudflared tunel na localhost:8501
 │   └── full_setup.ps1             # Orchestrator: wszystko od zera do tunelu
@@ -101,9 +101,9 @@ font = "sans serif"
   - Cicha instalacja: `OllamaSetup.exe /S`
 - [ ] Sprawdza czy serwer działa (`curl http://localhost:11434`):
   - Jeśli nie → startuje proces w tle: `ollama serve`
-- [ ] Pull modelu: `ollama pull llava:13b`
-- [ ] Weryfikacja: `ollama list` zawiera `llava:13b`
-- [ ] Test API: `curl -X POST http://localhost:11434/api/generate -d "{\"model\":\"llava:13b\",\"prompt\":\"test\"}"`
+- [ ] Pull modelu: `ollama pull llava-llama3`
+- [ ] Weryfikacja: `ollama list` zawiera `llava-llama3`
+- [ ] Test API: `curl -X POST http://localhost:11434/api/generate -d "{\"model\":\"llava-llama3\",\"prompt\":\"test\"}"`
 - [ ] Log do `logs/setup_ollama.log`
 
 ---
@@ -114,7 +114,7 @@ font = "sans serif"
 - Klasa `AppConfig(BaseSettings)` z polami:
   - `APP_PASSWORD: str = "ankieter2026"`
   - `OLLAMA_URL: str = "http://localhost:11434"`
-  - `MODEL_NAME: str = "llava:13b"`
+  - `MODEL_NAME: str = "llava-llama3"`
   - `RESULTS_CSV: str = "wyniki.csv"`
   - `CACHE_FILE: str = "logs/cache_results.json"`
   - `MAX_RETRIES: int = 3`
@@ -122,15 +122,24 @@ font = "sans serif"
 - Singleton `config = AppConfig()`
 
 ### `src/schemas.py` — Modele danych
-- `MedicalSurvey(BaseModel)`:
-  - `wiek: int` (validacja: 0-120)
-  - `plec: Literal["M", "K"]`
-  - `skala_bólu: int` (validacja: 1-5, z `Field(ge=1, le=5)`)
-  - `uczelnia: str`
-  - `pola_wyboru: dict[str, bool]` — dynamiczne pole wyboru
-  - `needs_review: dict[str, bool]` — per-pole flaga wątpliwości AI
-  - Metoda `to_csv_row() -> list` — kolejność kolumn do CSV
-  - Metoda `from_ai_json(data: dict) -> MedicalSurvey` — walidacja z API
+
+`MedicalSurvey(BaseModel)` zawiera **67 pól** odwzorowujących rzeczywistą ankietę (plik `wyniki ankiety.csv`), podzielonych na sekcje:
+
+| Sekcja | Pola | Opis |
+|--------|------|------|
+| **A. Demografia** | 7 | `plec` (Kobieta/Mężczyzna), `wiek` (int 18-80), `miejsce_zamieszkania` (4 opcje), `stan_cywilny` (3), `forma_zamieszkania` (5), `stopien_studiow` (2), `uczelnia` (str) |
+| **B. Praca** | 4 | `praca_status` (3 opcje), `praca_system` (str), `oddzial` (5), `staz_pracy` (str) |
+| **C. Styl życia** | 3 | `sen_godziny` (4), `ekran_godziny` (2), `kofeina` (3) |
+| **D. Objawy (21)** | 21 | `objaw_*` — skala: Nigdy/Rzadko/Czasami/Często/Prawie zawsze |
+| **E. Zdrowie** | 4 | `anemia`, `problemy_tarczyca` (Tak/Nie), `jaka_tarczyca` (str), `inne_choroby` (str) |
+| **F. Jakość snu** | 8 | `zasypianie`, `budzenie_noc`, `budzenie_rano`, `czas_snu`, `jakosc_snu`, `samopoczucie`, `sprawnosc`, `sennosc` — każdy z 3-4 opcjami |
+| **G. CES-D (20)** | 20 | `cesd_*` — skala: <1d / 1-2d / 3-4d / 5-7d |
+| **H. Metadane AI** | 1 | `needs_review: dict[str, bool]` — flaga wątpliwości per-pole |
+
+- `CSV_HEADER: list[str]` — 68 nagłówków (z `Sygnatura czasowa` na pierwszej pozycji)
+- `_FIELD_TO_CSV: list[tuple]` — mapowanie nazw pól → nagłówki CSV
+- `to_csv_row() -> list` — generuje wiersz CSV z timestampem na początku
+- `from_ai_json(data: dict) -> MedicalSurvey` — parsuje odpowiedź AI z ekstrakcją wieku
 - `SurveyResult(BaseModel)`:
   - `raw_response: str`
   - `validated_data: MedicalSurvey`
@@ -181,7 +190,7 @@ font = "sans serif"
     - User: lista obrazów (base64) + instrukcja JSON
   - `async analyze_survey(survey: SurveyGroup) -> SurveyResult`:
     - Konwersja 5 obrazów do base64
-    - POST do `/api/chat` z `model: llava:13b, messages: [...], format: "json", stream: false`
+    - POST do `/api/chat` z `model: llava-llama3, messages: [...], format: "json", stream: false, options: {num_ctx: 8192}`
     - Timeout: 120s
     - Parsowanie odpowiedzi, mapowanie do `MedicalSurvey`
     - Dla pól z niską pewnością → `needs_review=true`
@@ -295,7 +304,7 @@ font = "sans serif"
   Aplikacja lokalna:  http://localhost:8501
   Tunel publiczny:    https://xxxxx.trycloudflare.com
   Hasło:              ankieter2026
-  Model:              llava:13b
+  Model:              llava-llama3
   ==============================
   ```
 
