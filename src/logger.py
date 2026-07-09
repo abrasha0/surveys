@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 _LOG_FILE: Path | None = None
+_LOGGING_SETUP_DONE: bool = False
 
 
 def setup_logging(
@@ -11,10 +12,17 @@ def setup_logging(
     level: int = logging.DEBUG,
     console_level: int = logging.DEBUG,
 ):
-    global _LOG_FILE
-    log_path = Path(log_dir)
-    log_path.mkdir(parents=True, exist_ok=True)
-    _LOG_FILE = log_path / log_file
+    global _LOG_FILE, _LOGGING_SETUP_DONE
+
+    if _LOGGING_SETUP_DONE:
+        return
+
+    log_path = Path(log_file)
+    if log_path.parent != Path("."):
+        _LOG_FILE = log_path
+    else:
+        _LOG_FILE = Path(log_dir) / log_path
+    _LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     root = logging.getLogger()
     root.setLevel(level)
@@ -34,7 +42,15 @@ def setup_logging(
     console_handler.setFormatter(formatter)
     root.addHandler(console_handler)
 
-    logging.getLogger(__name__).info("Logging initialized, file: %s", _LOG_FILE)
+    for noisy in ("httpx", "httpcore", "PIL", "asyncio"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
+    separator = "=" * 60
+    app_logger = logging.getLogger("app")
+    app_logger.info(separator)
+    app_logger.info("Application started — logging initialized, file: %s", _LOG_FILE)
+
+    _LOGGING_SETUP_DONE = True
 
 
 def get_log_path() -> Path | None:

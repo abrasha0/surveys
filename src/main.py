@@ -57,7 +57,6 @@ st.set_page_config(page_title="AnkieterAI", layout="wide")
 setup_logging(log_file=config.log_file, level=getattr(logging, config.log_level.upper(), logging.DEBUG))
 StateManager.init()
 _inject_global_css()
-logger.info("Application started")
 
 sm = StateManager()
 
