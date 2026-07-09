@@ -9,6 +9,8 @@ class AppConfig(BaseSettings):
     cache_file: str = "logs/cache_results.json"
     max_retries: int = 3
     timeout_sec: int = 120
+    log_file: str = "logs/ankieter.log"
+    log_level: str = "DEBUG"
 
     model_config = {"env_prefix": "ANKIETER_"}
 
