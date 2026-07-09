@@ -64,3 +64,11 @@ Proszę o implementację krokową. Będziemy pisać moduł po module. Pytaj mnie
 - **Faza 5 (Integracja VLM):** Implementacja `ai_client.py`. Połączenie z Ollamą (port 11434). Wymuszenie zwrotu obiektu JSON zgodnego ze schematem oraz flagi `needs_review: bool` dla każdego pola, które budzi wątpliwości modelu.
 - **Faza 6 (Spięcie logiki):** Podłączenie pętli "Zapisz i Następna" oraz pobierania gotowego CSV. Podświetlanie pól oznaczonych jako `needs_review`.
 
+---
+
+> **Adnotacja (2026-07):** Ten dokument to pierwotna koncepcja. W zaimplementowanej wersji:
+> - Zastosowano model `deepseek-ocr` (zamiast `llava-llama3`), a domyślne hasło to `a`
+> - Upload to wyłącznie wielokrotny wybór plików (bez `.zip`)
+> - Flow to **batch-first**: AI przetwarza wszystkie ankiety przed weryfikacją (nie async per-survey po zatwierdzeniu)
+> - Formularz weryfikacji ma 5 zakładek z ręcznie rozłożonymi polami, a nie generowanymi dynamicznie z `MedicalSurvey.__fields__`
+

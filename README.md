@@ -6,7 +6,7 @@ Automatyczny system wprowadzania ankiet papierowych do formy cyfrowej z wykorzys
 
 - Logowanie hasłem do aplikacji
 - Upload zdjęć ankiet (jpg/png/webp)
-- Automatyczna analiza obrazów przez VLM (Ollama + llava-llama3)
+- Automatyczna analiza obrazów przez VLM (Ollama + deepseek-ocr)
 - Batch processing z progress barem i cache'owaniem wyników
 - Weryfikacja i korekta odczytanych danych w interfejsie side-by-side
 - Podgląd zdjęć z zoomem (zakładki dla każdej strony)
@@ -33,4 +33,11 @@ Automatyczny system wprowadzania ankiet papierowych do formy cyfrowej z wykorzys
    streamlit run src/main.py
    ```
 
-Aplikacja dostępna pod `http://localhost:8501`. Domyślne hasło: `ankieter2026`.
+Aplikacja dostępna pod `http://localhost:8501`. Domyślne hasło: `a`.
+
+## Testy
+
+```powershell
+.venv\Scripts\Activate.ps1
+pytest tests/
+```

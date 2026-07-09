@@ -2,10 +2,10 @@
 
 ## Metadane
 - **Project:** AnkieterAI — Zautomatyzowany system wprowadzania ankiet papierowych (VLM)
-- **Stack:** Python 3.12, Streamlit, Ollama (llava-llama3), Cloudflared Tunnel
+- **Stack:** Python 3.12, Streamlit, Ollama (deepseek-ocr), Cloudflared Tunnel
 - **Hardware:** Windows, RTX 5070 Ti 16GB VRAM, 32GB RAM
-- **Hasło domyślne:** `ankieter2026`
-- **Model VLM:** `llava-llama3`
+- **Hasło domyślne:** `a`
+- **Model VLM:** `deepseek-ocr`
 
 ---
 
@@ -28,7 +28,7 @@ C:\workspace\dev\surveys\
 │   └── data_handler.py              # Groupowanie plików, cache, CSV export
 ├── scripts/
 │   ├── setup_env.ps1               # Python venv + pip install
-│   ├── setup_ollama.ps1            # Instalacja Ollamy + pull llava-llama3 + start serwera
+│   ├── setup_ollama.ps1            # Instalacja Ollamy + pull deepseek-ocr + start serwera
 │   ├── run_dev.ps1                 # Start Streamlit + weryfikacja Ollamy
 │   ├── deploy_tunnel.ps1           # Cloudflared tunel na localhost:8501
 │   └── full_setup.ps1             # Orchestrator: wszystko od zera do tunelu
@@ -45,12 +45,15 @@ C:\workspace\dev\surveys\
 
 ### `requirements.txt`
 ```
-streamlit==1.38.0
-pydantic==2.9.0
-pydantic-settings==2.5.0
-Pillow==10.4.0
-httpx==0.27.2
-python-multipart==0.0.12
+streamlit==1.59.0
+pydantic==2.13.4
+pydantic-settings==2.14.2
+Pillow==12.3.0
+httpx==0.28.1
+python-multipart==0.0.32
+
+pytest==8.3.4
+pytest-asyncio==0.24.0
 ```
 
 ### `scripts/setup_env.ps1`
@@ -101,9 +104,11 @@ font = "sans serif"
   - Cicha instalacja: `OllamaSetup.exe /S`
 - [ ] Sprawdza czy serwer działa (`curl http://localhost:11434`):
   - Jeśli nie → startuje proces w tle: `ollama serve`
-- [ ] Pull modelu: `ollama pull llava-llama3`
-- [ ] Weryfikacja: `ollama list` zawiera `llava-llama3`
-- [ ] Test API: `curl -X POST http://localhost:11434/api/generate -d "{\"model\":\"llava-llama3\",\"prompt\":\"test\"}"`
+- [ ] Parametry: `-Model <nazwa>` (domyślnie `deepseek-ocr`), `-SkipPull`, `-ListModels`, `-Status`
+- [ ] Wsparcie dla `$env:OLLAMA_MODEL` (nadpisuje `-Model`)
+- [ ] Pull modelu: `ollama pull <model>`
+- [ ] Weryfikacja: `ollama list` zawiera `<model>`
+- [ ] Test API: `curl -X POST http://localhost:11434/api/generate -d "{\"model\":\"<model>\",\"prompt\":\"test\"}"`
 - [ ] Log do `logs/setup_ollama.log`
 
 ---
@@ -112,13 +117,14 @@ font = "sans serif"
 
 ### `src/config.py` — Konfiguracja
 - Klasa `AppConfig(BaseSettings)` z polami:
-  - `APP_PASSWORD: str = "ankieter2026"`
-  - `OLLAMA_URL: str = "http://localhost:11434"`
-  - `MODEL_NAME: str = "llava-llama3"`
-  - `RESULTS_CSV: str = "wyniki.csv"`
-  - `CACHE_FILE: str = "logs/cache_results.json"`
-  - `MAX_RETRIES: int = 3`
-  - `TIMEOUT_SEC: int = 120`
+  - `app_password: str = "a"`
+  - `ollama_url: str = "http://localhost:11434"`
+  - `model_name: str = "deepseek-ocr"`
+  - `results_csv: str = "wyniki.csv"`
+  - `cache_file: str = "logs/cache_results.json"`
+  - `max_retries: int = 3`
+  - `timeout_sec: int = 120`
+  - `model_config = {"env_prefix": "ANKIETER_"}` — wsparcie dla zmiennych środowiskowych
 - Singleton `config = AppConfig()`
 
 ### `src/schemas.py` — Modele danych
@@ -173,24 +179,24 @@ font = "sans serif"
 - `save_survey_to_csv(data: MedicalSurvey, path: str)`:
   - Nagłówek CSV z nazw pól `MedicalSurvey`
   - Append wiersza (tryb `"a"`, encoding UTF-8 BOM dla Excela)
-  - Lock na zapis (przy współbieżności Streamlit)
+  - (Streamlit działa synchronicznie, lock nie jest wymagany)
 - `save_cache(results: dict[int, SurveyResult])`:
-  - Zapis do `config.CACHE_FILE` jako JSON (z `model_dump()`)
+  - Zapis do `config.cache_file` jako JSON (z `model_dump()`)
 - `load_cache() -> dict[int, SurveyResult]`:
-  - Odczyt z `config.CACHE_FILE`, deserializacja
+  - Odczyt z `config.cache_file`, deserializacja
   - Zwraca pusty dict jeśli plik nie istnieje
 - `export_csv_path() -> str`:
-  - Zwraca `config.RESULTS_CSV`
+  - Zwraca `config.results_csv`
 
 ### `src/ai_client.py` — Komunikacja z Ollamą
 - Klasa `AIClient`:
-  - `__init__(model_name: str = config.MODEL_NAME, base_url: str = config.OLLAMA_URL)`
+  - `__init__(model_name: str = config.model_name, base_url: str = config.ollama_url)`
   - `build_prompt() -> list[dict]` — generuje wiadomości dla `/api/chat`:
     - System: "Jesteś asystentem odczytującym dane z medycznych ankiet papierowych. Zwróć JSON..."
     - User: lista obrazów (base64) + instrukcja JSON
   - `async analyze_survey(survey: SurveyGroup) -> SurveyResult`:
     - Konwersja 5 obrazów do base64
-    - POST do `/api/chat` z `model: llava-llama3, messages: [...], format: "json", stream: false, options: {num_ctx: 8192}`
+    - POST do `/api/chat` z `model: <config.model_name>, messages: [...], format: "json", stream: false, options: {num_ctx: 8192}`
     - Timeout: 120s
     - Parsowanie odpowiedzi, mapowanie do `MedicalSurvey`
     - Dla pól z niską pewnością → `needs_review=true`
@@ -218,9 +224,13 @@ font = "sans serif"
       - Każda zakładka: `st.image()` z zoomem
       - Suwak zoom: `st.slider("Powiększenie", 1.0, 5.0, 1.0)` + CSS `transform: scale(zoom)` na obrazie
     - **Prawa**: `render_form(survey)`
-      - Formularz (`st.form(key=f"form_{survey.id}")`)
-      - Pola generowane dynamicznie z `MedicalSurvey.__fields__`
-      - `st.number_input("Wiek")`, `st.selectbox("Płeć")` itp.
+      - 5 zakładek (`st.tabs(["Strona 1", ..., "Strona 5"])`) z polami podzielonymi per strona:
+        - **Strona 1**: Demografia (A), Aktywność zawodowa (B), Styl życia (C)
+        - **Strona 2**: CES-D (20 pytań)
+        - **Strona 3**: Ateńska skala bezsenności (8 pól)
+        - **Strona 4**: MFIS 1-15
+        - **Strona 5**: MFIS 16-21 + Stan zdrowia (E)
+      - Pola renderowane ręcznie (`st.selectbox`, `st.number_input`, `st.text_input`)
       - Pola z `needs_review=True` otoczone `st.error()` (czerwona ramka)
       - `st.form_submit_button("Zatwierdź i Następna (Spacja)")`
   - Obsługa skrótu Spacja przez JS:
@@ -274,6 +284,7 @@ font = "sans serif"
 ## Sekcja 4 — Deployment
 
 ### `scripts/run_dev.ps1`
+- [ ] Parametr: `-Force` (nadpisuje istniejący `.venv`)
 - [ ] Sprawdza czy Ollama działa na porcie 11434 (jeśli nie → exit z błędem)
 - [ ] Sprawdza czy `.venv` istnieje (jeśli nie → `setup_env.ps1`)
 - [ ] Aktywuje venv: `.venv\Scripts\Activate.ps1`
@@ -281,6 +292,7 @@ font = "sans serif"
 - [ ] Czeka na proces (Streamlit uruchomiony w foreground)
 
 ### `scripts/deploy_tunnel.ps1`
+- [ ] Parametr: `-Stop` (zatrzymuje aktywny tunel i czyści plik URL)
 - [ ] Sprawdza `cloudflared --version`, jeśli brak:
   - Download `cloudflared-windows-amd64.exe` z `https://github.com/cloudflare/cloudflared/releases/latest`
   - Zapis do `C:\tools\cloudflared.exe`
@@ -303,14 +315,32 @@ font = "sans serif"
   === AnkieterAI — Gotowe! ===
   Aplikacja lokalna:  http://localhost:8501
   Tunel publiczny:    https://xxxxx.trycloudflare.com
-  Hasło:              ankieter2026
-  Model:              llava-llama3
+  Hasło:              a
+  Model:              $modelName (deepseek-ocr lub z $env:OLLAMA_MODEL)
   ==============================
   ```
 
 ---
 
-## Sekcja 5 — Harmonogram implementacji (fazy)
+## Sekcja 5 — Testy
+
+### `tests/` — 6 plików testowych
+- `conftest.py` — Fixture `sample_survey_data`, `sample_survey`, `ai_json_response` + autouse reset `st.session_state`
+- `test_schemas.py` — Testy `_extract_age`, `_normalize_value`, `MedicalSurvey.from_ai_json()`, `to_csv_row()`, `SurveyResult`, `SurveyGroup`
+- `test_data_handler.py` — Testy grupowania plików, zapisu CSV z BOM, cache roundtrip
+- `test_state_manager.py` — Testy logowania, indeksowania, next/clear
+- `test_ai_client.py` — Testy `_image_to_base64()`, `_merge_partial_results()`
+- `test_csv_integrity.py` — Testy spójności: 68 kolumn, wszystkie nagłówki unikalne, mapowanie 1:1
+
+Uruchomienie:
+```powershell
+.venv\Scripts\Activate.ps1
+pytest tests/
+```
+
+---
+
+## Sekcja 6 — Harmonogram implementacji (fazy)
 
 | Faza | Opis | Pliki | Status |
 |------|------|-------|--------|
