@@ -57,16 +57,50 @@ def render_verification(survey: SurveyGroup):
     _space_shortcut()
     _inject_verification_css()
 
-    col1, col2 = st.columns(2, gap="small")
+    result = sm.get_ai_results().get(survey.id)
+    if not result:
+        st.error("Brak wynik\u00f3w analizy AI dla tej ankiety")
+        return False, None
 
-    with col1:
-        _render_image_viewer(survey.files)
+    data = result.validated_data
+    needs_review = data.needs_review
+    p = f"f_{survey.id}"
 
-    result = (False, None)
-    with col2:
-        result = _render_form(survey)
+    _ALL_FIELD_KEYS = [
+        "plec","wiek","miejsce_zamieszkania","stan_cywilny","forma_zamieszkania",
+        "stopien_studiow","uczelnia",
+        "praca_status","praca_system","oddzial","staz_pracy",
+        "sen_godziny","ekran_godziny","kofeina",
+        "anemia","problemy_tarczyca","jaka_tarczyca","inne_choroby",
+        "zasypianie","budzenie_noc","budzenie_rano","czas_snu","jakosc_snu",
+        "samopoczucie","sprawnosc","sennosc",
+    ]
+    _ALL_FIELD_KEYS += [fn for fn, _ in _MFIS_1_15]
+    _ALL_FIELD_KEYS += [fn for fn, _ in _MFIS_16_21]
+    _ALL_FIELD_KEYS += [fn for fn, _ in _CESD_FIELDS]
 
-    return result
+    page_tabs = st.tabs(["Strona 1", "Strona 2", "Strona 3", "Strona 4", "Strona 5"])
+
+    for i, tab in enumerate(page_tabs):
+        with tab:
+            col1, col2 = st.columns(2, gap="small")
+            with col1:
+                _render_single_image(survey.files[i])
+            with col2:
+                _render_page_fields(i, data, needs_review, p)
+
+    submitted = st.button("Zatwierdź i Następna (Spacja)", type="primary", key=f"submit_{survey.id}")
+
+    if submitted:
+        kwargs = {}
+        for fn in _ALL_FIELD_KEYS:
+            widget_key = f"{p}_{fn}"
+            val = st.session_state.get(widget_key)
+            kwargs[fn] = val
+        kwargs["needs_review"] = needs_review
+        return submitted, kwargs
+
+    return submitted, None
 
 
 def _space_shortcut():
@@ -86,15 +120,12 @@ def _space_shortcut():
     )
 
 
-def _render_image_viewer(files: list[Path]):
-    tabs = st.tabs([f"Strona {i + 1}" for i in range(len(files))])
-    for tab, file_path in zip(tabs, files):
-        with tab:
-            data_url = _image_to_data_url(file_path)
-            st.markdown(
-                f'<div class="image-wrap"><img src="{data_url}" /></div>',
-                unsafe_allow_html=True,
-            )
+def _render_single_image(path: Path):
+    data_url = _image_to_data_url(path)
+    st.markdown(
+        f'<div class="image-wrap"><img src="{data_url}" /></div>',
+        unsafe_allow_html=True,
+    )
 
 
 # ─── Field definitions per page ────────────────────────────────────
@@ -222,6 +253,52 @@ _HEALTH_FIELDS = [
 ]
 
 
+# ─── Page form renderer ───────────────────────────────────────────
+
+def _render_page_fields(page_index: int, data, needs_review, prefix):
+    if page_index == 0:
+        col_a, col_b = st.columns(2)
+        with col_a:
+            for field_def in _PAGE1_FIELDS[:7]:
+                _render_single_field(field_def, needs_review, data, prefix)
+        with col_b:
+            for field_def in _PAGE1_FIELDS[7:]:
+                _render_single_field(field_def, needs_review, data, prefix)
+
+    elif page_index == 1:
+        st.subheader("Samopoczucie (CES-D)")
+        st.markdown(
+            '<div style="font-size:0.75rem;margin-bottom:4px">Skala: &lt;1d / 1-2d / 3-4d / 5-7d</div>',
+            unsafe_allow_html=True,
+        )
+        cesd_defs = [(fn, label, "select", _CESD_SKALA) for fn, label in _CESD_FIELDS]
+        _render_fields_grid(cesd_defs, needs_review, data, prefix)
+
+    elif page_index == 2:
+        st.subheader("Ateńska skala bezsenności")
+        _render_fields_grid(_ATHENS_FIELDS, needs_review, data, prefix)
+
+    elif page_index == 3:
+        st.subheader("Zmęczenie MFIS (1-15)")
+        st.markdown(
+            '<div style="font-size:0.75rem;margin-bottom:4px">Skala: Nigdy / Rzadko / Czasami / Często / Prawie zawsze</div>',
+            unsafe_allow_html=True,
+        )
+        mfis_defs = [(fn, label, "select", _OBJAWY_SKALA) for fn, label in _MFIS_1_15]
+        _render_fields_grid(mfis_defs, needs_review, data, prefix)
+
+    elif page_index == 4:
+        st.subheader("Zmęczenie MFIS (16-21)")
+        st.markdown(
+            '<div style="font-size:0.75rem;margin-bottom:4px">Skala: Nigdy / Rzadko / Czasami / Często / Prawie zawsze</div>',
+            unsafe_allow_html=True,
+        )
+        mfis2_defs = [(fn, label, "select", _OBJAWY_SKALA) for fn, label in _MFIS_16_21]
+        _render_fields_grid(mfis2_defs, needs_review, data, prefix)
+        st.subheader("Stan zdrowia")
+        _render_fields_grid(_HEALTH_FIELDS, needs_review, data, prefix)
+
+
 # ─── Helpers ──────────────────────────────────────────────────────
 
 def _image_to_data_url(path: Path) -> str:
@@ -291,92 +368,6 @@ def _render_single_field(field_def, needs_review, data, prefix):
     elif kind == "number":
         lo, hi = field_def[3], field_def[4]
         st.number_input(label, lo, hi, value=getattr(data, fn), key=f"{prefix}_{fn}")
-
-
-def _render_form(survey: SurveyGroup):
-    sm = StateManager()
-    result = sm.get_ai_results().get(survey.id)
-
-    if not result:
-        st.error("Brak wyników analizy AI dla tej ankiety")
-        return False, None
-
-    data = result.validated_data
-    needs_review = data.needs_review
-    p = f"f_{survey.id}"
-
-    # ── keys used in this survey form ────────
-    _ALL_FIELD_KEYS = [
-        "plec","wiek","miejsce_zamieszkania","stan_cywilny","forma_zamieszkania",
-        "stopien_studiow","uczelnia",
-        "praca_status","praca_system","oddzial","staz_pracy",
-        "sen_godziny","ekran_godziny","kofeina",
-        "anemia","problemy_tarczyca","jaka_tarczyca","inne_choroby",
-        "zasypianie","budzenie_noc","budzenie_rano","czas_snu","jakosc_snu",
-        "samopoczucie","sprawnosc","sennosc",
-    ]
-    _ALL_FIELD_KEYS += [fn for fn, _ in _MFIS_1_15]
-    _ALL_FIELD_KEYS += [fn for fn, _ in _MFIS_16_21]
-    _ALL_FIELD_KEYS += [fn for fn, _ in _CESD_FIELDS]
-
-    # ── render each page inside tabs ────────
-    page_tabs = st.tabs(["Strona 1", "Strona 2", "Strona 3", "Strona 4", "Strona 5"])
-
-    with page_tabs[0]:
-        col_a, col_b = st.columns(2)
-        with col_a:
-            for field_def in _PAGE1_FIELDS[:7]:
-                _render_single_field(field_def, needs_review, data, p)
-        with col_b:
-            for field_def in _PAGE1_FIELDS[7:]:
-                _render_single_field(field_def, needs_review, data, p)
-
-    with page_tabs[1]:
-        st.subheader("Samopoczucie (CES-D)")
-        st.markdown(
-            '<div style="font-size:0.75rem;margin-bottom:4px">Skala: &lt;1d / 1-2d / 3-4d / 5-7d</div>',
-            unsafe_allow_html=True,
-        )
-        cesd_defs = [(fn, label, "select", _CESD_SKALA) for fn, label in _CESD_FIELDS]
-        _render_fields_grid(cesd_defs, needs_review, data, p)
-
-    with page_tabs[2]:
-        st.subheader("Ateńska skala bezsenności")
-        _render_fields_grid(_ATHENS_FIELDS, needs_review, data, p)
-
-    with page_tabs[3]:
-        st.subheader("Zmęczenie MFIS (1-15)")
-        st.markdown(
-            '<div style="font-size:0.75rem;margin-bottom:4px">Skala: Nigdy / Rzadko / Czasami / Często / Prawie zawsze</div>',
-            unsafe_allow_html=True,
-        )
-        mfis_defs = [(fn, label, "select", _OBJAWY_SKALA) for fn, label in _MFIS_1_15]
-        _render_fields_grid(mfis_defs, needs_review, data, p)
-
-    with page_tabs[4]:
-        st.subheader("Zmęczenie MFIS (16-21)")
-        st.markdown(
-            '<div style="font-size:0.75rem;margin-bottom:4px">Skala: Nigdy / Rzadko / Czasami / Często / Prawie zawsze</div>',
-            unsafe_allow_html=True,
-        )
-        mfis2_defs = [(fn, label, "select", _OBJAWY_SKALA) for fn, label in _MFIS_16_21]
-        _render_fields_grid(mfis2_defs, needs_review, data, p)
-        st.subheader("Stan zdrowia")
-        _render_fields_grid(_HEALTH_FIELDS, needs_review, data, p)
-
-    # ── global submit button ─────────────────────────────────────
-    submitted = st.button("Zatwierdź i Następna (Spacja)", type="primary", key=f"submit_{survey.id}")
-
-    if submitted:
-        kwargs = {}
-        for fn in _ALL_FIELD_KEYS:
-            widget_key = f"{p}_{fn}"
-            val = st.session_state.get(widget_key)
-            kwargs[fn] = val
-        kwargs["needs_review"] = needs_review
-        return submitted, kwargs
-
-    return submitted, None
 
 
 def render_complete():
