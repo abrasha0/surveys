@@ -24,6 +24,17 @@
 - przedstawiasz mi to do akceptacji i ewentualnego wprowadzenia zmian/przeiterowania
 - jak jasno zaakceptuję zmiany to robisz git push
 
+6. kiedy rozwiązujemy konkretne issue masz przygotować kompletne flow jego poprawy
+
+- odczytanie błędu z ./docs/known-issues.md
+- analiza błędu
+- analiza kodu, który realizuje tę część funkcjonalności
+- wskazanie kodu/logiki, która odpowiada za ten błąd
+- przygotowanie szczegółowego planu poprawy
+- czekasz na moją akceptację/wskazówki dot. planu
+- po mojej akceptacji realizujesz poprawkę zgodnie z planem
+- dajesz mi przestrzeń do testowania
+
 # ważne informacje
 
 jeżeli musisz przetestować kawałek kodu to musisz korzystać z wirtualnego środowiska:
