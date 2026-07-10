@@ -337,6 +337,15 @@ div[data-testid="column"]:has(.image-wrap) { height: calc(100vh - 80px) !importa
 .stMainBlockContainer > [data-testid="stVerticalBlock"] { row-gap: 0 !important; gap: 0 !important; }
 div[data-testid="column"]:has(.image-wrap) div[data-testid="stVerticalBlock"] { row-gap: 0 !important; gap: 0 !important; }
 div[data-testid="column"]:has(.image-wrap) [data-testid="stTabs"] { margin-top: 4px !important; }
+.field-err-dot {
+    width: 6px;
+    height: 6px;
+    background: #ff4b4b;
+    border-radius: 50%;
+    margin-top: 22px;
+    margin-left: 2px;
+    flex-shrink: 0;
+}
 </style>
 """,
         unsafe_allow_html=True,
@@ -351,27 +360,63 @@ def _render_fields_grid(fields, needs_review, data, prefix, columns=2):
                 _render_single_field(field_def, needs_review, data, prefix)
 
 
-def _render_single_field(field_def, needs_review, data, prefix):
+def _is_field_empty(field_def, data):
     fn = field_def[0]
-    label = field_def[1]
-    if needs_review.get(fn):
-        label = f"\u26a0\ufe0f {label}"
-
     kind = field_def[2]
+    current = getattr(data, fn)
+    if kind == "select":
+        return current is None
+    elif kind == "text":
+        return current is None or current == ""
+    elif kind == "number":
+        return current is None
+    return False
+
+
+def _init_touched(prefix, fn):
+    key = f"{prefix}_{fn}_touched"
+    if key not in st.session_state:
+        st.session_state[key] = False
+
+
+def _mark_touched(prefix, fn):
+    st.session_state[f"{prefix}_{fn}_touched"] = True
+
+
+def _render_field_widget(field_def, data, prefix, label):
+    fn = field_def[0]
+    kind = field_def[2]
+
     if kind == "select":
         options = field_def[3]
         current = getattr(data, fn)
         if current is None:
-            st.selectbox(label, options, index=None, placeholder="—", key=f"{prefix}_{fn}")
+            st.selectbox(label, options, index=None, placeholder="—", key=f"{prefix}_{fn}", on_change=_mark_touched, args=(prefix, fn))
         else:
             idx = options.index(current) if current in options else 0
-            st.selectbox(label, options, index=idx, key=f"{prefix}_{fn}")
+            st.selectbox(label, options, index=idx, key=f"{prefix}_{fn}", on_change=_mark_touched, args=(prefix, fn))
     elif kind == "text":
-        st.text_input(label, value=getattr(data, fn) or "", key=f"{prefix}_{fn}")
+        st.text_input(label, value=getattr(data, fn) or "", key=f"{prefix}_{fn}", on_change=_mark_touched, args=(prefix, fn))
     elif kind == "number":
         lo, hi = field_def[3], field_def[4]
         current = getattr(data, fn)
-        st.number_input(label, lo, hi, value=current if current is not None else lo, key=f"{prefix}_{fn}")
+        st.number_input(label, lo, hi, value=current if current is not None else lo, key=f"{prefix}_{fn}", on_change=_mark_touched, args=(prefix, fn))
+
+
+def _render_single_field(field_def, needs_review, data, prefix):
+    fn = field_def[0]
+    label = field_def[1]
+
+    _init_touched(prefix, fn)
+    is_empty = _is_field_empty(field_def, data)
+    show_error = (is_empty or needs_review.get(fn, False)) and not st.session_state[f"{prefix}_{fn}_touched"]
+
+    dot_style = "" if show_error else "opacity: 0;"
+    cols = st.columns([0.04, 0.96])
+    with cols[0]:
+        st.markdown(f'<div class="field-err-dot" style="{dot_style}"></div>', unsafe_allow_html=True)
+    with cols[1]:
+        _render_field_widget(field_def, data, prefix, label)
 
 
 def render_complete():
