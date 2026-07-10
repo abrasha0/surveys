@@ -162,30 +162,30 @@ _CESD_SKALA = [
 # ─── Compact field definitions for 2-column grid ─────────────────
 
 _PAGE1_FIELDS = [
-    ("plec", "Płeć", "select", ["Kobieta", "Mężczyzna"]),
-    ("wiek", "Wiek", "number", 18, 80),
-    ("miejsce_zamieszkania", "Miejsce zamieszkania", "select",
+    ("plec", "1. Płeć", "select", ["Kobieta", "Mężczyzna"]),
+    ("wiek", "2. Wiek", "number", 18, 80),
+    ("miejsce_zamieszkania", "3. Miejsce zamieszkania", "select",
      ["Wieś", "Miasto do 50 tys. mieszkańców", "Miasto 50-100 tys. mieszkańców",
       "Miasto powyżej 100 tys. mieszkańców"]),
-    ("stan_cywilny", "Stan cywilny", "select",
+    ("stan_cywilny", "4. Stan cywilny", "select",
      ["Panna/kawaler", "W związku nieformalnym", "Mężatka/żonaty"]),
-    ("forma_zamieszkania", "Forma zamieszkania", "select",
+    ("forma_zamieszkania", "5. Forma zamieszkania", "select",
      ["Z rodziną", "W wynajmowanym mieszkaniu/pokoju", "Własne mieszkanie",
       "We własnym mieszkaniu z partnerem", "z partnerem"]),
-    ("stopien_studiow", "Stopień studiów", "select",
+    ("stopien_studiow", "6. Stopień studiów", "select",
      ["Studia I stopnia", "Studia II stopnia"]),
-    ("uczelnia", "Uczelnia", "text"),
-    ("praca_status", "Praca w trakcie studiów?", "select",
+    ("uczelnia", "7. Uczelnia", "text"),
+    ("praca_status", "8. Praca w trakcie studiów?", "select",
      ["Nie", "Tak, w zawodzie medycznym", "Tak, poza zawodem"]),
-    ("praca_system", "System pracy", "text"),
-    ("oddzial", "Rodzaj oddziału", "select",
+    ("praca_system", "9. System pracy", "text"),
+    ("oddzial", "10. Rodzaj oddziału", "select",
      ["", "Przychodnia", "Zabiegowym", "Zachowawczym", "Pracownia"]),
-    ("staz_pracy", "Staż pracy", "text"),
-    ("sen_godziny", "Średnia liczba godzin snu", "select",
+    ("staz_pracy", "11. Staż pracy", "text"),
+    ("sen_godziny", "12. Średnia liczba godzin snu", "select",
      ["Poniżej 5 godzin", "5-6 godzin", "7-8 godzin", "Powyżej 8 godzin"]),
-    ("ekran_godziny", "Godziny przed ekranem", "select",
+    ("ekran_godziny", "13. Godziny przed ekranem", "select",
      ["1-3 godziny", "Powyżej 3 godzin"]),
-    ("kofeina", "Spożycie kofeiny", "select",
+    ("kofeina", "14. Spożycie kofeiny", "select",
      ["Nie", "Tak, 1-2 porcje dziennie", "Tak, 3 lub więcej porcji dziennie"]),
 ]
 
@@ -323,12 +323,13 @@ def _render_form(survey: SurveyGroup):
     page_tabs = st.tabs(["Strona 1", "Strona 2", "Strona 3", "Strona 4", "Strona 5"])
 
     with page_tabs[0]:
-        st.subheader("A. Dane demograficzne")
-        _render_fields_grid(_PAGE1_FIELDS[:7], needs_review, data, p)
-        st.subheader("B. Aktywność zawodowa")
-        _render_fields_grid(_PAGE1_FIELDS[7:11], needs_review, data, p)
-        st.subheader("C. Styl życia")
-        _render_fields_grid(_PAGE1_FIELDS[11:], needs_review, data, p)
+        col_a, col_b = st.columns(2)
+        with col_a:
+            for field_def in _PAGE1_FIELDS[:7]:
+                _render_single_field(field_def, needs_review, data, p)
+        with col_b:
+            for field_def in _PAGE1_FIELDS[7:]:
+                _render_single_field(field_def, needs_review, data, p)
 
     with page_tabs[1]:
         st.subheader("Samopoczucie (CES-D)")
