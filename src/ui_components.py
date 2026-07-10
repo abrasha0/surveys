@@ -361,13 +361,17 @@ def _render_single_field(field_def, needs_review, data, prefix):
     if kind == "select":
         options = field_def[3]
         current = getattr(data, fn)
-        idx = options.index(current) if current in options else 0
-        st.selectbox(label, options, index=idx, key=f"{prefix}_{fn}")
+        if current is None:
+            st.selectbox(label, options, index=None, placeholder="—", key=f"{prefix}_{fn}")
+        else:
+            idx = options.index(current) if current in options else 0
+            st.selectbox(label, options, index=idx, key=f"{prefix}_{fn}")
     elif kind == "text":
-        st.text_input(label, value=getattr(data, fn), key=f"{prefix}_{fn}")
+        st.text_input(label, value=getattr(data, fn) or "", key=f"{prefix}_{fn}")
     elif kind == "number":
         lo, hi = field_def[3], field_def[4]
-        st.number_input(label, lo, hi, value=getattr(data, fn), key=f"{prefix}_{fn}")
+        current = getattr(data, fn)
+        st.number_input(label, lo, hi, value=current if current is not None else lo, key=f"{prefix}_{fn}")
 
 
 def render_complete():

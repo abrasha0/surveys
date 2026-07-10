@@ -218,96 +218,96 @@ _FIELD_TO_CSV = [
 
 # ─── Helper: extract first number from a string ───────────────────
 
-def _extract_age(raw: str | int) -> int:
+def _extract_age(raw: str | int | None) -> int | None:
     if isinstance(raw, int):
         return raw
     m = re.search(r"\d+", str(raw))
-    return int(m.group()) if m else 22
+    return int(m.group()) if m else None
 
 
 # ─── MedicalSurvey ────────────────────────────────────────────────
 
 class MedicalSurvey(BaseModel):
     # A. Demografia
-    plec: Plec
-    wiek: int = Field(ge=18, le=80)
-    miejsce_zamieszkania: MiejsceZamieszkania
-    stan_cywilny: StanCywilny
-    forma_zamieszkania: FormaZamieszkania
-    stopien_studiow: StopienStudiow
-    uczelnia: str
+    plec: Optional[Plec] = None
+    wiek: Optional[int] = Field(default=None, ge=18, le=80)
+    miejsce_zamieszkania: Optional[MiejsceZamieszkania] = None
+    stan_cywilny: Optional[StanCywilny] = None
+    forma_zamieszkania: Optional[FormaZamieszkania] = None
+    stopien_studiow: Optional[StopienStudiow] = None
+    uczelnia: str = ""
 
     # B. Aktywność zawodowa
-    praca_status: PracaStatus
+    praca_status: Optional[PracaStatus] = None
     praca_system: str = ""
-    oddzial: Oddzial = ""
+    oddzial: Optional[Oddzial] = None
     staz_pracy: str = ""
 
     # C. Styl życia
-    sen_godziny: ZakresSnu
-    ekran_godziny: ZakresEkranu
-    kofeina: Kofeina
+    sen_godziny: Optional[ZakresSnu] = None
+    ekran_godziny: Optional[ZakresEkranu] = None
+    kofeina: Optional[Kofeina] = None
 
     # D. Objawy (21)
-    objaw_mniej_uwazna: SkalaObjawow
-    objaw_trudno_skupic: SkalaObjawow
-    objaw_trudno_myslec: SkalaObjawow
-    objaw_niezdarna: SkalaObjawow
-    objaw_zapominalska: SkalaObjawow
-    objaw_wyznaczac_tempo: SkalaObjawow
-    objaw_zmotywowac_fizycznie: SkalaObjawow
-    objaw_zmotywowac_spotkania: SkalaObjawow
-    objaw_nie_zdolna_poza_domem: SkalaObjawow
-    objaw_wysilek_fizyczny: SkalaObjawow
-    objaw_trudnosci_decyzyjne: SkalaObjawow
-    objaw_zmusic_do_myslenia: SkalaObjawow
-    objaw_miesnie_z_waty: SkalaObjawow
-    objaw_dyskomfort_fizyczny: SkalaObjawow
-    objaw_ukonczenie_myslenie: SkalaObjawow
-    objaw_uporzadkowanie_mysli: SkalaObjawow
-    objaw_ukonczenie_wysilek: SkalaObjawow
-    objaw_myslenie_spowolnione: SkalaObjawow
-    objaw_problemy_koncentracja: SkalaObjawow
-    objaw_ograniczyc_aktywnosc: SkalaObjawow
-    objaw_czesciej_odpoczywac: SkalaObjawow
+    objaw_mniej_uwazna: Optional[SkalaObjawow] = None
+    objaw_trudno_skupic: Optional[SkalaObjawow] = None
+    objaw_trudno_myslec: Optional[SkalaObjawow] = None
+    objaw_niezdarna: Optional[SkalaObjawow] = None
+    objaw_zapominalska: Optional[SkalaObjawow] = None
+    objaw_wyznaczac_tempo: Optional[SkalaObjawow] = None
+    objaw_zmotywowac_fizycznie: Optional[SkalaObjawow] = None
+    objaw_zmotywowac_spotkania: Optional[SkalaObjawow] = None
+    objaw_nie_zdolna_poza_domem: Optional[SkalaObjawow] = None
+    objaw_wysilek_fizyczny: Optional[SkalaObjawow] = None
+    objaw_trudnosci_decyzyjne: Optional[SkalaObjawow] = None
+    objaw_zmusic_do_myslenia: Optional[SkalaObjawow] = None
+    objaw_miesnie_z_waty: Optional[SkalaObjawow] = None
+    objaw_dyskomfort_fizyczny: Optional[SkalaObjawow] = None
+    objaw_ukonczenie_myslenie: Optional[SkalaObjawow] = None
+    objaw_uporzadkowanie_mysli: Optional[SkalaObjawow] = None
+    objaw_ukonczenie_wysilek: Optional[SkalaObjawow] = None
+    objaw_myslenie_spowolnione: Optional[SkalaObjawow] = None
+    objaw_problemy_koncentracja: Optional[SkalaObjawow] = None
+    objaw_ograniczyc_aktywnosc: Optional[SkalaObjawow] = None
+    objaw_czesciej_odpoczywac: Optional[SkalaObjawow] = None
 
     # E. Stan zdrowia
-    anemia: TakNie
-    problemy_tarczyca: TakNie
+    anemia: Optional[TakNie] = None
+    problemy_tarczyca: Optional[TakNie] = None
     jaka_tarczyca: str = ""
     inne_choroby: str = ""
 
     # F. Jakość snu (PSQI-like)
-    zasypianie: Zasypianie
-    budzenie_noc: BudzenieNoc
-    budzenie_rano: BudzenieRano
-    czas_snu: CzasSnuJakosc
-    jakosc_snu: JakoscSnu
-    samopoczucie: Samopoczucie
-    sprawnosc: Sprawnosc
-    sennosc: Sennosc
+    zasypianie: Optional[Zasypianie] = None
+    budzenie_noc: Optional[BudzenieNoc] = None
+    budzenie_rano: Optional[BudzenieRano] = None
+    czas_snu: Optional[CzasSnuJakosc] = None
+    jakosc_snu: Optional[JakoscSnu] = None
+    samopoczucie: Optional[Samopoczucie] = None
+    sprawnosc: Optional[Sprawnosc] = None
+    sennosc: Optional[Sennosc] = None
 
     # G. CES-D (20)
-    cesd_przeszkadzaly: SkalaCESD
-    cesd_brak_apetytu: SkalaCESD
-    cesd_chandra: SkalaCESD
-    cesd_tak_samo_dobry: SkalaCESD
-    cesd_ciezko_skoncentrowac: SkalaCESD
-    cesd_przygnebiony: SkalaCESD
-    cesd_wysilek: SkalaCESD
-    cesd_optymistycznie: SkalaCESD
-    cesd_zycie_porazka: SkalaCESD
-    cesd_strach: SkalaCESD
-    cesd_sen_niespokojny: SkalaCESD
-    cesd_szczesliwy: SkalaCESD
-    cesd_mowil_mniej: SkalaCESD
-    cesd_samotny: SkalaCESD
-    cesd_ludzie_nieprzyjazni: SkalaCESD
-    cesd_radosci: SkalaCESD
-    cesd_placzu: SkalaCESD
-    cesd_smutno: SkalaCESD
-    cesd_ludzie_nie_lubia: SkalaCESD
-    cesd_nic_nie_zabrac: SkalaCESD
+    cesd_przeszkadzaly: Optional[SkalaCESD] = None
+    cesd_brak_apetytu: Optional[SkalaCESD] = None
+    cesd_chandra: Optional[SkalaCESD] = None
+    cesd_tak_samo_dobry: Optional[SkalaCESD] = None
+    cesd_ciezko_skoncentrowac: Optional[SkalaCESD] = None
+    cesd_przygnebiony: Optional[SkalaCESD] = None
+    cesd_wysilek: Optional[SkalaCESD] = None
+    cesd_optymistycznie: Optional[SkalaCESD] = None
+    cesd_zycie_porazka: Optional[SkalaCESD] = None
+    cesd_strach: Optional[SkalaCESD] = None
+    cesd_sen_niespokojny: Optional[SkalaCESD] = None
+    cesd_szczesliwy: Optional[SkalaCESD] = None
+    cesd_mowil_mniej: Optional[SkalaCESD] = None
+    cesd_samotny: Optional[SkalaCESD] = None
+    cesd_ludzie_nieprzyjazni: Optional[SkalaCESD] = None
+    cesd_radosci: Optional[SkalaCESD] = None
+    cesd_placzu: Optional[SkalaCESD] = None
+    cesd_smutno: Optional[SkalaCESD] = None
+    cesd_ludzie_nie_lubia: Optional[SkalaCESD] = None
+    cesd_nic_nie_zabrac: Optional[SkalaCESD] = None
 
     # H. Metadane AI
     needs_review: dict[str, bool] = {}
@@ -405,15 +405,15 @@ def _normalize_value(field_name: str, raw: object) -> object:
                     for c in choices:
                         if v.lower().strip() == c.lower().strip():
                             return c
-            return choices[0]
+            return None
         if isinstance(raw, str):
             if raw in choices:
                 return raw
             for c in choices:
                 if raw.lower().strip() == c.lower().strip():
                     return c
-            return choices[0]
-        return choices[0]
+            return None
+        return None
 
     if field_name in _OBJAWY_FIELDS_LIST:
         choices = ["Nigdy", "Rzadko", "Czasami", "Często", "Prawie zawsze"]
@@ -421,15 +421,15 @@ def _normalize_value(field_name: str, raw: object) -> object:
             for v in raw.values():
                 if isinstance(v, str) and v in choices:
                     return v
-            return "Nigdy"
+            return None
         if isinstance(raw, str):
             if raw in choices:
                 return raw
             for c in choices:
                 if raw.lower().strip().startswith(c.rstrip("ęóź").lower()[:3]):
                     return c
-            return "Nigdy"
-        return "Nigdy"
+            return None
+        return None
 
     if field_name in _CESD_FIELDS_LIST:
         choices = [
@@ -442,12 +442,12 @@ def _normalize_value(field_name: str, raw: object) -> object:
             for v in raw.values():
                 if isinstance(v, str) and v in choices:
                     return v
-            return choices[0]
+            return None
         if isinstance(raw, str):
             if raw in choices:
                 return raw
-            return choices[0]
-        return choices[0]
+            return None
+        return None
 
     if isinstance(raw, dict):
         return str(raw)
