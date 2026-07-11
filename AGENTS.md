@@ -41,7 +41,7 @@ jeżeli musisz przetestować kawałek kodu to musisz korzystać z wirtualnego ś
 
 ```ps1
 .venv\Scripts\Activate.ps1
-streamlit run src/main.py
+streamlit run src/app.py
 ```
 
 jeżeli musisz testować modele ollama rób to z poziomu katalogu root aplikacji

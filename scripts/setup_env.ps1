@@ -122,6 +122,6 @@ Write-Log "Aby aktywowac srodowisko recznie:"
 Write-Log "  .venv\Scripts\Activate.ps1"
 Write-Log ""
 Write-Log "Aby uruchomic aplikacje:"
-Write-Log "  streamlit run src/main.py"
+Write-Log "  streamlit run src/app.py"
 
 exit 0

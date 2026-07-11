@@ -32,7 +32,7 @@ Automatyczny system wprowadzania ankiet papierowych do formy cyfrowej z wykorzys
 3. Start aplikacji:
    ```powershell
    .venv\Scripts\Activate.ps1
-   streamlit run src/main.py
+   streamlit run src/app.py
    ```
 
 Aplikacja dostępna pod `http://localhost:8501`. Domyślne hasło: `a`.

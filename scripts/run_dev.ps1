@@ -57,14 +57,14 @@ $ErrorActionPreference = "Continue"
 Write-Log "Krok 3: Uruchamianie Streamlit..."
 $PythonVenv = Join-Path -Path $VenvPath -ChildPath "Scripts\python.exe"
 $Streamlit = Join-Path -Path $VenvPath -ChildPath "Scripts\streamlit.exe"
-$MainPy = Join-Path -Path $ProjectRoot -ChildPath "src\main.py"
+$MainPy = Join-Path -Path $ProjectRoot -ChildPath "src\app.py"
 
 if (-not (Test-Path -LiteralPath $MainPy)) {
-    Write-Log "BLAD: Nie znaleziono src\main.py w $ProjectRoot"
+    Write-Log "BLAD: Nie znaleziono src\app.py w $ProjectRoot"
     exit 1
 }
 
-Write-Log "Uruchamianie: streamlit run src/main.py --server.port 8501"
+Write-Log "Uruchamianie: streamlit run src/app.py --server.port 8501"
 Write-Log "Aplikacja dostepna pod adresem: http://localhost:8501"
 Write-Log "=== Streamlit przejmuje konsole ==="
 
