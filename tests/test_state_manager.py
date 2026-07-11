@@ -1,13 +1,13 @@
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from state_manager import StateManager
+from state.state_manager import StateManager
 
 class TestStateManager:
     def test_init_creates_session_key(self):
         StateManager.init()
         import streamlit as st
-        assert "ankieter" in st.session_state
+        assert "auth" in st.session_state
 
     def test_is_authenticated_returns_false_initially(self):
         StateManager.init()

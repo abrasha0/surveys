@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import pytest
-from schemas import MedicalSurvey
+from domain.schemas import MedicalSurvey
 
 
 @pytest.fixture(autouse=True)

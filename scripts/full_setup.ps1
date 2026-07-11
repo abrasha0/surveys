@@ -171,7 +171,7 @@ if (-not $NoTunnel -and $tunnelUrl) {
     Write-Log "  Tunel publiczny:   $tunnelUrl"
 }
 
-Write-Log "  Haslo:             ankieter2026"
+Write-Log "  Haslo:             a"
 
 $modelName = if ($env:OLLAMA_MODEL) { $env:OLLAMA_MODEL } else { "deepseek-ocr" }
 Write-Log "  Model:             $modelName"
