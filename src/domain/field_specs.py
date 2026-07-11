@@ -241,3 +241,12 @@ PAGE_MAP = {
     3: PAGE3_FIELDS,
     4: PAGE4_FIELDS,
 }
+
+# Opisy stron — źródło prawdy dla promptów (zakaz hardkodowania w prompts.py)
+PAGE_DESCRIPTIONS: dict[int, str] = {
+    0: "Otrzymasz zdjęcie pierwszej strony ankiety – dane demograficzne, praca, styl życia.",
+    1: "Otrzymasz zdjęcie drugiej strony – skala CES-D (odczucia w minionym tygodniu).",
+    2: "Otrzymasz zdjęcie trzeciej strony – Ateńska skala bezsenności.",
+    3: "Otrzymasz zdjęcie czwartej strony – MFIS (część 1, pozycje 1-15).",
+    4: "Otrzymasz zdjęcie piątej strony – MFIS (część 2, pozycje 16-21) oraz pytania o zdrowie.",
+}

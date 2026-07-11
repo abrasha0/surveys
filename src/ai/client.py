@@ -9,16 +9,20 @@ from pathlib import Path
 from typing import Any, Callable
 
 import httpx
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 from config import config
 from domain.schemas import MedicalSurvey
 from ai.prompts import build_system_prompt
-from domain.field_specs import ALL_FIELDS  # do ewentualnego użycia
+from domain.field_specs import ALL_FIELDS
 
 logger = logging.getLogger(__name__)
 
 _OLLAMA_NUM_CTX = 8192
+_OLLAMA_TEMPERATURE = 0.0
+_OLLAMA_KEEP_ALIVE = "-1"
+_MAX_IMAGE_DIMENSION = 2000
+_CONTRAST_FACTOR = 1.5
 
 @dataclass
 class ProcessingStatus:
@@ -31,13 +35,30 @@ class ProcessingStatus:
     extra: dict[str, Any] | None = None
 
 
-def _image_to_base64(path: Path) -> str:
+def preprocess_image(path: Path) -> bytes:
     with Image.open(path) as img:
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
-        buffer = BytesIO()
-        img.save(buffer, format=img.format or "JPEG")
-        return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+        w, h = img.size
+        long_side = max(w, h)
+        if long_side > _MAX_IMAGE_DIMENSION:
+            scale = _MAX_IMAGE_DIMENSION / long_side
+            new_w = int(w * scale)
+            new_h = int(h * scale)
+            img = img.resize((new_w, new_h), Image.LANCZOS)
+
+        img = img.convert("L")
+        img = ImageEnhance.Contrast(img).enhance(_CONTRAST_FACTOR)
+
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        return buf.getvalue()
+
+
+def _image_to_base64(path: Path) -> str:
+    raw = preprocess_image(path)
+    return base64.b64encode(raw).decode("utf-8")
 
 
 class AIClient:
@@ -108,7 +129,11 @@ class AIClient:
                         "messages": messages,
                         "format": "json",
                         "stream": False,
-                        "options": {"num_ctx": _OLLAMA_NUM_CTX},
+                        "keep_alive": _OLLAMA_KEEP_ALIVE,
+                        "options": {
+                            "num_ctx": _OLLAMA_NUM_CTX,
+                            "temperature": _OLLAMA_TEMPERATURE,
+                        },
                     },
                 )
                 elapsed = time.perf_counter() - t0
