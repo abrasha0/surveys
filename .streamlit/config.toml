@@ -8,3 +8,6 @@ backgroundColor = "#FAFAFA"
 secondaryBackgroundColor = "#EEEEEE"
 textColor = "#212121"
 font = "sans serif"
+
+[client]
+toolbarMode = "viewer"
