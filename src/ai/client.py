@@ -3,7 +3,7 @@ import base64
 import json
 import logging
 import time
-from contextlib import nullcontext
+from contextlib import asynccontextmanager, nullcontext
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -26,11 +26,11 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-_OLLAMA_NUM_CTX = 8192
-_OLLAMA_TEMPERATURE = 0.0
-_OLLAMA_KEEP_ALIVE = "-1"
-_MAX_IMAGE_DIMENSION = 2000
-_CONTRAST_FACTOR = 1.5
+_OLLAMA_NUM_CTX = config.ai["num_ctx"]
+_OLLAMA_TEMPERATURE = config.ai["temperature"]
+_OLLAMA_KEEP_ALIVE = config.ai["keep_alive"]
+_MAX_IMAGE_DIMENSION = config.image["max_dimension"]
+_CONTRAST_FACTOR = config.image["contrast_factor"]
 
 
 @asynccontextmanager
@@ -89,7 +89,7 @@ def preprocess_image(path: Path) -> bytes:
         img = ImageEnhance.Contrast(img).enhance(_CONTRAST_FACTOR)
 
         buf = BytesIO()
-        img.save(buf, format="JPEG", quality=85)
+        img.save(buf, format="JPEG", quality=config.image["jpeg_quality"])
         return buf.getvalue()
 
 
@@ -101,11 +101,11 @@ def _image_to_base64(path: Path) -> str:
 class AIClient:
     def __init__(
         self,
-        vlm_model: str = config.vlm_model,
-        text_model: str = config.text_model,
-        base_url: str = config.ollama_url,
-        max_retries: int = config.max_retries,
-        timeout_sec: int = config.timeout_sec,
+        vlm_model: str = config.ai["vlm_model"],
+        text_model: str = config.ai["text_model"],
+        base_url: str = config.ai["ollama_url"],
+        max_retries: int = config.ai["max_retries"],
+        timeout_sec: int = config.ai["timeout_sec"],
     ):
         self.vlm_model = vlm_model
         self.text_model = text_model

@@ -3,6 +3,8 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from config import config
+
 _LOG_FILE: Path | None = None
 _LOGGING_SETUP_DONE: bool = False
 ai_req_logger: logging.Logger | None = None
@@ -55,8 +57,8 @@ def setup_logging(
 
     ai_handler = RotatingFileHandler(
         _LOG_FILE.parent / "ai_requests.log",
-        maxBytes=10*1024*1024,  # 10MB
-        backupCount=3,
+        maxBytes=config.logging["ai_log_max_bytes"],
+        backupCount=config.logging["ai_log_backup_count"],
         encoding="utf-8"
     )
     ai_handler.setFormatter(logging.Formatter(

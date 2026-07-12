@@ -1,8 +1,9 @@
 import streamlit as st
+from config import config
 
 st.set_page_config(
-    page_title="surveyAI",
-    layout="wide",
+    page_title=config.app["page_title"],
+    layout=config.app["layout"],
 )
 
 import logging
@@ -10,10 +11,9 @@ from state.state_manager import StateManager
 from ui.pages import login, upload, processing, verification, complete
 from data_handler import load_cache, export_csv_path
 from logger import setup_logging
-from config import config
 from ui.styles import inject_global_css
 
-setup_logging(log_file=config.log_file, level=getattr(logging, config.log_level.upper(), logging.DEBUG))
+setup_logging(log_file=config.logging["file"], level=getattr(logging, config.logging["level"].upper(), logging.DEBUG))
 StateManager.init()
 inject_global_css()
 

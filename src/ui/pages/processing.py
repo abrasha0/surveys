@@ -4,6 +4,7 @@ from state.state_manager import StateManager
 from ai.client import AIClient, ProcessingStatus
 from data_handler import save_cache
 from ui.styles import inject_global_css
+from config import config
 
 def render():
     inject_global_css()
@@ -24,9 +25,9 @@ def render():
         if status.status == "survey_start":
             pct = idx / total
         elif status.status in ("vlm_extracting", "vlm_retrying"):
-            pct = (idx + 0.3) / total
+            pct = (idx + config.processing["progress_vlm_weight"]) / total
         elif status.status in ("text_formatting", "text_retrying"):
-            pct = (idx + 0.6) / total
+            pct = (idx + config.processing["progress_text_weight"]) / total
         elif status.status == "survey_done":
             pct = (idx + 1) / total
         elif status.status == "batch_done":
@@ -81,11 +82,11 @@ def render():
                 st.success(status.message)
 
         # Dodaj do historii tylko jeśli nowy i nie jest ostatnim
-        if status.message not in history[-8:]:
+        if status.message not in history[-config.processing["history_display_limit"]:]:
             history.append(status.message)
         with history_placeholder.container():
             st.caption("Ostatnie kroki:")
-            for line in history[-8:]:
+            for line in history[-config.processing["history_display_limit"]:]:
                 st.text(line)
 
     async def run_batch():

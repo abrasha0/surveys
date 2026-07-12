@@ -24,7 +24,7 @@ class StateManager:
     @staticmethod
     def set_authenticated(password: str) -> bool:
         from config import config
-        if password == config.app_password:
+        if password == config.app["password"]:
             st.session_state.auth = True
             return True
         return False

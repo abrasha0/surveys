@@ -25,17 +25,17 @@ def _get_client():
     _client_attempted = True
 
     from config import config
-    if not config.langchain_tracing_v2 or not config.langchain_endpoint:
+    if not config.langsmith["tracing_v2"] or not config.langsmith["endpoint"]:
         logger.debug("LangSmith tracing disabled")
         return None
 
     try:
         from langsmith import Client
         _client = Client(
-            api_url=config.langchain_endpoint,
-            api_key=config.langchain_api_key.get_secret_value(),
+            api_url=config.langsmith["endpoint"],
+            api_key=config.langsmith["api_key"],
         )
-        logger.info("LangSmith client initialized, project=%s", config.langchain_project)
+        logger.info("LangSmith client initialized, project=%s", config.langsmith["project"])
     except ImportError:
         logger.warning("langsmith package not installed — tracing disabled")
     except Exception as e:
@@ -66,7 +66,7 @@ async def vlm_trace(ctx: TraceContext):
 
     run = client.create_run(
         name=f"vlm_{ctx.operation}",
-        project_name=config.langchain_project,
+        project_name=config.langsmith["project"],
         run_type="chain",
         tags=tags,
         extra={
@@ -120,7 +120,7 @@ async def llm_trace(ctx: TraceContext):
 
     run = client.create_run(
         name=f"llm_{ctx.operation}",
-        project_name=config.langchain_project,
+        project_name=config.langsmith["project"],
         run_type="chain",
         tags=tags,
         extra={
@@ -168,7 +168,7 @@ async def io_trace(op_name: str, metadata: dict | None = None):
 
     run = client.create_run(
         name=f"io_{op_name}",
-        project_name=config.langchain_project,
+        project_name=config.langsmith["project"],
         run_type="tool",
         tags=tags,
         extra=metadata or {},

@@ -3,6 +3,8 @@ from pathlib import Path
 import tempfile
 from typing import List, Tuple
 
+from config import config
+
 logger = logging.getLogger(__name__)
 
 _UPLOAD_DIR = None
@@ -10,7 +12,7 @@ _UPLOAD_DIR = None
 def get_upload_dir() -> Path:
     global _UPLOAD_DIR
     if _UPLOAD_DIR is None:
-        _UPLOAD_DIR = Path(tempfile.mkdtemp(prefix="ankieter_uploads_"))
+        _UPLOAD_DIR = Path(tempfile.mkdtemp(prefix=config.ingestion["upload_dir_prefix"]))
     return _UPLOAD_DIR
 
 def group_files_by_survey(files: list) -> Tuple[List[List[Path]], List[str]]:
@@ -31,10 +33,11 @@ def group_files_by_survey(files: list) -> Tuple[List[List[Path]], List[str]]:
             out.write(f.getbuffer())
         saved_paths.append(dest)
 
-    # Podziel na grupy po 5
-    for i in range(0, len(saved_paths), 5):
-        chunk = saved_paths[i:i+5]
-        if len(chunk) < 5:
+    # Podziel na grupy
+    group_size = config.ingestion["survey_group_size"]
+    for i in range(0, len(saved_paths), group_size):
+        chunk = saved_paths[i:i+group_size]
+        if len(chunk) < group_size:
             warnings.append(f"Ostatnia grupa ma tylko {len(chunk)} plików (oczekiwano 5).")
         groups.append(chunk)
 

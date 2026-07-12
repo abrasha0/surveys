@@ -20,7 +20,7 @@ class TestStateManager:
     def test_set_authenticated_with_correct_password(self):
         StateManager.init()
         from config import config
-        assert StateManager.set_authenticated(config.app_password) is True
+        assert StateManager.set_authenticated(config.app["password"]) is True
 
     def test_current_index_defaults_to_zero(self):
         StateManager.init()
@@ -79,7 +79,7 @@ class TestStateManager:
     def test_clear_session_resets_state(self):
         StateManager.init()
         from config import config
-        StateManager.set_authenticated(config.app_password)
+        StateManager.set_authenticated(config.app["password"])
         StateManager.clear_session()
         assert StateManager.is_authenticated() is False
         assert StateManager.get_current_index() == 0

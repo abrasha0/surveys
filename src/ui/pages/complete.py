@@ -2,6 +2,7 @@ import streamlit as st
 from pathlib import Path
 from data_handler import export_csv_path
 from state.state_manager import StateManager
+from config import config
 
 def render():
     st.balloons()
@@ -14,7 +15,7 @@ def render():
         st.download_button(
             "Pobierz CSV",
             data=csv_content,
-            file_name="wyniki.csv",
+            file_name=config.app["csv_results"],
             mime="text/csv",
         )
     if st.button("Nowa sesja"):

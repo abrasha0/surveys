@@ -55,19 +55,17 @@ class TestSaveSurveyToCSV:
 class TestCache:
     def test_save_and_load_cache_roundtrip(self, sample_survey, tmp_path):
         from config import config
-        orig = config.cache_file
-        config.cache_file = str(tmp_path / "c.json")
-        from pydantic import TypeAdapter
-        from domain.schemas import MedicalSurvey
+        orig = config.app["cache_file"]
+        config.app["cache_file"] = str(tmp_path / "c.json")
         r = {"raw_response": "{}", "validated_data": sample_survey.model_dump(), "confidence": 0.95}
         save_cache({0: r})
         loaded = load_cache()
         assert 0 in loaded and loaded[0]["confidence"] == 0.95
-        config.cache_file = orig
+        config.app["cache_file"] = orig
 
     def test_load_cache_returns_empty_when_no_file(self):
         from config import config
-        orig = config.cache_file
-        config.cache_file = "noexist.json"
+        orig = config.app["cache_file"]
+        config.app["cache_file"] = "noexist.json"
         assert load_cache() == {}
-        config.cache_file = orig
+        config.app["cache_file"] = orig

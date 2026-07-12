@@ -1,0 +1,69 @@
+# =============================================================
+# AnkieterAI — konfiguracja aplikacji
+# Skopiuj do config.yaml i dostosuj do swojego środowiska
+# =============================================================
+
+app:
+  page_title: "surveyAI"
+  layout: "wide"
+  password: "a"
+  csv_results: "wyniki.csv"
+  cache_file: "logs/cache_results.json"
+  accepted_file_types:
+    - jpg
+    - png
+    - webp
+
+ai:
+  vlm_model: "deepseek-ocr"
+  text_model: "llama3.1"
+  ollama_url: "http://localhost:11434"
+  max_retries: 3
+  timeout_sec: 120
+  ollama_num_parallel: 2
+  num_ctx: 8192
+  temperature: 0.0
+  keep_alive: "5m"
+
+image:
+  max_dimension: 2000
+  contrast_factor: 1.5
+  jpeg_quality: 85
+
+ingestion:
+  survey_group_size: 5
+  upload_dir_prefix: "ankieter_uploads_"
+
+logging:
+  file: "logs/ankieter.log"
+  level: "DEBUG"
+  ai_log_max_bytes: 10485760
+  ai_log_backup_count: 3
+
+langsmith:
+  tracing_v2: false
+  endpoint: ""
+  api_key: ""
+  project: "ankieterai"
+
+processing:
+  progress_vlm_weight: 0.3
+  progress_text_weight: 0.6
+  history_display_limit: 8
+
+prompts:
+  vlm: |
+    === VLM Extraction — Strona {page_idx} ===
+    Przeanalizuj zdjęcie i wyekstrahuj surowy tekst.
+    Odpowiedz TYLKO surowym tekstem, BEZ formatowania JSON.
+
+  text_format: |
+    === Formatowanie Strony {page_idx} ===
+    Przekształć surowy tekst w JSON.
+
+    Surowy tekst z VLM:
+    ---
+    {raw_text}
+    ---
+
+    Odpowiedz wyłącznie w formacie JSON.

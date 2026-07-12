@@ -1,13 +1,14 @@
 import streamlit as st
 from ingestion.file_grouping import group_files_by_survey
-from domain.schemas import SurveyGroup  # import
+from domain.schemas import SurveyGroup
+from config import config
 
 def render():
     st.title("Wgrywanie ankiet")
     files = st.file_uploader(
         "Wybierz zdjęcia (jpg/png/webp)",
         accept_multiple_files=True,
-        type=["jpg", "png", "webp"],
+        type=config.app["accepted_file_types"],
     )
     if not files:
         return None, False
