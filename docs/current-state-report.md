@@ -1,6 +1,6 @@
 # RAPORT STANU PROJEKTU: AnkieterAI
 
-**Data:** 2026-07-11  
+**Data:** 2026-07-12  
 **Branch:** main (up-to-date z origin/main)  
 **Git status:** clean
 
@@ -8,8 +8,9 @@
 
 ## 🏗️ Struktura i Stack
 
-- **Stack:** Python 3.12+, Streamlit, Ollama (deepseek-ocr), Cloudflared Tunnel
+- **Stack:** Python 3.12+, Streamlit, Ollama (deepseek-ocr + llama3.1), Cloudflared Tunnel
 - **Architektura:** Modularna - `src/` z 8 modułami, `scripts/` z 5 skryptami PS1, `tests/` 6 plików
+- **AI Architecture:** Producer-Consumer (VLM → Text LLM), auto-fallback sekwencyjny przy VRAM OOM
 
 ---
 
@@ -28,19 +29,32 @@
 | 8 | Deployment: `run_dev.ps1`, `deploy_tunnel.ps1`, `full_setup.ps1` | ⚠️ Większość OK, `deploy_tunnel.ps1` ma bugi |
 | 9 | Testy: 58 testów (56 ✅, 2 ❌) | ⚠️ 2 testy fail |
 
+### Etap 3 — Przebudowa Architektury AI na Producer-Consumer
+
+| Krok | Opis | Status |
+|------|------|--------|
+| 1 | Rozszerzenie `config.py` o `vlm_model`, `text_model`, `ollama_num_parallel` | ✅ |
+| 2 | Prompty z placeholderami (`build_vlm_prompt`, `build_text_format_prompt`) | ✅ |
+| 3 | Przebudowa `client.py` — `_extract_text_vlm`, `_format_json_llm`, producer-consumer, fallback | ✅ |
+| 4 | Nowe statusy w `ProcessingStatus` (vlm_extracting, text_formatting, fallback_activated) | ✅ |
+| 5 | Aktualizacja UI processing — obsługę nowych statusów | ✅ |
+| 6 | Usunięcie `_analyze_page()`, aktualizacja importów | ✅ |
+| 7 | Nowe testy — 15/15 passed | ✅ |
+| 8 | Walidacja kompatybilności | ✅ |
+
 ---
 
 ## 📦 STAN MODUŁÓW ŹRÓDŁOWYCH (`src/`)
 
 | Plik | Linii | Status | Uwagi |
 |------|-------|--------|-------|
-| `config.py` | 18 | ✅ | Pydantic Settings, env prefix `ANKIETER_` |
+| `config.py` | 21 | ✅ | Pydantic Settings, env prefix `ANKIETER_`, dual model config |
 | `schemas.py` | 470 | ✅ | 67 pól MedicalSurvey, CSV mapping, needs_review, normalizacja |
 | `state_manager.py` | 90 | ✅ | Session state wrapper, auth, progress, AI results cache |
 | `data_handler.py` | 78 | ✅ | Grupowanie po 5, CSV z BOM, JSON cache |
-| `ai_client.py` | 461 | ✅ | Per-page prompts, retry 3x, async batch, progress callback, logging |
-| `ui_components.py` | 439 | ✅ | Side-by-side, 5 tabs, zoom (CSS), red dot dla needs_review, Spacja shortcut |
-| `main.py` | 130 | ✅ | Routing: login → upload → batch AI → verify → CSV → complete |
+| `ai/client.py` | ~350 | ✅ | Producer-consumer, dual-model (VLM + Text LLM), auto-fallback |
+| `ai/prompts.py` | 57 | ✅ | build_system_prompt + build_vlm_prompt + build_text_format_prompt |
+| `ui/pages/processing.py` | 83 | ✅ | Obsługa statusów VLM/TextLLM, spinery, fallback |
 | `logger.py` | 57 | ✅ | File + console, DEBUG, noise reduction |
 | `__init__.py` | 0 | ✅ | Pusty |
 
@@ -54,7 +68,7 @@
 | 7 | Lepsze komunikaty przy `JSONDecodeError` (treść odpowiedzi, status HTTP) | ❌ Otwarte | Średni |
 | 9 | Monitoring issues w repo (tagi commitów + sekcja README/plik) | ❌ Otwarte | Niski |
 | 10 | Progress bar: reset po kliknięciu "Rozpocznij analizę" | ❌ Otwarte | Średni |
-| **11** | **KRYTYCZNY: UI rozjeżdża się przy interakcji z kontrolką (zakładki rozjeżdżają, powrót do Strony 1 naprawia)** | ❌ Otwarte | **Krytyczny** |
+| **11** | **KRYTYCZNY: UI rozjeżdża się przy interakcji z kontrolką** | ❌ Otwarte | **Krytyczny** |
 
 **Zamknięte (✅):** #1 (sync tabs), #2 (progress UI), #3 (debug log), #4 (file log), #5 (brak domyślnych wartości), #6 (czerwona kropka znika po interakcji), #7 (Strona 1 - 2 kolumny 1-14).
 
@@ -111,23 +125,7 @@ Minimalny - brakuje:
 - Dodać tracking issues do README (issue #9)
 
 ### Priorytet 5 - OPTYMALIZACJA (z `docs/optimalization-plan.md`)
-- **Etap 1:** Pre-processing obrazów (resize, grayscale, contrast), `keep_alive: "-1"`, `temperature: 0`
-- **Etap 2:** Architektura dwuetapowa (VLM → tekst → Text LLM → JSON)
-- **Etap 3:** Async producer-consumer z `asyncio.Queue`
+- **Etap 1:** Pre-processing obrazów (resize, grayscale, contrast), `keep_alive: "-1"`, `temperature: 0` ✅ ZROBIONE
+- **Etap 2:** Architektura dwuetapowa (VLM → tekst → Text LLM → JSON) ✅ ZROBIONE
+- **Etap 3:** Async producer-consumer z `asyncio.Queue` ✅ ZROBIONE
 - **Etap 4:** LangSmith tracing
-
-> ⚠️ **UWAGA z optimalization-plan.md:** "Kategoryczny zakaz modyfikowania promptów w kodzie - prompty z zewnętrznego modułu/konfiguracji"
-
----
-
-## 🤔 PYTANIA DECYZYJNE
-
-1. **Issue #11 (krytyczny UI)** - chcesz, żebym przeanalizowałem `ui_components.py` i przygotowałem plan naprawy jako osobny task?
-
-2. **Testy** - naprawiam 2 failujące testy (to prosta zmiana asercji), czy robimy to teraz?
-
-3. **Deployment tunnel** - naprawiam `deploy_tunnel.ps1`?
-
-4. **Optymalizacja (Etap 1-4)** - to duży refaktoring `ai_client.py` + nowa architektura. Chcesz przejść do fazy optymalizacji, czy najpierw stabilizujemy obecny stan?
-
-5. **README** - rozszerzamy teraz, czy na końcu?

@@ -21,32 +21,56 @@ def render():
         pct = status.survey_idx / max(status.total_surveys, 1)
         with progress_placeholder.container():
             st.progress(pct, text=f"Ankieta {status.survey_idx+1} z {status.total_surveys}")
-            if status.status == "processing_page":
+
+            if status.status == "survey_start":
+                st.info(status.message)
+
+            elif status.status == "vlm_extracting":
                 st.markdown(
                     f'<div style="display:flex;align-items:center;gap:8px;min-height:24px;font-size:0.9rem">'
-                    f'<span class="mini-spinner"></span><span>{status.message}</span></div>',
+                    f'<span class="mini-spinner"></span>'
+                    f'<span>👁 {status.message}</span></div>',
                     unsafe_allow_html=True,
                 )
-            elif status.status == "retrying":
-                st.warning(status.message)
+
+            elif status.status == "vlm_retrying":
+                st.warning(f"🔄 {status.message}")
+
+            elif status.status == "text_formatting":
+                st.markdown(
+                    f'<div style="display:flex;align-items:center;gap:8px;min-height:24px;font-size:0.9rem">'
+                    f'<span class="mini-spinner" style="border-top-color:#1E88E5;"></span>'
+                    f'<span>📝 {status.message}</span></div>',
+                    unsafe_allow_html=True,
+                )
+
+            elif status.status == "text_retrying":
+                st.warning(f"🔄 {status.message}")
+
+            elif status.status == "fallback_activated":
+                st.error(f"⚠️ {status.message}")
+
             elif status.status == "page_error":
                 st.error(status.message)
+
             elif status.status == "survey_done":
                 extra = status.extra or {}
                 elapsed = extra.get("elapsed_s", "")
+                pages = extra.get("pages", "")
                 msg = status.message
                 if elapsed:
-                    msg += f" ({elapsed}s)"
+                    msg += f" ({elapsed}s, {pages} stron)"
                 st.success(msg)
+
             elif status.status == "batch_done":
                 st.success(status.message)
 
         # Dodaj do historii tylko jeśli nowy i nie jest ostatnim
-        if status.message not in history[-5:]:
+        if status.message not in history[-8:]:
             history.append(status.message)
         with history_placeholder.container():
-            st.caption("Podsumowanie ostatnich kroków:")
-            for line in history[-5:]:
+            st.caption("Ostatnie kroki:")
+            for line in history[-8:]:
                 st.text(line)
 
     async def run_batch():

@@ -89,3 +89,41 @@ class TestPayloadConfig:
         assert _OLLAMA_KEEP_ALIVE == "-1"
         assert _OLLAMA_TEMPERATURE == 0.0
         assert _OLLAMA_NUM_CTX == 8192
+
+    def test_client_has_two_models(self):
+        from ai.client import AIClient
+        client = AIClient()
+        assert hasattr(client, "vlm_model")
+        assert hasattr(client, "text_model")
+        assert client.vlm_model == "deepseek-ocr"
+        assert client.text_model == "llama3.1"
+
+
+class TestVLMPrompt:
+    def test_returns_string(self):
+        from ai.prompts import build_vlm_prompt
+        result = build_vlm_prompt(0)
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_contains_page_number(self):
+        from ai.prompts import build_vlm_prompt
+        result = build_vlm_prompt(2)
+        assert "3" in result
+
+    def test_no_json_instruction(self):
+        from ai.prompts import build_vlm_prompt
+        result = build_vlm_prompt(0)
+        assert "JSON" not in result.upper() or "BEZ" in result.upper()
+
+
+class TestTextFormatPrompt:
+    def test_injects_raw_text(self):
+        from ai.prompts import build_text_format_prompt
+        result = build_text_format_prompt(0, "Płeć: Kobieta, Wiek: 23")
+        assert "Płeć: Kobieta, Wiek: 23" in result
+
+    def test_returns_string(self):
+        from ai.prompts import build_text_format_prompt
+        result = build_text_format_prompt(0, "test")
+        assert isinstance(result, str)
