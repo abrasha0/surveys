@@ -4,61 +4,63 @@
 # =============================================================
 
 app:
-  page_title: "surveyAI"
-  layout: "wide"
-  password: "a"
-  csv_results: "wyniki.csv"
-  cache_file: "logs/cache_results.json"
-  accepted_file_types:
+  page_title: "surveyAI"          # Tytuł strony w przeglądarce
+  layout: "wide"                  # Layout Streamlit: "wide" lub "centered"
+  password: "a"                   # Hasło do logowania
+  csv_results: "wyniki.csv"       # Nazwa pliku wynikowego CSV
+  cache_file: "logs/cache_results.json"  # Ścieżka do cache wyników AI
+  accepted_file_types:            # Dozwolone rozszerzenia plików
     - jpg
     - png
     - webp
 
 ai:
-  vlm_model: "deepseek-ocr"
-  text_model: "llama3.1"
-  ollama_url: "http://localhost:11434"
-  max_retries: 3
-  timeout_sec: 120
-  num_ctx: 8192
-  temperature: 0.0
-  keep_alive: "5m"
+  vlm_model: "deepseek-ocr"      # Model wizyjny (VLM) do ekstrakcji tekstu
+  text_model: "llama3.1"          # Model tekstowy do formatowania JSON
+  ollama_url: "http://localhost:11434"  # URL serwera Ollama
+  max_retries: 3                  # Maksymalna liczba ponawiań przy błędach
+  timeout_sec: 120                # Timeout żądania API (sekundy)
+  num_ctx: 8192                   # Rozmiar kontekstu modelu (tokeny)
+  temperature: 0.0                # Temperatura generowania (0.0 = deterministycznie)
+  keep_alive: "5m"                # Czas trzymania modelu w VRAM po żądaniu
 
 image:
-  max_dimension: 2000
-  contrast_factor: 1.5
-  jpeg_quality: 85
+  max_dimension: 2000             # Maksymalny rozmiar dłuższego boku obrazu (px)
+  contrast_factor: 1.5            # Współczynnik podbicia kontrastu (1.0 = brak)
+  jpeg_quality: 85                # Jakość kompresji JPEG (1-100)
 
 ingestion:
-  survey_group_size: 5
-  upload_dir_prefix: "ankieter_uploads_"
+  survey_group_size: 5            # Liczba stron na ankietę (5 = standard)
+  upload_dir_prefix: "ankieter_uploads_"  # Prefiks katalogu tymczasowego
 
 logging:
-  file: "logs/ankieter.log"
-  level: "DEBUG"
-  ai_log_max_bytes: 10485760
-  ai_log_backup_count: 3
-  shorten_models_io: true
-  max_models_io_size: 500
+  file: "logs/ankieter.log"       # Ścieżka do głównego pliku logów
+  level: "DEBUG"                  # Poziom logowania (DEBUG/INFO/WARNING/ERROR)
+  ai_log_max_bytes: 10485760      # Maksymalny rozmiar logu AI (10MB)
+  ai_log_backup_count: 3          # Liczba kopii zapasowych logu AI
+  shorten_models_io: true         # Skracanie I/O modeli w logach (dla czytelności)
+  max_models_io_size: 500         # Maksymalna długość skróconego I/O (znaki)
 
 langsmith:
-  tracing_v2: false
-  endpoint: ""
-  api_key: ""
-  project: "ankieterai"
+  tracing_v2: false               # Włącz/wyłącz tracing LangSmith
+  endpoint: ""                    # URL API LangSmith (wymagane jeśli tracing_v2: true)
+  api_key: ""                     # Klucz API LangSmith (wymagane jeśli tracing_v2: true)
+  project: "ankieterai"           # Nazwa projektu w LangSmith
 
 processing:
-  progress_vlm_weight: 0.3
-  progress_text_weight: 0.6
-  history_display_limit: 8
+  progress_vlm_weight: 0.3        # Waga postępu VLM w całkowitym progressie
+  progress_text_weight: 0.6       # Waga postępu Text LLM w całkowitym progressie
+  history_display_limit: 8        # Liczba ostatnich kroków w historii przetwarzania
 
 prompts:
-  vlm: |
+  vlm: |                          # Prompt dla modelu wizyjnego (VLM)
     === VLM Extraction — Strona {page_idx} ===
-    Przeanalizuj zdjęcie i wyekstrahuj surowy tekst.
-    Odpowiedz TYLKO surowym tekstem, BEZ formatowania JSON.
+    Na dołączonym zdjęciu znajduje się ankieta. Twoim zadaniem jest wyodrębnienie
+    wszystkich pytań i udzielonych na nie odpowiedzi.
+    Masz odpowiedzieć w formacie: <pytanie> : <odpowiedź>.
+    Jeśli nie możesz znaleźć odpowiedzi, napisz "Brak odpowiedzi" dla tego pytania.
 
-  text_format: |
+  text_format: |                  # Prompt dla modelu tekstowego (formatowanie)
     === Formatowanie Strony {page_idx} ===
     Przekształć surowy tekst w JSON.
 

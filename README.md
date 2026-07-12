@@ -2,70 +2,7 @@
 
 Automatyczny system wprowadzania ankiet papierowych do formy cyfrowej z wykorzystaniem lokalnego modelu wizyjno-jężykowego (VLM).
 
-## Architektura
-
-System wykorzystuje architekturę **sekwencyjną per-strona** z dwoma modelami AI:
-
-- **VLM (deepseek-ocr)** — ekstrakcja surowego tekstu z obrazów ankiet
-- **Text LLM (llama3.1)** — formatowanie surowego tekstu do struktury JSON
-
-Flow przetwarzania (dla każdej strony kolejno):
-1. Pre-processing obrazu (resize, grayscale, contrast)
-2. VLM ekstrahuje surowy tekst z obrazu
-3. Text LLM formatuje tekst do JSON
-4. Następna strona...
-
-Dzięki temu uzyskujemy:
-- Przewidywalny, deterministyczny flow — łatwy w debugowaniu i logowaniu
-- Tylko jeden model naraz w pamięci GPU (mniejsze zużycie VRAM)
-- Lepszą separację odpowiedzialności (wizja vs. formatowanie)
-
-## Funkcjonalności
-
-- Logowanie hasłem do aplikacji
-- Upload zdjęć ankiet (jpg/png/webp)
-- Automatyczna analiza obrazów przez VLM (Ollama + deepseek-ocr)
-- Dwuetapowe przetwarzanie: VLM → tekst → Text LLM → JSON
-- Sekwencyjne przetwarzanie per-strona (jeden model naraz)
-- Batch processing z progress barem i cache'owaniem wyników
-- Weryfikacja i korekta odczytanych danych w interfejsie side-by-side
-- Podgląd zdjęć z zoomem (zakładki dla każdej strony)
-- Formularz z dynamicznym zaznaczaniem pól o niskiej pewności odczytu
-- Skrót klawiszowy Spacja do szybkiego zatwierdzania
-- Eksport wyników do CSV (UTF-8 BOM, gotowy do Excela)
-- Zapis do cache (wznawianie sesji po przerwie)
-
-## Konfiguracja
-
-### Podstawowa
-
-| Zmienna środowiskowa | Domyślna wartość | Opis |
-|---------------------|------------------|------|
-| `ANKIETER_VLM_MODEL` | `deepseek-ocr` | Model wizyjny (VLM) |
-| `ANKIETER_TEXT_MODEL` | `llama3.1` | Model tekstowy (formatowanie) |
-| `ANKIETER_OLLAMA_URL` | `http://localhost:11434` | URL serwera Ollama |
-| `ANKIETER_MAX_RETRIES` | `3` | Maksymalna liczba ponawiań |
-
-### LangSmith (opcjonalne)
-
-Aby włączyć śledzenie wywołań AI w dashboardzie LangSmith, ustaw zmienne środowiskowe:
-
-| Zmienna środowiskowa | Domyślna wartość | Opis |
-|---------------------|------------------|------|
-| `LANGCHAIN_TRACING_V2` | `false` | Włącz/wyłącz tracing |
-| `LANGCHAIN_ENDPOINT` | — | URL API LangSmith |
-| `LANGCHAIN_API_KEY` | — | Klucz API LangSmith |
-| `LANGCHAIN_PROJECT` | `ankieterai` | Nazwa projektu w LangSmith |
-
-Tracing jest opcjonalny — gdy wyłączony lub gdy pakiet `langsmith` nie jest zainstalowany, traces są pomijane (no-op).
-
-### Logi
-
-- `logs/ankieter.log` — logi główne aplikacji (rotacja: brak)
-- `logs/ai_requests.log` — dedykowany log wywołań AI per-call (rotacja: 10MB, 3 kopie zapasowe)
-- `logs/cache_results.json` — cache wyników analizy
-
-## Uruchomienie
+## Quick Start
 
 1. Przygotowanie środowiska:
 
@@ -80,6 +17,7 @@ Tracing jest opcjonalny — gdy wyłączony lub gdy pakiet `langsmith` nie jest 
    ```
 
 3. Start aplikacji:
+
    ```powershell
    .venv\Scripts\Activate.ps1
    streamlit run src/app.py
@@ -87,9 +25,39 @@ Tracing jest opcjonalny — gdy wyłączony lub gdy pakiet `langsmith` nie jest 
 
 Aplikacja dostępna pod `http://localhost:8501`. Domyślne hasło: `a`.
 
+## Funkcjonalności
+
+- Logowanie hasłem do aplikacji
+- Upload zdjęć ankiet (jpg/png/webp)
+- Automatyczna analiza obrazów przez VLM (Ollama + deepseek-ocr)
+- Dwuetapowe przetwarzanie: VLM → tekst → Text LLM → JSON
+- Sekwencyjne przetwarzanie per-strona (jeden model naraz)
+- Batch processing z progress barem i cache'owaniem wyników
+- Weryfikacja i korekta odczytanych danych w interfejsie side-by-side
+- Podgląd zdjęć z zoomem (zakładki dla każdej strony)
+- Formularz z dynamicznym zaznaczaniem pól o niskiej pewności odczytu
+- Skrót klawiszowy Spacja do szybkiego zatwierdzania
+- Eksport wyników do CSV (UTF-8 BOM, gotowy do Excela)
+
+## Konfiguracja
+
+Aplikacja wykorzystuje `config.yaml` jako główne źródło konfiguracji.
+Skopiuj `config.yaml.example` i dostosuj do swojego środowiska.
+
+Zmienne środowiskowe z prefiksem `ANKIETER_*` nadpisują wartości z pliku YAML.
+
+Szczegóły: patrz `config.yaml.example` (skomentowane klucze) oraz `docs/main-doc.md`.
+
 ## Testy
 
 ```powershell
 .venv\Scripts\Activate.ps1
 pytest tests/
 ```
+
+## Dokumentacja
+
+- `docs/architecture-report.md` — opis architektury i modułów
+- `docs/survey-structure.md` — pełna struktura ankiety (63 pola)
+- `docs/main-doc.md` — szczegółowy opis flow, funkcjonalności, konfiguracji
+- `docs/known-issues.md` — bieżące problemy
