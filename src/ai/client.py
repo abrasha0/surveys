@@ -16,7 +16,7 @@ from config import config
 from domain.schemas import MedicalSurvey
 from ai.prompts import build_vlm_prompt, build_text_format_prompt
 from domain.field_specs import ALL_FIELDS
-from logger import ai_req_logger
+import logger as _logger_mod
 
 try:
     from ai.tracing import vlm_trace, llm_trace, io_trace, TraceContext
@@ -40,22 +40,22 @@ async def log_ai_call(operation: str, model: str, page_idx: int, survey_idx: int
     header = f"{operation} | model={model} | page={page_idx} | survey={survey_idx}"
     if extra_str:
         header += f" | {extra_str}"
-    if ai_req_logger:
-        ai_req_logger.info("%s", header)
+    if _logger_mod.ai_req_logger:
+        _logger_mod.ai_req_logger.info("%s", header)
     try:
         yield
     except Exception as e:
         elapsed = time.perf_counter() - t0
-        if ai_req_logger:
-            ai_req_logger.error(
+        if _logger_mod.ai_req_logger:
+            _logger_mod.ai_req_logger.error(
                 "%s_err | model=%s | page=%d | latency=%.2fs | error_type=%s | error=%s",
                 operation, model, page_idx, elapsed, type(e).__name__, str(e)[:300],
             )
         raise
     else:
         elapsed = time.perf_counter() - t0
-        if ai_req_logger:
-            ai_req_logger.info(
+        if _logger_mod.ai_req_logger:
+            _logger_mod.ai_req_logger.info(
                 "%s_ok | model=%s | page=%d | latency=%.2fs",
                 operation, model, page_idx, elapsed,
             )
@@ -169,11 +169,11 @@ class AIClient:
                     else:
                         image_b64 = _image_to_base64(image_path)
 
-                    if ai_req_logger:
-                        ai_req_logger.info(
-                            "vlm_extract | model=%s | page=%d | survey=%d | attempt=%d/%d | prompt_preview=%s",
+                    if _logger_mod.ai_req_logger:
+                        _logger_mod.ai_req_logger.info(
+                            "vlm_extract | model=%s | page=%d | survey=%d | attempt=%d/%d | file=%s | prompt=%s",
                             self.vlm_model, page_index, survey_idx, attempt+1, self.max_retries,
-                            system_prompt[:200],
+                            image_path.name, system_prompt[:500],
                         )
                     resp = await self._client.post(
                         f"{self.base_url}/api/chat",
@@ -195,10 +195,11 @@ class AIClient:
                     resp.raise_for_status()
                     body = resp.json()
                     raw_text = body.get("message", {}).get("content", "")
-                    if ai_req_logger:
-                        ai_req_logger.info(
-                            "vlm_extract_ok | model=%s | page=%d | chars=%d | latency=%.2fs",
+                    if _logger_mod.ai_req_logger:
+                        _logger_mod.ai_req_logger.info(
+                            "vlm_extract_ok | model=%s | page=%d | chars=%d | latency=%.2fs | output_preview=%s",
                             self.vlm_model, page_index, len(raw_text), elapsed,
+                            raw_text[:500],
                         )
                     logger.info("VLM page %d extracted %d chars in %.2fs", page_index, len(raw_text), elapsed)
                     return raw_text
@@ -211,8 +212,8 @@ class AIClient:
                         hse.response.status_code, page_index, attempt+1, self.max_retries, elapsed,
                         hse.response.text[:500],
                     )
-                    if ai_req_logger:
-                        ai_req_logger.error(
+                    if _logger_mod.ai_req_logger:
+                        _logger_mod.ai_req_logger.error(
                             "vlm_extract_err | model=%s | page=%d | attempt=%d/%d | error_type=HTTPStatusError | http_status=%d | error=%s",
                             self.vlm_model, page_index, attempt+1, self.max_retries,
                             hse.response.status_code, hse.response.text[:300],
@@ -227,8 +228,8 @@ class AIClient:
                         "VLM attempt %d/%d for page %d failed after %.2fs: %s",
                         attempt+1, self.max_retries, page_index, elapsed, str(e)[:200],
                     )
-                    if ai_req_logger:
-                        ai_req_logger.error(
+                    if _logger_mod.ai_req_logger:
+                        _logger_mod.ai_req_logger.error(
                             "vlm_extract_err | model=%s | page=%d | attempt=%d/%d | error_type=%s | error=%s",
                             self.vlm_model, page_index, attempt+1, self.max_retries,
                             type(e).__name__, str(e)[:300],
@@ -273,10 +274,11 @@ class AIClient:
                                     else f"Ankieta {survey_idx+1}, Strona {page_index+1}: Text LLM ponawianie ({attempt+1}/{self.max_retries})...",
                         ))
 
-                    if ai_req_logger:
-                        ai_req_logger.info(
-                            "text_format | model=%s | page=%d | survey=%d | attempt=%d/%d | raw_text_len=%d",
-                            self.text_model, page_index, survey_idx, attempt+1, self.max_retries, len(raw_text),
+                    if _logger_mod.ai_req_logger:
+                        _logger_mod.ai_req_logger.info(
+                            "text_format | model=%s | page=%d | survey=%d | attempt=%d/%d | prompt=%s | raw_text_len=%d",
+                            self.text_model, page_index, survey_idx, attempt+1, self.max_retries,
+                            system_prompt[:500], len(raw_text),
                         )
                     resp = await self._client.post(
                         f"{self.base_url}/api/chat",
@@ -300,10 +302,11 @@ class AIClient:
                     body = resp.json()
                     content = body.get("message", {}).get("content", "")
                     parsed = json.loads(content)
-                    if ai_req_logger:
-                        ai_req_logger.info(
-                            "text_format_ok | model=%s | page=%d | keys=%s | latency=%.2fs",
+                    if _logger_mod.ai_req_logger:
+                        _logger_mod.ai_req_logger.info(
+                            "text_format_ok | model=%s | page=%d | keys=%s | latency=%.2fs | output_preview=%s",
                             self.text_model, page_index, list(parsed.keys()), elapsed,
+                            json.dumps(parsed, ensure_ascii=False)[:500],
                         )
                     logger.info("Text LLM page %d formatted in %.2fs", page_index, elapsed)
                     return parsed
@@ -317,8 +320,8 @@ class AIClient:
                         page_index, attempt+1, self.max_retries, elapsed,
                         str(jde), content[:500],
                     )
-                    if ai_req_logger:
-                        ai_req_logger.error(
+                    if _logger_mod.ai_req_logger:
+                        _logger_mod.ai_req_logger.error(
                             "text_format_json_err | model=%s | page=%d | attempt=%d/%d | json_error=%s | raw_preview=%s",
                             self.text_model, page_index, attempt+1, self.max_retries,
                             str(jde), content[:500],
@@ -333,8 +336,8 @@ class AIClient:
                         "Text LLM attempt %d/%d for page %d failed after %.2fs: %s",
                         attempt+1, self.max_retries, page_index, elapsed, str(e)[:200],
                     )
-                    if ai_req_logger:
-                        ai_req_logger.error(
+                    if _logger_mod.ai_req_logger:
+                        _logger_mod.ai_req_logger.error(
                             "text_format_err | model=%s | page=%d | attempt=%d/%d | error_type=%s | error=%s",
                             self.text_model, page_index, attempt+1, self.max_retries,
                             type(e).__name__, str(e)[:300],
@@ -391,8 +394,8 @@ class AIClient:
                 except json.JSONDecodeError as jde:
                     logger.error("Text LLM page %d JSONDecodeError: %s | raw: %s",
                                  page_idx, str(jde), raw_text[:1000])
-                    if ai_req_logger:
-                        ai_req_logger.error(
+                    if _logger_mod.ai_req_logger:
+                        _logger_mod.ai_req_logger.error(
                             "text_format_json_err | model=%s | page=%d | json_error=%s | raw_preview=%s",
                             self.text_model, page_idx, str(jde), raw_text[:500],
                         )
@@ -406,8 +409,8 @@ class AIClient:
                     results[page_idx] = {}
                 except Exception as e:
                     logger.error("Text LLM page %d failed: %s", page_idx, e)
-                    if ai_req_logger:
-                        ai_req_logger.error(
+                    if _logger_mod.ai_req_logger:
+                        _logger_mod.ai_req_logger.error(
                             "text_format_err | model=%s | page=%d | error_type=%s | error=%s",
                             self.text_model, page_idx, type(e).__name__, str(e)[:300],
                         )

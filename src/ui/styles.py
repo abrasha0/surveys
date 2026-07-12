@@ -25,17 +25,18 @@ def _hide_toolbar_js():
         });
     }
 
-    function patchContainerHeights(root) {
+    function patchContainerLayout(root) {
         root.querySelectorAll(
             '[data-testid="stAppViewBlockContainer"], .block-container'
         ).forEach(function(el) {
-            el.style.paddingTop = '0';
-            el.style.paddingBottom = '0';
+            el.style.padding = '0';
+            el.style.maxWidth = '100%';
+            el.style.width = '100%';
         });
     }
 
     hideElements(document);
-    patchContainerHeights(document);
+    patchContainerLayout(document);
 
     var observer = new MutationObserver(function(mutations) {
         for (var i = 0; i < mutations.length; i++) {
@@ -45,14 +46,15 @@ def _hide_toolbar_js():
                     var node = m.addedNodes[j];
                     if (node.nodeType !== 1) continue;
                     hideElements(node);
-                    patchContainerHeights(node);
+                    patchContainerLayout(node);
                 }
             }
             if (m.type === 'attributes' && m.attributeName === 'style') {
                 var el = m.target;
                 if (el.matches('[data-testid="stAppViewBlockContainer"], .block-container')) {
-                    el.style.paddingTop = '0';
-                    el.style.paddingBottom = '0';
+                    el.style.padding = '0';
+                    el.style.maxWidth = '100%';
+                    el.style.width = '100%';
                 }
             }
         }
@@ -90,12 +92,12 @@ def inject_global_css():
     }
 
     /* Rozciągnięcie na całą szerokość */
-    .stMainBlockContainer, .main .block-container {
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
+    .stMainBlockContainer,
+    [data-testid="stMainBlockContainer"],
+    .main .block-container {
+        padding: 0 !important;
         max-width: 100% !important;
+        width: 100% !important;
     }
     .stApp {
         overflow: hidden;
