@@ -4,14 +4,20 @@ Automatyczny system wprowadzania ankiet papierowych do formy cyfrowej z wykorzys
 
 ## Architektura
 
-System wykorzystuje architekturę **Producer-Consumer** z dwoma modelami AI:
+System wykorzystuje architekturę **sekwencyjną per-strona** z dwoma modelami AI:
 
 - **VLM (deepseek-ocr)** — ekstrakcja surowego tekstu z obrazów ankiet
 - **Text LLM (llama3.1)** — formatowanie surowego tekstu do struktury JSON
 
+Flow przetwarzania (dla każdej strony kolejno):
+1. Pre-processing obrazu (resize, grayscale, contrast)
+2. VLM ekstrahuje surowy tekst z obrazu
+3. Text LLM formatuje tekst do JSON
+4. Następna strona...
+
 Dzięki temu uzyskujemy:
-- Nakładanie faz: podczas gdy Text LLM formatuje jedną stronę, VLM ekstrakuje kolejną
-- Automatyczny fallback sekwencyjny przy VRAM OOM
+- Przewidywalny, deterministyczny flow — łatwy w debugowaniu i logowaniu
+- Tylko jeden model naraz w pamięci GPU (mniejsze zużycie VRAM)
 - Lepszą separację odpowiedzialności (wizja vs. formatowanie)
 
 ## Funkcjonalności
@@ -20,8 +26,7 @@ Dzięki temu uzyskujemy:
 - Upload zdjęć ankiet (jpg/png/webp)
 - Automatyczna analiza obrazów przez VLM (Ollama + deepseek-ocr)
 - Dwuetapowe przetwarzanie: VLM → tekst → Text LLM → JSON
-- Producer-consumer z `asyncio.Queue` dla optymalnego wykorzystania GPU
-- Auto-fallback sekwencyjny przy VRAM OOM
+- Sekwencyjne przetwarzanie per-strona (jeden model naraz)
 - Batch processing z progress barem i cache'owaniem wyników
 - Weryfikacja i korekta odczytanych danych w interfejsie side-by-side
 - Podgląd zdjęć z zoomem (zakładki dla każdej strony)
@@ -38,7 +43,6 @@ Dzięki temu uzyskujemy:
 |---------------------|------------------|------|
 | `ANKIETER_VLM_MODEL` | `deepseek-ocr` | Model wizyjny (VLM) |
 | `ANKIETER_TEXT_MODEL` | `llama3.1` | Model tekstowy (formatowanie) |
-| `ANKIETER_OLLAMA_NUM_PARALLEL` | `2` | Liczba równoległych żądań |
 | `ANKIETER_OLLAMA_URL` | `http://localhost:11434` | URL serwera Ollama |
 | `ANKIETER_MAX_RETRIES` | `3` | Maksymalna liczba ponawiań |
 

@@ -86,7 +86,7 @@ class TestPreprocessImage:
 class TestPayloadConfig:
     def test_keep_alive_and_temperature_present(self):
         from ai.client import AIClient, _OLLAMA_KEEP_ALIVE, _OLLAMA_TEMPERATURE, _OLLAMA_NUM_CTX
-        assert _OLLAMA_KEEP_ALIVE == "-1"
+        assert _OLLAMA_KEEP_ALIVE == "5m"
         assert _OLLAMA_TEMPERATURE == 0.0
         assert _OLLAMA_NUM_CTX == 8192
 

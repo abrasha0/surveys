@@ -3,7 +3,18 @@ import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
+from config import config
+
 logger = logging.getLogger(__name__)
+
+_SHORTEN_IO = config.logging["shorten_models_io"]
+_MAX_IO_SIZE = config.logging["max_models_io_size"]
+
+
+def _truncate(text: str, limit: int | None = None) -> str:
+    if not _SHORTEN_IO:
+        return text
+    return text[: limit or _MAX_IO_SIZE]
 
 _client = None
 _client_attempted = False
@@ -93,11 +104,11 @@ async def vlm_trace(ctx: TraceContext):
                 end_time=time.time(),
                 extra={
                     "latency_s": round(elapsed, 3),
-                    "error": str(error)[:500] if error else None,
+                    "error": _truncate(str(error)) if error else None,
                 },
             )
             if error:
-                client.update_run(run.id, error=str(error)[:500])
+                client.update_run(run.id, error=_truncate(str(error)))
         except Exception as e:
             logger.warning("LangSmith vlm_trace update_run failed: %s", e)
 
@@ -147,11 +158,11 @@ async def llm_trace(ctx: TraceContext):
                 end_time=time.time(),
                 extra={
                     "latency_s": round(elapsed, 3),
-                    "error": str(error)[:500] if error else None,
+                    "error": _truncate(str(error)) if error else None,
                 },
             )
             if error:
-                client.update_run(run.id, error=str(error)[:500])
+                client.update_run(run.id, error=_truncate(str(error)))
         except Exception as e:
             logger.warning("LangSmith llm_trace update_run failed: %s", e)
 
@@ -189,10 +200,10 @@ async def io_trace(op_name: str, metadata: dict | None = None):
                 end_time=time.time(),
                 extra={
                     "latency_s": round(elapsed, 3),
-                    "error": str(error)[:500] if error else None,
+                    "error": _truncate(str(error)) if error else None,
                 },
             )
             if error:
-                client.update_run(run.id, error=str(error)[:500])
+                client.update_run(run.id, error=_truncate(str(error)))
         except Exception as e:
             logger.warning("LangSmith io_trace update_run failed: %s", e)

@@ -10,7 +10,7 @@
 
 - **Stack:** Python 3.12+, Streamlit, Ollama (deepseek-ocr + llama3.1), Cloudflared Tunnel
 - **Architektura:** Modularna - `src/` z 8 modułami, `scripts/` z 5 skryptami PS1, `tests/` 6 plików
-- **AI Architecture:** Producer-Consumer (VLM → Text LLM), auto-fallback sekwencyjny przy VRAM OOM
+- **AI Architecture:** Sekwencyjne przetwarzanie per-strona (VLM → Text LLM → następna strona)
 
 ---
 
@@ -29,18 +29,18 @@
 | 8 | Deployment: `run_dev.ps1`, `deploy_tunnel.ps1`, `full_setup.ps1` | ⚠️ Większość OK, `deploy_tunnel.ps1` ma bugi |
 | 9 | Testy: 58 testów (56 ✅, 2 ❌) | ⚠️ 2 testy fail |
 
-### Etap 3 — Przebudowa Architektury AI na Producer-Consumer
+### Etap 3 — Sekwencyjne przetwarzanie per-strona (refactor z Producer-Consumer)
 
 | Krok | Opis | Status |
 |------|------|--------|
-| 1 | Rozszerzenie `config.py` o `vlm_model`, `text_model`, `ollama_num_parallel` | ✅ |
+| 1 | Rozszerzenie `config.py` o `vlm_model`, `text_model` | ✅ |
 | 2 | Prompty z placeholderami (`build_vlm_prompt`, `build_text_format_prompt`) | ✅ |
-| 3 | Przebudowa `client.py` — `_extract_text_vlm`, `_format_json_llm`, producer-consumer, fallback | ✅ |
-| 4 | Nowe statusy w `ProcessingStatus` (vlm_extracting, text_formatting, fallback_activated) | ✅ |
-| 5 | Aktualizacja UI processing — obsługę nowych statusów | ✅ |
-| 6 | Usunięcie `_analyze_page()`, aktualizacja importów | ✅ |
-| 7 | Nowe testy — 15/15 passed | ✅ |
-| 8 | Walidacja kompatybilności | ✅ |
+| 3 | `_process_pages_sequential()` — VLM → Text LLM per strona, bez kolejek | ✅ |
+| 4 | Statusy w `ProcessingStatus` (vlm_extracting, text_formatting, page_error) | ✅ |
+| 5 | Aktualizacja UI processing — obsługa statusów sekwencyjnych | ✅ |
+| 6 | Usunięcie producer-consumer, fallback_activated, ollama_num_parallel | ✅ |
+| 7 | Usunięcie nieużywanej `build_system_prompt()` | ✅ |
+| 8 | Testy — brak zmian wymaganych (testy nie refaktorowanej logiki) | ✅ |
 
 ---
 
@@ -52,9 +52,9 @@
 | `schemas.py` | 470 | ✅ | 67 pól MedicalSurvey, CSV mapping, needs_review, normalizacja |
 | `state_manager.py` | 90 | ✅ | Session state wrapper, auth, progress, AI results cache |
 | `data_handler.py` | 78 | ✅ | Grupowanie po 5, CSV z BOM, JSON cache |
-| `ai/client.py` | ~350 | ✅ | Producer-consumer, dual-model (VLM + Text LLM), auto-fallback |
-| `ai/prompts.py` | 57 | ✅ | build_system_prompt + build_vlm_prompt + build_text_format_prompt |
-| `ui/pages/processing.py` | 83 | ✅ | Obsługa statusów VLM/TextLLM, spinery, fallback |
+| `ai/client.py` | ~400 | ✅ | Sekwencyjne per-strona: VLM → Text LLM, retry, logging |
+| `ai/prompts.py` | 27 | ✅ | build_vlm_prompt + build_text_format_prompt |
+| `ui/pages/processing.py` | 80 | ✅ | Obsługa statusów VLM/TextLLM, spinery |
 | `logger.py` | 57 | ✅ | File + console, DEBUG, noise reduction |
 | `__init__.py` | 0 | ✅ | Pusty |
 
@@ -125,7 +125,7 @@ Minimalny - brakuje:
 - Dodać tracking issues do README (issue #9)
 
 ### Priorytet 5 - OPTYMALIZACJA (z `docs/optimalization-plan.md`)
-- **Etap 1:** Pre-processing obrazów (resize, grayscale, contrast), `keep_alive: "-1"`, `temperature: 0` ✅ ZROBIONE
+- **Etap 1:** Pre-processing obrazów (resize, grayscale, contrast), `keep_alive`, `temperature: 0` ✅ ZROBIONE
 - **Etap 2:** Architektura dwuetapowa (VLM → tekst → Text LLM → JSON) ✅ ZROBIONE
-- **Etap 3:** Async producer-consumer z `asyncio.Queue` ✅ ZROBIONE
+- **Etap 3:** Sekwencyjne przetwarzanie per-strona (bez kolejek, bez fallback) ✅ ZROBIONE
 - **Etap 4:** LangSmith tracing

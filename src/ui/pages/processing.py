@@ -63,9 +63,6 @@ def render():
             elif status.status == "text_retrying":
                 st.warning(f"🔄 {status.message}")
 
-            elif status.status == "fallback_activated":
-                st.error(f"⚠️ {status.message}")
-
             elif status.status == "page_error":
                 st.error(status.message)
 

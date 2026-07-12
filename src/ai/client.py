@@ -31,6 +31,14 @@ _OLLAMA_TEMPERATURE = config.ai["temperature"]
 _OLLAMA_KEEP_ALIVE = config.ai["keep_alive"]
 _MAX_IMAGE_DIMENSION = config.image["max_dimension"]
 _CONTRAST_FACTOR = config.image["contrast_factor"]
+_SHORTEN_IO = config.logging["shorten_models_io"]
+_MAX_IO_SIZE = config.logging["max_models_io_size"]
+
+
+def _truncate(text: str, limit: int | None = None) -> str:
+    if not _SHORTEN_IO:
+        return text
+    return text[: limit or _MAX_IO_SIZE]
 
 
 @asynccontextmanager
@@ -49,7 +57,7 @@ async def log_ai_call(operation: str, model: str, page_idx: int, survey_idx: int
         if _logger_mod.ai_req_logger:
             _logger_mod.ai_req_logger.error(
                 "%s_err | model=%s | page=%d | latency=%.2fs | error_type=%s | error=%s",
-                operation, model, page_idx, elapsed, type(e).__name__, str(e)[:300],
+                operation, model, page_idx, elapsed, type(e).__name__, _truncate(str(e)),
             )
         raise
     else:
@@ -67,7 +75,7 @@ class ProcessingStatus:
     page_idx: int
     total_pages: int
     status: str          # "survey_start", "vlm_extracting", "vlm_retrying", "text_formatting", "text_retrying",
-                         # "fallback_activated", "page_error", "survey_done", "batch_done", "survey_error"
+                         # "page_error", "survey_done", "batch_done", "survey_error"
     message: str
     extra: dict[str, Any] | None = None
 
@@ -173,7 +181,7 @@ class AIClient:
                         _logger_mod.ai_req_logger.info(
                             "vlm_extract | model=%s | page=%d | survey=%d | attempt=%d/%d | file=%s | prompt=%s",
                             self.vlm_model, page_index, survey_idx, attempt+1, self.max_retries,
-                            image_path.name, system_prompt[:500],
+                            image_path.name, _truncate(system_prompt),
                         )
                     resp = await self._client.post(
                         f"{self.base_url}/api/chat",
@@ -199,7 +207,7 @@ class AIClient:
                         _logger_mod.ai_req_logger.info(
                             "vlm_extract_ok | model=%s | page=%d | chars=%d | latency=%.2fs | output_preview=%s",
                             self.vlm_model, page_index, len(raw_text), elapsed,
-                            raw_text[:500],
+                            _truncate(raw_text),
                         )
                     logger.info("VLM page %d extracted %d chars in %.2fs", page_index, len(raw_text), elapsed)
                     return raw_text
@@ -210,13 +218,13 @@ class AIClient:
                     logger.warning(
                         "VLM HTTP %d page %d attempt %d/%d after %.2fs: %s",
                         hse.response.status_code, page_index, attempt+1, self.max_retries, elapsed,
-                        hse.response.text[:500],
+                        _truncate(hse.response.text),
                     )
                     if _logger_mod.ai_req_logger:
                         _logger_mod.ai_req_logger.error(
                             "vlm_extract_err | model=%s | page=%d | attempt=%d/%d | error_type=HTTPStatusError | http_status=%d | error=%s",
                             self.vlm_model, page_index, attempt+1, self.max_retries,
-                            hse.response.status_code, hse.response.text[:300],
+                            hse.response.status_code, _truncate(hse.response.text),
                         )
                     if attempt < self.max_retries - 1:
                         await asyncio.sleep(2 ** attempt)
@@ -226,13 +234,13 @@ class AIClient:
                     last_error = e
                     logger.warning(
                         "VLM attempt %d/%d for page %d failed after %.2fs: %s",
-                        attempt+1, self.max_retries, page_index, elapsed, str(e)[:200],
+                        attempt+1, self.max_retries, page_index, elapsed, _truncate(str(e)),
                     )
                     if _logger_mod.ai_req_logger:
                         _logger_mod.ai_req_logger.error(
                             "vlm_extract_err | model=%s | page=%d | attempt=%d/%d | error_type=%s | error=%s",
                             self.vlm_model, page_index, attempt+1, self.max_retries,
-                            type(e).__name__, str(e)[:300],
+                            type(e).__name__, _truncate(str(e)),
                         )
                     if attempt < self.max_retries - 1:
                         await asyncio.sleep(2 ** attempt)
@@ -278,7 +286,7 @@ class AIClient:
                         _logger_mod.ai_req_logger.info(
                             "text_format | model=%s | page=%d | survey=%d | attempt=%d/%d | prompt=%s | raw_text_len=%d",
                             self.text_model, page_index, survey_idx, attempt+1, self.max_retries,
-                            system_prompt[:500], len(raw_text),
+                            _truncate(system_prompt), len(raw_text),
                         )
                     resp = await self._client.post(
                         f"{self.base_url}/api/chat",
@@ -306,7 +314,7 @@ class AIClient:
                         _logger_mod.ai_req_logger.info(
                             "text_format_ok | model=%s | page=%d | keys=%s | latency=%.2fs | output_preview=%s",
                             self.text_model, page_index, list(parsed.keys()), elapsed,
-                            json.dumps(parsed, ensure_ascii=False)[:500],
+                            _truncate(json.dumps(parsed, ensure_ascii=False)),
                         )
                     logger.info("Text LLM page %d formatted in %.2fs", page_index, elapsed)
                     return parsed
@@ -318,13 +326,13 @@ class AIClient:
                         "JSONDecodeError page=%d attempt=%d/%d after %.2fs: %s | "
                         "Raw content (first 500 chars): %s",
                         page_index, attempt+1, self.max_retries, elapsed,
-                        str(jde), content[:500],
+                        str(jde), _truncate(content),
                     )
                     if _logger_mod.ai_req_logger:
                         _logger_mod.ai_req_logger.error(
                             "text_format_json_err | model=%s | page=%d | attempt=%d/%d | json_error=%s | raw_preview=%s",
                             self.text_model, page_index, attempt+1, self.max_retries,
-                            str(jde), content[:500],
+                            str(jde), _truncate(content),
                         )
                     if attempt < self.max_retries - 1:
                         await asyncio.sleep(2 ** attempt)
@@ -334,144 +342,61 @@ class AIClient:
                     last_error = e
                     logger.warning(
                         "Text LLM attempt %d/%d for page %d failed after %.2fs: %s",
-                        attempt+1, self.max_retries, page_index, elapsed, str(e)[:200],
+                        attempt+1, self.max_retries, page_index, elapsed, _truncate(str(e)),
                     )
                     if _logger_mod.ai_req_logger:
                         _logger_mod.ai_req_logger.error(
                             "text_format_err | model=%s | page=%d | attempt=%d/%d | error_type=%s | error=%s",
                             self.text_model, page_index, attempt+1, self.max_retries,
-                            type(e).__name__, str(e)[:300],
+                            type(e).__name__, _truncate(str(e)),
                         )
                     if attempt < self.max_retries - 1:
                         await asyncio.sleep(2 ** attempt)
 
             raise RuntimeError(f"Text LLM page {page_index} failed after {self.max_retries} retries")
 
-    async def _run_producer_consumer(
+    async def _process_pages_sequential(
         self,
         survey_files: list[Path],
         survey_idx: int,
         total_surveys: int,
         progress_callback: Callable[[ProcessingStatus], None] | None = None,
     ) -> list[dict]:
-        queue: asyncio.Queue[tuple[int, str] | None] = asyncio.Queue(maxsize=1)
-        results: list[dict | None] = [None] * len(survey_files)
+        """Przetwarza strony sekwencyjnie: dla każdej strony VLM → Text LLM → result."""
         total_pages = len(survey_files)
+        page_results: list[dict] = []
 
-        async def producer():
-            for page_idx, file_path in enumerate(survey_files):
-                if progress_callback:
-                    progress_callback(ProcessingStatus(
-                        survey_idx=survey_idx, total_surveys=total_surveys,
-                        page_idx=page_idx, total_pages=total_pages,
-                        status="vlm_extracting",
-                        message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}/{total_pages}: VLM ekstrakcja tekstu...",
-                    ))
+        for page_idx, file_path in enumerate(survey_files):
+            logger.info(
+                "Processing page %d/%d for survey %d — step 1/2: VLM extraction",
+                page_idx + 1, total_pages, survey_idx + 1,
+            )
+            try:
                 raw_text = await self._extract_text_vlm(
                     file_path, page_idx, progress_callback, survey_idx, total_surveys, total_pages
                 )
-                await queue.put((page_idx, raw_text))
-            await queue.put(None)
-
-        async def consumer():
-            while True:
-                item = await queue.get()
-                if item is None:
-                    break
-                page_idx, raw_text = item
+            except Exception as e:
+                logger.error("VLM failed for page %d of survey %d: %s", page_idx + 1, survey_idx + 1, e)
                 if progress_callback:
                     progress_callback(ProcessingStatus(
                         survey_idx=survey_idx, total_surveys=total_surveys,
                         page_idx=page_idx, total_pages=total_pages,
-                        status="text_formatting",
-                        message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}/{total_pages}: Text LLM formatowanie JSON...",
+                        status="page_error",
+                        message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}: VLM błąd — pominięto",
                     ))
-                try:
-                    result = await self._format_json_llm(
-                        raw_text, page_idx, progress_callback, survey_idx, total_surveys, total_pages
-                    )
-                    results[page_idx] = result
-                except json.JSONDecodeError as jde:
-                    logger.error("Text LLM page %d JSONDecodeError: %s | raw: %s",
-                                 page_idx, str(jde), raw_text[:1000])
-                    if _logger_mod.ai_req_logger:
-                        _logger_mod.ai_req_logger.error(
-                            "text_format_json_err | model=%s | page=%d | json_error=%s | raw_preview=%s",
-                            self.text_model, page_idx, str(jde), raw_text[:500],
-                        )
-                    if progress_callback:
-                        progress_callback(ProcessingStatus(
-                            survey_idx=survey_idx, total_surveys=total_surveys,
-                            page_idx=page_idx, total_pages=total_pages,
-                            status="page_error",
-                            message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}: Text LLM błąd — pominięto",
-                        ))
-                    results[page_idx] = {}
-                except Exception as e:
-                    logger.error("Text LLM page %d failed: %s", page_idx, e)
-                    if _logger_mod.ai_req_logger:
-                        _logger_mod.ai_req_logger.error(
-                            "text_format_err | model=%s | page=%d | error_type=%s | error=%s",
-                            self.text_model, page_idx, type(e).__name__, str(e)[:300],
-                        )
-                    if progress_callback:
-                        progress_callback(ProcessingStatus(
-                            survey_idx=survey_idx, total_surveys=total_surveys,
-                            page_idx=page_idx, total_pages=total_pages,
-                            status="page_error",
-                            message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}: Text LLM błąd — pominięto",
-                        ))
-                    results[page_idx] = {}
-                queue.task_done()
+                page_results.append({})
+                continue
 
-        try:
-            await asyncio.gather(producer(), consumer())
-        except Exception as e:
-            error_str = str(e).lower()
-            if any(kw in error_str for kw in ("out of memory", "cuda", "oom", "insufficient memory")):
-                logger.warning("VRAM OOM detected, falling back to sequential: %s", e)
-                if progress_callback:
-                    progress_callback(ProcessingStatus(
-                        survey_idx=survey_idx, total_surveys=total_surveys,
-                        page_idx=0, total_pages=total_pages,
-                        status="fallback_activated",
-                        message="Za mało VRAM — przełączam na tryb sekwencyjny...",
-                    ))
-                return await self._run_sequential_fallback(survey_files, survey_idx, total_surveys, progress_callback)
-            raise
-
-        return [r if r is not None else {} for r in results]
-
-    async def _run_sequential_fallback(
-        self,
-        survey_files: list[Path],
-        survey_idx: int,
-        total_surveys: int,
-        progress_callback: Callable[[ProcessingStatus], None] | None = None,
-    ) -> list[dict]:
-        total_pages = len(survey_files)
-        raw_texts: list[str] = []
-        for page_idx, file_path in enumerate(survey_files):
-            if progress_callback:
-                progress_callback(ProcessingStatus(
-                    survey_idx=survey_idx, total_surveys=total_surveys,
-                    page_idx=page_idx, total_pages=total_pages,
-                    status="vlm_extracting",
-                    message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}/{total_pages}: VLM ekstrakcja tekstu (sekwencyjnie)...",
-                ))
-            raw_text = await self._extract_text_vlm(
-                file_path, page_idx, progress_callback, survey_idx, total_surveys, total_pages
+            logger.info(
+                "Processing page %d/%d for survey %d — step 2/2: Text LLM formatting (raw_text=%d chars)",
+                page_idx + 1, total_pages, survey_idx + 1, len(raw_text),
             )
-            raw_texts.append(raw_text)
-
-        page_results: list[dict] = []
-        for page_idx, raw_text in enumerate(raw_texts):
             if progress_callback:
                 progress_callback(ProcessingStatus(
                     survey_idx=survey_idx, total_surveys=total_surveys,
                     page_idx=page_idx, total_pages=total_pages,
                     status="text_formatting",
-                    message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}/{total_pages}: Text LLM formatowanie JSON (sekwencyjnie)...",
+                    message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}/{total_pages}: Text LLM formatowanie JSON...",
                 ))
             try:
                 result = await self._format_json_llm(
@@ -479,7 +404,12 @@ class AIClient:
                 )
                 page_results.append(result)
             except Exception as e:
-                logger.error("Sequential fallback page %d failed: %s", page_idx, e)
+                logger.error("Text LLM failed for page %d of survey %d: %s", page_idx + 1, survey_idx + 1, e)
+                if _logger_mod.ai_req_logger:
+                    _logger_mod.ai_req_logger.error(
+                        "text_format_err | model=%s | page=%d | survey=%d | error_type=%s | error=%s",
+                        self.text_model, page_idx, survey_idx, type(e).__name__, _truncate(str(e)),
+                    )
                 if progress_callback:
                     progress_callback(ProcessingStatus(
                         survey_idx=survey_idx, total_surveys=total_surveys,
@@ -511,7 +441,7 @@ class AIClient:
 
         t0 = time.perf_counter()
 
-        page_results = await self._run_producer_consumer(
+        page_results = await self._process_pages_sequential(
             survey_files, survey_idx, total_surveys, progress_callback
         )
 
