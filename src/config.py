@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 
 
@@ -14,6 +15,12 @@ class AppConfig(BaseSettings):
     ollama_num_parallel: int = 2
     log_file: str = "logs/ankieter.log"
     log_level: str = "DEBUG"
+
+    # LangSmith (optional — reads LANGCHAIN_* env vars)
+    langchain_tracing_v2: bool = False
+    langchain_endpoint: str = ""
+    langchain_api_key: SecretStr = SecretStr("")
+    langchain_project: str = "ankieterai"
 
     model_config = {"env_prefix": "ANKIETER_"}
 

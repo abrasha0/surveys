@@ -1,9 +1,11 @@
 import logging
 import sys
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 _LOG_FILE: Path | None = None
 _LOGGING_SETUP_DONE: bool = False
+ai_req_logger: logging.Logger | None = None
 
 
 def setup_logging(
@@ -44,6 +46,23 @@ def setup_logging(
 
     for noisy in ("httpx", "httpcore", "PIL", "asyncio"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
+
+    # Dedykowany logger dla AI requests z rotacją
+    global ai_req_logger
+    ai_req_logger = logging.getLogger("ai.requests")
+    ai_req_logger.setLevel(logging.DEBUG)
+    ai_req_logger.propagation = False  # nie duplikuj do root
+
+    ai_handler = RotatingFileHandler(
+        _LOG_FILE.parent / "ai_requests.log",
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=3,
+        encoding="utf-8"
+    )
+    ai_handler.setFormatter(logging.Formatter(
+        "%(asctime)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    ))
+    ai_req_logger.addHandler(ai_handler)
 
     separator = "=" * 60
     app_logger = logging.getLogger("app")

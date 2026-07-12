@@ -3,6 +3,7 @@ import base64
 import json
 import logging
 import time
+from contextlib import nullcontext
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -15,6 +16,13 @@ from config import config
 from domain.schemas import MedicalSurvey
 from ai.prompts import build_vlm_prompt, build_text_format_prompt
 from domain.field_specs import ALL_FIELDS
+from logger import ai_req_logger
+
+try:
+    from ai.tracing import vlm_trace, llm_trace, io_trace, TraceContext
+    _HAS_TRACING = True
+except ImportError:
+    _HAS_TRACING = False
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +31,34 @@ _OLLAMA_TEMPERATURE = 0.0
 _OLLAMA_KEEP_ALIVE = "-1"
 _MAX_IMAGE_DIMENSION = 2000
 _CONTRAST_FACTOR = 1.5
+
+
+@asynccontextmanager
+async def log_ai_call(operation: str, model: str, page_idx: int, survey_idx: int, **extra):
+    t0 = time.perf_counter()
+    extra_str = " | ".join(f"{k}={v}" for k, v in extra.items())
+    header = f"{operation} | model={model} | page={page_idx} | survey={survey_idx}"
+    if extra_str:
+        header += f" | {extra_str}"
+    if ai_req_logger:
+        ai_req_logger.info("%s", header)
+    try:
+        yield
+    except Exception as e:
+        elapsed = time.perf_counter() - t0
+        if ai_req_logger:
+            ai_req_logger.error(
+                "%s_err | model=%s | page=%d | latency=%.2fs | error_type=%s | error=%s",
+                operation, model, page_idx, elapsed, type(e).__name__, str(e)[:300],
+            )
+        raise
+    else:
+        elapsed = time.perf_counter() - t0
+        if ai_req_logger:
+            ai_req_logger.info(
+                "%s_ok | model=%s | page=%d | latency=%.2fs",
+                operation, model, page_idx, elapsed,
+            )
 
 @dataclass
 class ProcessingStatus:
@@ -105,55 +141,102 @@ class AIClient:
         last_error = None
         system_prompt = build_vlm_prompt(page_index)
 
-        for attempt in range(self.max_retries):
-            t0 = time.perf_counter()
-            try:
-                if progress_callback:
-                    progress_callback(ProcessingStatus(
-                        survey_idx=survey_idx,
-                        total_surveys=total_surveys,
-                        page_idx=page_index,
-                        total_pages=total_pages,
-                        status="vlm_extracting" if attempt == 0 else "vlm_retrying",
-                        message=f"Ankieta {survey_idx+1}, Strona {page_index+1}/{total_pages}: VLM ekstrakcja tekstu..." if attempt == 0
-                                else f"Ankieta {survey_idx+1}, Strona {page_index+1}: VLM ponawianie ({attempt+1}/{self.max_retries})...",
-                    ))
+        ctx = TraceContext(
+            operation="extract_text",
+            model=self.vlm_model,
+            page_idx=page_index,
+            survey_idx=survey_idx,
+        ) if _HAS_TRACING else None
 
-                image_b64 = _image_to_base64(image_path)
-                resp = await self._client.post(
-                    f"{self.base_url}/api/chat",
-                    json={
-                        "model": self.vlm_model,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "images": [image_b64], "content": "Przeanalizuj zdjęcie i wyekstrahuj tekst."},
-                        ],
-                        "stream": False,
-                        "keep_alive": _OLLAMA_KEEP_ALIVE,
-                        "options": {
-                            "num_ctx": _OLLAMA_NUM_CTX,
-                            "temperature": _OLLAMA_TEMPERATURE,
+        async with (vlm_trace(ctx) if ctx else nullcontext()):
+            for attempt in range(self.max_retries):
+                t0 = time.perf_counter()
+                try:
+                    if progress_callback:
+                        progress_callback(ProcessingStatus(
+                            survey_idx=survey_idx,
+                            total_surveys=total_surveys,
+                            page_idx=page_index,
+                            total_pages=total_pages,
+                            status="vlm_extracting" if attempt == 0 else "vlm_retrying",
+                            message=f"Ankieta {survey_idx+1}, Strona {page_index+1}/{total_pages}: VLM ekstrakcja tekstu..." if attempt == 0
+                                    else f"Ankieta {survey_idx+1}, Strona {page_index+1}: VLM ponawianie ({attempt+1}/{self.max_retries})...",
+                        ))
+
+                    if _HAS_TRACING:
+                        async with io_trace("image_base64", {"page_idx": page_index, "path": str(image_path)}):
+                            image_b64 = _image_to_base64(image_path)
+                    else:
+                        image_b64 = _image_to_base64(image_path)
+
+                    if ai_req_logger:
+                        ai_req_logger.info(
+                            "vlm_extract | model=%s | page=%d | survey=%d | attempt=%d/%d | prompt_preview=%s",
+                            self.vlm_model, page_index, survey_idx, attempt+1, self.max_retries,
+                            system_prompt[:200],
+                        )
+                    resp = await self._client.post(
+                        f"{self.base_url}/api/chat",
+                        json={
+                            "model": self.vlm_model,
+                            "messages": [
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "images": [image_b64], "content": "Przeanalizuj zdjęcie i wyekstrahuj tekst."},
+                            ],
+                            "stream": False,
+                            "keep_alive": _OLLAMA_KEEP_ALIVE,
+                            "options": {
+                                "num_ctx": _OLLAMA_NUM_CTX,
+                                "temperature": _OLLAMA_TEMPERATURE,
+                            },
                         },
-                    },
-                )
-                elapsed = time.perf_counter() - t0
-                resp.raise_for_status()
-                body = resp.json()
-                raw_text = body.get("message", {}).get("content", "")
-                logger.info("VLM page %d extracted %d chars in %.2fs", page_index, len(raw_text), elapsed)
-                return raw_text
+                    )
+                    elapsed = time.perf_counter() - t0
+                    resp.raise_for_status()
+                    body = resp.json()
+                    raw_text = body.get("message", {}).get("content", "")
+                    if ai_req_logger:
+                        ai_req_logger.info(
+                            "vlm_extract_ok | model=%s | page=%d | chars=%d | latency=%.2fs",
+                            self.vlm_model, page_index, len(raw_text), elapsed,
+                        )
+                    logger.info("VLM page %d extracted %d chars in %.2fs", page_index, len(raw_text), elapsed)
+                    return raw_text
 
-            except Exception as e:
-                elapsed = time.perf_counter() - t0
-                last_error = e
-                logger.warning(
-                    "VLM attempt %d/%d for page %d failed after %.2fs: %s",
-                    attempt+1, self.max_retries, page_index, elapsed, str(e)[:200],
-                )
-                if attempt < self.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                except httpx.HTTPStatusError as hse:
+                    elapsed = time.perf_counter() - t0
+                    last_error = hse
+                    logger.warning(
+                        "VLM HTTP %d page %d attempt %d/%d after %.2fs: %s",
+                        hse.response.status_code, page_index, attempt+1, self.max_retries, elapsed,
+                        hse.response.text[:500],
+                    )
+                    if ai_req_logger:
+                        ai_req_logger.error(
+                            "vlm_extract_err | model=%s | page=%d | attempt=%d/%d | error_type=HTTPStatusError | http_status=%d | error=%s",
+                            self.vlm_model, page_index, attempt+1, self.max_retries,
+                            hse.response.status_code, hse.response.text[:300],
+                        )
+                    if attempt < self.max_retries - 1:
+                        await asyncio.sleep(2 ** attempt)
 
-        raise RuntimeError(f"VLM page {page_index} failed after {self.max_retries} retries")
+                except Exception as e:
+                    elapsed = time.perf_counter() - t0
+                    last_error = e
+                    logger.warning(
+                        "VLM attempt %d/%d for page %d failed after %.2fs: %s",
+                        attempt+1, self.max_retries, page_index, elapsed, str(e)[:200],
+                    )
+                    if ai_req_logger:
+                        ai_req_logger.error(
+                            "vlm_extract_err | model=%s | page=%d | attempt=%d/%d | error_type=%s | error=%s",
+                            self.vlm_model, page_index, attempt+1, self.max_retries,
+                            type(e).__name__, str(e)[:300],
+                        )
+                    if attempt < self.max_retries - 1:
+                        await asyncio.sleep(2 ** attempt)
+
+            raise RuntimeError(f"VLM page {page_index} failed after {self.max_retries} retries")
 
     async def _format_json_llm(
         self,
@@ -167,56 +250,99 @@ class AIClient:
         last_error = None
         system_prompt = build_text_format_prompt(page_index, raw_text)
 
-        for attempt in range(self.max_retries):
-            t0 = time.perf_counter()
-            try:
-                if progress_callback:
-                    progress_callback(ProcessingStatus(
-                        survey_idx=survey_idx,
-                        total_surveys=total_surveys,
-                        page_idx=page_index,
-                        total_pages=total_pages,
-                        status="text_formatting" if attempt == 0 else "text_retrying",
-                        message=f"Ankieta {survey_idx+1}, Strona {page_index+1}/{total_pages}: Text LLM formatowanie JSON..." if attempt == 0
-                                else f"Ankieta {survey_idx+1}, Strona {page_index+1}: Text LLM ponawianie ({attempt+1}/{self.max_retries})...",
-                    ))
+        ctx = TraceContext(
+            operation="format_json",
+            model=self.text_model,
+            page_idx=page_index,
+            survey_idx=survey_idx,
+            extra={"raw_text_len": len(raw_text)},
+        ) if _HAS_TRACING else None
 
-                resp = await self._client.post(
-                    f"{self.base_url}/api/chat",
-                    json={
-                        "model": self.text_model,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": "Przekształć tekst w JSON."},
-                        ],
-                        "format": "json",
-                        "stream": False,
-                        "keep_alive": _OLLAMA_KEEP_ALIVE,
-                        "options": {
-                            "num_ctx": _OLLAMA_NUM_CTX,
-                            "temperature": _OLLAMA_TEMPERATURE,
+        async with (llm_trace(ctx) if ctx else nullcontext()):
+            for attempt in range(self.max_retries):
+                t0 = time.perf_counter()
+                try:
+                    if progress_callback:
+                        progress_callback(ProcessingStatus(
+                            survey_idx=survey_idx,
+                            total_surveys=total_surveys,
+                            page_idx=page_index,
+                            total_pages=total_pages,
+                            status="text_formatting" if attempt == 0 else "text_retrying",
+                            message=f"Ankieta {survey_idx+1}, Strona {page_index+1}/{total_pages}: Text LLM formatowanie JSON..." if attempt == 0
+                                    else f"Ankieta {survey_idx+1}, Strona {page_index+1}: Text LLM ponawianie ({attempt+1}/{self.max_retries})...",
+                        ))
+
+                    if ai_req_logger:
+                        ai_req_logger.info(
+                            "text_format | model=%s | page=%d | survey=%d | attempt=%d/%d | raw_text_len=%d",
+                            self.text_model, page_index, survey_idx, attempt+1, self.max_retries, len(raw_text),
+                        )
+                    resp = await self._client.post(
+                        f"{self.base_url}/api/chat",
+                        json={
+                            "model": self.text_model,
+                            "messages": [
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": "Przekształć tekst w JSON."},
+                            ],
+                            "format": "json",
+                            "stream": False,
+                            "keep_alive": _OLLAMA_KEEP_ALIVE,
+                            "options": {
+                                "num_ctx": _OLLAMA_NUM_CTX,
+                                "temperature": _OLLAMA_TEMPERATURE,
+                            },
                         },
-                    },
-                )
-                elapsed = time.perf_counter() - t0
-                resp.raise_for_status()
-                body = resp.json()
-                content = body.get("message", {}).get("content", "")
-                parsed = json.loads(content)
-                logger.info("Text LLM page %d formatted in %.2fs", page_index, elapsed)
-                return parsed
+                    )
+                    elapsed = time.perf_counter() - t0
+                    resp.raise_for_status()
+                    body = resp.json()
+                    content = body.get("message", {}).get("content", "")
+                    parsed = json.loads(content)
+                    if ai_req_logger:
+                        ai_req_logger.info(
+                            "text_format_ok | model=%s | page=%d | keys=%s | latency=%.2fs",
+                            self.text_model, page_index, list(parsed.keys()), elapsed,
+                        )
+                    logger.info("Text LLM page %d formatted in %.2fs", page_index, elapsed)
+                    return parsed
 
-            except Exception as e:
-                elapsed = time.perf_counter() - t0
-                last_error = e
-                logger.warning(
-                    "Text LLM attempt %d/%d for page %d failed after %.2fs: %s",
-                    attempt+1, self.max_retries, page_index, elapsed, str(e)[:200],
-                )
-                if attempt < self.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                except json.JSONDecodeError as jde:
+                    elapsed = time.perf_counter() - t0
+                    last_error = jde
+                    logger.error(
+                        "JSONDecodeError page=%d attempt=%d/%d after %.2fs: %s | "
+                        "Raw content (first 500 chars): %s",
+                        page_index, attempt+1, self.max_retries, elapsed,
+                        str(jde), content[:500],
+                    )
+                    if ai_req_logger:
+                        ai_req_logger.error(
+                            "text_format_json_err | model=%s | page=%d | attempt=%d/%d | json_error=%s | raw_preview=%s",
+                            self.text_model, page_index, attempt+1, self.max_retries,
+                            str(jde), content[:500],
+                        )
+                    if attempt < self.max_retries - 1:
+                        await asyncio.sleep(2 ** attempt)
 
-        raise RuntimeError(f"Text LLM page {page_index} failed after {self.max_retries} retries")
+                except Exception as e:
+                    elapsed = time.perf_counter() - t0
+                    last_error = e
+                    logger.warning(
+                        "Text LLM attempt %d/%d for page %d failed after %.2fs: %s",
+                        attempt+1, self.max_retries, page_index, elapsed, str(e)[:200],
+                    )
+                    if ai_req_logger:
+                        ai_req_logger.error(
+                            "text_format_err | model=%s | page=%d | attempt=%d/%d | error_type=%s | error=%s",
+                            self.text_model, page_index, attempt+1, self.max_retries,
+                            type(e).__name__, str(e)[:300],
+                        )
+                    if attempt < self.max_retries - 1:
+                        await asyncio.sleep(2 ** attempt)
+
+            raise RuntimeError(f"Text LLM page {page_index} failed after {self.max_retries} retries")
 
     async def _run_producer_consumer(
         self,
@@ -262,8 +388,29 @@ class AIClient:
                         raw_text, page_idx, progress_callback, survey_idx, total_surveys, total_pages
                     )
                     results[page_idx] = result
+                except json.JSONDecodeError as jde:
+                    logger.error("Text LLM page %d JSONDecodeError: %s | raw: %s",
+                                 page_idx, str(jde), raw_text[:1000])
+                    if ai_req_logger:
+                        ai_req_logger.error(
+                            "text_format_json_err | model=%s | page=%d | json_error=%s | raw_preview=%s",
+                            self.text_model, page_idx, str(jde), raw_text[:500],
+                        )
+                    if progress_callback:
+                        progress_callback(ProcessingStatus(
+                            survey_idx=survey_idx, total_surveys=total_surveys,
+                            page_idx=page_idx, total_pages=total_pages,
+                            status="page_error",
+                            message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}: Text LLM błąd — pominięto",
+                        ))
+                    results[page_idx] = {}
                 except Exception as e:
                     logger.error("Text LLM page %d failed: %s", page_idx, e)
+                    if ai_req_logger:
+                        ai_req_logger.error(
+                            "text_format_err | model=%s | page=%d | error_type=%s | error=%s",
+                            self.text_model, page_idx, type(e).__name__, str(e)[:300],
+                        )
                     if progress_callback:
                         progress_callback(ProcessingStatus(
                             survey_idx=survey_idx, total_surveys=total_surveys,

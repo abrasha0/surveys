@@ -18,7 +18,22 @@ def render():
     history = []  # przechowuje ostatnie komunikaty
 
     def update_progress(status: ProcessingStatus):
-        pct = status.survey_idx / max(status.total_surveys, 1)
+        total = max(status.total_surveys, 1)
+        idx = status.survey_idx
+
+        if status.status == "survey_start":
+            pct = idx / total
+        elif status.status in ("vlm_extracting", "vlm_retrying"):
+            pct = (idx + 0.3) / total
+        elif status.status in ("text_formatting", "text_retrying"):
+            pct = (idx + 0.6) / total
+        elif status.status == "survey_done":
+            pct = (idx + 1) / total
+        elif status.status == "batch_done":
+            pct = 1.0
+        else:
+            pct = idx / total
+
         with progress_placeholder.container():
             st.progress(pct, text=f"Ankieta {status.survey_idx+1} z {status.total_surveys}")
 

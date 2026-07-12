@@ -112,3 +112,10 @@ class StateManager:
         st.session_state.ai_results = {}
         st.session_state.processing = False
         st.session_state.cancel_processing = False
+
+    @staticmethod
+    def reset_for_new_batch():
+        st.session_state.current_index = 0
+        st.session_state.ai_results = {}
+        st.session_state.processing = True
+        st.session_state.cancel_processing = False

@@ -30,8 +30,7 @@ if not surveys:
     groups, start = upload.render()
     if start and groups:
         StateManager.set_surveys(groups)
-        StateManager.set_current_index(0)
-        StateManager.set_processing(True)
+        StateManager.reset_for_new_batch()
         st.rerun()
     st.stop()
 

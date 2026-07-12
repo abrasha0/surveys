@@ -32,6 +32,8 @@ Dzięki temu uzyskujemy:
 
 ## Konfiguracja
 
+### Podstawowa
+
 | Zmienna środowiskowa | Domyślna wartość | Opis |
 |---------------------|------------------|------|
 | `ANKIETER_VLM_MODEL` | `deepseek-ocr` | Model wizyjny (VLM) |
@@ -39,6 +41,25 @@ Dzięki temu uzyskujemy:
 | `ANKIETER_OLLAMA_NUM_PARALLEL` | `2` | Liczba równoległych żądań |
 | `ANKIETER_OLLAMA_URL` | `http://localhost:11434` | URL serwera Ollama |
 | `ANKIETER_MAX_RETRIES` | `3` | Maksymalna liczba ponawiań |
+
+### LangSmith (opcjonalne)
+
+Aby włączyć śledzenie wywołań AI w dashboardzie LangSmith, ustaw zmienne środowiskowe:
+
+| Zmienna środowiskowa | Domyślna wartość | Opis |
+|---------------------|------------------|------|
+| `LANGCHAIN_TRACING_V2` | `false` | Włącz/wyłącz tracing |
+| `LANGCHAIN_ENDPOINT` | — | URL API LangSmith |
+| `LANGCHAIN_API_KEY` | — | Klucz API LangSmith |
+| `LANGCHAIN_PROJECT` | `ankieterai` | Nazwa projektu w LangSmith |
+
+Tracing jest opcjonalny — gdy wyłączony lub gdy pakiet `langsmith` nie jest zainstalowany, traces są pomijane (no-op).
+
+### Logi
+
+- `logs/ankieter.log` — logi główne aplikacji (rotacja: brak)
+- `logs/ai_requests.log` — dedykowany log wywołań AI per-call (rotacja: 10MB, 3 kopie zapasowe)
+- `logs/cache_results.json` — cache wyników analizy
 
 ## Uruchomienie
 
