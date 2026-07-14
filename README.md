@@ -29,7 +29,7 @@ Aplikacja dostępna pod `http://localhost:8501`. Domyślne hasło: `a`.
 
 - Logowanie hasłem do aplikacji
 - Upload zdjęć ankiet (jpg/png/webp)
-- Automatyczna analiza obrazów przez VLM (Ollama + deepseek-ocr)
+- Automatyczna analiza obrazów przez VLM (Ollama)
 - Dwuetapowe przetwarzanie: VLM → tekst → Text LLM → JSON
 - Sekwencyjne przetwarzanie per-strona (jeden model naraz)
 - Batch processing z progress barem i cache'owaniem wyników
@@ -58,6 +58,6 @@ pytest tests/
 ## Dokumentacja
 
 - `docs/architecture-report.md` — opis architektury i modułów
-- `docs/survey-structure.md` — pełna struktura ankiety (63 pola)
+- `docs/survey-structure.md` — pełna struktura ankiety (70 pól)
 - `docs/main-doc.md` — szczegółowy opis flow, funkcjonalności, konfiguracji
 - `docs/known-issues.md` — bieżące problemy

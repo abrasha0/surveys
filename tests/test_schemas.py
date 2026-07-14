@@ -9,45 +9,45 @@ from domain.field_specs import ALL_FIELDS
 class TestMedicalSurveyFromAI:
     def test_from_ai_json_parses_correctly(self, ai_json_response):
         survey = MedicalSurvey.from_ai_json(ai_json_response)
-        assert survey.plec == "Kobieta"
-        assert survey.wiek == 23
-        assert survey.needs_review["wiek"] is True
+        assert survey.p1_plec == "Kobieta"
+        assert survey.p2_wiek == 23
+        assert survey.needs_review["p2_wiek"] is True
 
     def test_from_ai_json_sets_age_as_int(self, ai_json_response):
         survey = MedicalSurvey.from_ai_json(ai_json_response)
-        assert isinstance(survey.wiek, int) and survey.wiek == 23
+        assert isinstance(survey.p2_wiek, int) and survey.p2_wiek == 23
 
     def test_from_ai_json_normalizes_select_values(self, ai_json_response):
-        ai_json_response["plec"] = "kobieta"
+        ai_json_response["p1_plec"] = "kobieta"
         survey = MedicalSurvey.from_ai_json(ai_json_response)
-        assert survey.plec == "Kobieta"
+        assert survey.p1_plec == "Kobieta"
 
     def test_from_ai_json_returns_none_for_unknown_select(self, ai_json_response):
-        ai_json_response["plec"] = "Nieznane"
+        ai_json_response["p1_plec"] = "Nieznane"
         survey = MedicalSurvey.from_ai_json(ai_json_response)
-        assert survey.plec is None
+        assert survey.p1_plec is None
 
     def test_from_ai_json_returns_none_for_unparseable_age(self, ai_json_response):
-        ai_json_response["wiek"] = "nie wiem"
+        ai_json_response["p2_wiek"] = "nie wiem"
         survey = MedicalSurvey.from_ai_json(ai_json_response)
-        assert survey.wiek is None
+        assert survey.p2_wiek is None
 
 
 class TestMedicalSurveyToCSV:
-    def test_to_csv_row_returns_68_elements(self, sample_survey):
-        assert len(sample_survey.to_csv_row()) == 68
+    def test_to_csv_row_returns_71_elements(self, sample_survey):
+        assert len(sample_survey.to_csv_row()) == 71
 
     def test_to_csv_row_matches_header_length(self, sample_survey):
         assert len(sample_survey.to_csv_row()) == len(CSV_HEADER)
 
     def test_to_csv_row_values_match(self, sample_survey):
         row = sample_survey.to_csv_row()
-        assert row[1] == "Kobieta" and str(row[2]) == "23" and row[7] == "PANS"
+        assert row[1] == "Kobieta" and str(row[2]) == "23" and row[8] == "PANS"
 
 
 class TestFieldCount:
     def test_all_fields_count(self):
-        assert len(ALL_FIELDS) == 67
+        assert len(ALL_FIELDS) == 70
 
 
 class TestSurveyGroup:

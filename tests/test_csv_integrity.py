@@ -5,8 +5,8 @@ from domain.csv_export import CSV_HEADER
 
 
 class TestCSVHeaderIntegrity:
-    def test_csv_header_has_68_columns(self):
-        assert len(CSV_HEADER) == 68
+    def test_csv_header_has_71_columns(self):
+        assert len(CSV_HEADER) == 71
 
     def test_first_header_is_sygnatura_czasowa(self):
         assert CSV_HEADER[0] == "Sygnatura czasowa"

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Literal, get_args
+from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 from domain.field_specs import FIELD_SPEC_BY_NAME, ALL_FIELDS
 
@@ -11,93 +11,90 @@ class SurveyGroup:
     id: int
     files: list[Path]
 
-# Generujemy Literale dynamicznie – dla uproszczenia pozostawiamy jawne typy,
-# ale walidację i normalizację oprzemy na specyfikacjach.
-
 class MedicalSurvey(BaseModel):
-    # Wszystkie pola zdefiniowane w field_specs – dla czytelności wypisujemy je jawnie,
-    # ale wartości domyślne i walidację bierzemy ze specyfikacji.
-
     # A. Demografia
-    plec: Optional[str] = None
-    wiek: Optional[int] = Field(default=None, ge=18, le=80)
-    miejsce_zamieszkania: Optional[str] = None
-    stan_cywilny: Optional[str] = None
-    forma_zamieszkania: Optional[str] = None
-    stopien_studiow: Optional[str] = None
-    uczelnia: str = ""
+    p1_plec: Optional[str] = None
+    p2_wiek: Optional[int] = Field(default=None, ge=18, le=80)
+    p3_miejsce: Optional[str] = None
+    p4_stan: Optional[str] = None
+    p5_forma: Optional[str] = None
+    p5_inne: str = ""
+    p6_stopien: Optional[str] = None
+    p7_uczelnia: str = ""
 
     # B. Aktywność zawodowa
-    praca_status: Optional[str] = None
-    praca_system: str = ""
-    oddzial: Optional[str] = None
-    staz_pracy: str = ""
+    p8_praca: Optional[str] = None
+    p9_system: Optional[str] = None
+    p9_inne: str = ""
+    p10_oddzial: Optional[str] = None
+    p10_inne: str = ""
+    p11_staz: str = ""
 
     # C. Styl życia
-    sen_godziny: Optional[str] = None
-    ekran_godziny: Optional[str] = None
-    kofeina: Optional[str] = None
+    p12_sen: Optional[str] = None
+    p13_ekran: Optional[str] = None
+    p14_kofeina: Optional[str] = None
 
-    # D. Objawy (21)
-    objaw_mniej_uwazna: Optional[str] = None
-    objaw_trudno_skupic: Optional[str] = None
-    objaw_trudno_myslec: Optional[str] = None
-    objaw_niezdarna: Optional[str] = None
-    objaw_zapominalska: Optional[str] = None
-    objaw_wyznaczac_tempo: Optional[str] = None
-    objaw_zmotywowac_fizycznie: Optional[str] = None
-    objaw_zmotywowac_spotkania: Optional[str] = None
-    objaw_nie_zdolna_poza_domem: Optional[str] = None
-    objaw_wysilek_fizyczny: Optional[str] = None
-    objaw_trudnosci_decyzyjne: Optional[str] = None
-    objaw_zmusic_do_myslenia: Optional[str] = None
-    objaw_miesnie_z_waty: Optional[str] = None
-    objaw_dyskomfort_fizyczny: Optional[str] = None
-    objaw_ukonczenie_myslenie: Optional[str] = None
-    objaw_uporzadkowanie_mysli: Optional[str] = None
-    objaw_ukonczenie_wysilek: Optional[str] = None
-    objaw_myslenie_spowolnione: Optional[str] = None
-    objaw_problemy_koncentracja: Optional[str] = None
-    objaw_ograniczyc_aktywnosc: Optional[str] = None
-    objaw_czesciej_odpoczywac: Optional[str] = None
+    # D. MFIS (21)
+    mfis_1: Optional[str] = None
+    mfis_2: Optional[str] = None
+    mfis_3: Optional[str] = None
+    mfis_4: Optional[str] = None
+    mfis_5: Optional[str] = None
+    mfis_6: Optional[str] = None
+    mfis_7: Optional[str] = None
+    mfis_8: Optional[str] = None
+    mfis_9: Optional[str] = None
+    mfis_10: Optional[str] = None
+    mfis_11: Optional[str] = None
+    mfis_12: Optional[str] = None
+    mfis_13: Optional[str] = None
+    mfis_14: Optional[str] = None
+    mfis_15: Optional[str] = None
+    mfis_16: Optional[str] = None
+    mfis_17: Optional[str] = None
+    mfis_18: Optional[str] = None
+    mfis_19: Optional[str] = None
+    mfis_20: Optional[str] = None
+    mfis_21: Optional[str] = None
 
     # E. Stan zdrowia
-    anemia: Optional[str] = None
-    problemy_tarczyca: Optional[str] = None
-    jaka_tarczyca: str = ""
-    inne_choroby: str = ""
+    choroba_anemia: Optional[str] = None
+    choroba_tarczyca: Optional[str] = None
+    tarczyca_jakie: str = ""
+    choroba_inne: str = ""
 
     # F. Jakość snu
-    zasypianie: Optional[str] = None
-    budzenie_noc: Optional[str] = None
-    budzenie_rano: Optional[str] = None
-    czas_snu: Optional[str] = None
-    jakosc_snu: Optional[str] = None
-    samopoczucie: Optional[str] = None
-    sprawnosc: Optional[str] = None
-    sennosc: Optional[str] = None
+    sen_1: Optional[str] = None
+    sen_2: Optional[str] = None
+    sen_3: Optional[str] = None
+    sen_4: Optional[str] = None
+    sen_5: Optional[str] = None
+    sen_6: Optional[str] = None
+    sen_7: Optional[str] = None
+    sen_8: Optional[str] = None
 
     # G. CES-D (20)
-    cesd_przeszkadzaly: Optional[str] = None
-    cesd_brak_apetytu: Optional[str] = None
-    cesd_chandra: Optional[str] = None
-    cesd_tak_samo_dobry: Optional[str] = None
-    cesd_ciezko_skoncentrowac: Optional[str] = None
-    cesd_przygnebiony: Optional[str] = None
-    cesd_wysilek: Optional[str] = None
-    cesd_optymistycznie: Optional[str] = None
-    cesd_zycie_porazka: Optional[str] = None
-    cesd_strach: Optional[str] = None
-    cesd_sen_niespokojny: Optional[str] = None
-    cesd_szczesliwy: Optional[str] = None
-    cesd_mowil_mniej: Optional[str] = None
-    cesd_samotny: Optional[str] = None
-    cesd_ludzie_nieprzyjazni: Optional[str] = None
-    cesd_radosci: Optional[str] = None
-    cesd_placzu: Optional[str] = None
-    cesd_smutno: Optional[str] = None
-    cesd_ludzie_nie_lubia: Optional[str] = None
-    cesd_nic_nie_zabrac: Optional[str] = None
+    depr_1: Optional[str] = None
+    depr_2: Optional[str] = None
+    depr_3: Optional[str] = None
+    depr_4: Optional[str] = None
+    depr_5: Optional[str] = None
+    depr_6: Optional[str] = None
+    depr_7: Optional[str] = None
+    depr_8: Optional[str] = None
+    depr_9: Optional[str] = None
+    depr_10: Optional[str] = None
+    depr_11: Optional[str] = None
+    depr_12: Optional[str] = None
+    depr_13: Optional[str] = None
+    depr_14: Optional[str] = None
+    depr_15: Optional[str] = None
+    depr_16: Optional[str] = None
+    depr_17: Optional[str] = None
+    depr_18: Optional[str] = None
+    depr_19: Optional[str] = None
+    depr_20: Optional[str] = None
 
     # H. Metadane
     needs_review: dict[str, bool] = {}
@@ -154,12 +151,10 @@ class MedicalSurvey(BaseModel):
         kwargs = {}
         for f in ALL_FIELDS:
             raw = data.get(f.name)
-            # Dla wieku wyciągnij liczbę
-            if f.name == "wiek" and isinstance(raw, (int, str)):
-                if isinstance(raw, str):
-                    import re
-                    m = re.search(r"\d+", raw)
-                    raw = int(m.group()) if m else None
+            if f.name == "p2_wiek" and isinstance(raw, str):
+                import re
+                m = re.search(r"\d+", raw)
+                raw = int(m.group()) if m else None
             kwargs[f.name] = raw
         kwargs["needs_review"] = data.get("needs_review", {})
         return cls(**kwargs)
