@@ -24,7 +24,7 @@ def render_field(field_spec: FieldSpec, prefix: str, show_errors: bool = False):
         if current_value is None:
             error = True
 
-    col1, col2 = st.columns([0.04, 0.96])
+    col1, col2 = st.columns([0.06, 0.94])
     with col1:
         if show_errors and error:
             st.markdown('<div class="field-err-dot"></div>', unsafe_allow_html=True)

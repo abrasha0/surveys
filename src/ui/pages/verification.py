@@ -23,6 +23,24 @@ def get_image_base64(path):
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
+@st.fragment
+def render_form_fragment(survey, page_idx, prefix, show_errors):
+    """Fragment formularza — rerunuje tylko siebie przy edycji pól.
+    Renderuje własny wewnętrzny layout 2-kolumnowy z polami formularza."""
+    fields = PAGE_MAP.get(page_idx, [])
+    mid = len(fields) // 2
+    left_fields = fields[:mid]
+    right_fields = fields[mid:]
+
+    col_left, col_right = st.columns(2, gap="small")
+    with col_left:
+        for f in left_fields:
+            render_field(f, prefix, show_errors)
+    with col_right:
+        for f in right_fields:
+            render_field(f, prefix, show_errors)
+
+
 def render(survey):
     """
     Renderuje ekran weryfikacji dla pojedynczej ankiety.
@@ -73,11 +91,10 @@ def render(survey):
     )
     page_idx = page_names.index(selected_page)
 
-    # --- Główny layout: obrazek (lewo) + formularz (prawo) ---
-    col_left, col_right = st.columns(2, gap="small")
+    # --- Główny layout: obrazek (40%) + formularz (60%) ---
+    col_image, col_form = st.columns([4, 6], gap="medium")
 
-    # Lewa kolumna – obrazek dla wybranej strony
-    with col_left:
+    with col_image:
         if page_idx < len(survey.files):
             img_path = survey.files[page_idx]
             if img_path.exists():
@@ -98,11 +115,10 @@ def render(survey):
         else:
             st.info("Brak obrazu dla tej strony")
 
-    # Prawa kolumna – formularz dla wybranej strony
-    with col_right:
-        show_errors = st.session_state.get(f"show_errors_{survey.id}", False)
-        for f in PAGE_MAP.get(page_idx, []):
-            render_field(f, prefix, show_errors)
+    # --- Formularz jako fragment (REAKTYWNY — rerunuje tylko siebie) ---
+    show_errors = st.session_state.get(f"show_errors_{survey.id}", False)
+    with col_form:
+        render_form_fragment(survey, page_idx, prefix, show_errors)
 
     # --- Walidacja błędów ---
     errors_exist = False
@@ -122,7 +138,7 @@ def render(survey):
                 errors_exist = True
                 break
 
-    # --- Przyciski ---
+    # --- Przyciski (POZA fragmentem, stabilne) ---
     col_btns = st.columns([1, 1, 4])
     with col_btns[0]:
         if st.button("⬅ Poprzednia", key=f"prev_{survey.id}"):

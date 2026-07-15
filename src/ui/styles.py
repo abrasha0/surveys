@@ -25,47 +25,7 @@ def _hide_toolbar_js():
         });
     }
 
-    function patchContainerLayout(root) {
-        root.querySelectorAll(
-            '[data-testid="stAppViewBlockContainer"], .block-container'
-        ).forEach(function(el) {
-            el.style.padding = '0';
-            el.style.maxWidth = '100%';
-            el.style.width = '100%';
-        });
-    }
-
     hideElements(document);
-    patchContainerLayout(document);
-
-    var observer = new MutationObserver(function(mutations) {
-        for (var i = 0; i < mutations.length; i++) {
-            var m = mutations[i];
-            if (m.type === 'childList') {
-                for (var j = 0; j < m.addedNodes.length; j++) {
-                    var node = m.addedNodes[j];
-                    if (node.nodeType !== 1) continue;
-                    hideElements(node);
-                    patchContainerLayout(node);
-                }
-            }
-            if (m.type === 'attributes' && m.attributeName === 'style') {
-                var el = m.target;
-                if (el.matches('[data-testid="stAppViewBlockContainer"], .block-container')) {
-                    el.style.padding = '0';
-                    el.style.maxWidth = '100%';
-                    el.style.width = '100%';
-                }
-            }
-        }
-    });
-
-    observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['style']
-    });
 })();
 </script>
 """,
@@ -89,18 +49,6 @@ def inject_global_css():
         padding: 0 !important;
         margin: 0 !important;
         overflow: hidden !important;
-    }
-
-    /* Rozciągnięcie na całą szerokość */
-    .stMainBlockContainer,
-    [data-testid="stMainBlockContainer"],
-    .main .block-container {
-        padding: 0 !important;
-        max-width: 100% !important;
-        width: 100% !important;
-    }
-    .stApp {
-        overflow: hidden;
     }
 
     /* Spinner */
@@ -131,11 +79,12 @@ def inject_global_css():
 
     /* Obrazek w kolumnie */
     .verify-col-image {
-        height: calc(100vh - 150px);
+        height: calc(100vh - 180px);
         display: flex;
         align-items: center;
         justify-content: center;
         overflow: hidden;
+        padding: 8px 0;
     }
     .verify-col-image img {
         max-width: 100%;
