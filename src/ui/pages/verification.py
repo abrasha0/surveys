@@ -1,6 +1,6 @@
 import streamlit as st
 from domain.field_specs import PAGE_MAP, ALL_FIELDS
-from ui.styles import inject_verification_css
+from ui.styles import inject_verification_css, _inject_image_scaling_js
 from ui.shortcuts import inject_space_shortcut
 from ui.widgets import render_field
 from state.state_manager import StateManager
@@ -48,6 +48,7 @@ def render(survey):
     a values to dict z wartościami pól lub None.
     """
     inject_verification_css()
+    _inject_image_scaling_js()
     inject_space_shortcut()
 
     sm = StateManager()

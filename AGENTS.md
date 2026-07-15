@@ -35,6 +35,8 @@
 - po mojej akceptacji realizujesz poprawkę zgodnie z planem
 - dajesz mi przestrzeń do testowania
 
+7. ogólnie w trakcie implementacji i wprowadzania poprawek starasz się trzymać najnowszych standardów streamlit 1.59 - ./.opencode/basic-streamlit-guardrails.md
+
 # ważne informacje
 
 jeżeli musisz przetestować kawałek kodu to musisz korzystać z wirtualnego środowiska:
