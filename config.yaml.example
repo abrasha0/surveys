@@ -9,6 +9,7 @@ app:
   password: "a"                   # Hasło do logowania
   csv_results: "wyniki.csv"       # Nazwa pliku wynikowego CSV
   cache_file: "logs/cache_results.json"  # Ścieżka do cache wyników AI
+  surveys_dir: "surveys_data"     # Katalog ze zdjęciami ankiet (Etap 1+)
   accepted_file_types:            # Dozwolone rozszerzenia plików
     - jpg
     - png
