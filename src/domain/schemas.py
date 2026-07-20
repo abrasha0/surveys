@@ -96,16 +96,11 @@ class MedicalSurvey(BaseModel):
     depr_19: Optional[str] = None
     depr_20: Optional[str] = None
 
-    # H. Metadane
-    needs_review: dict[str, bool] = {}
-
     # --- Walidacja i normalizacja ---
     @field_validator("*", mode="before")
     @classmethod
     def normalize_field(cls, v, info):
         field_name = info.field_name
-        if field_name == "needs_review":
-            return v
         spec = FIELD_SPEC_BY_NAME.get(field_name)
         if not spec:
             return v
@@ -156,5 +151,4 @@ class MedicalSurvey(BaseModel):
                 m = re.search(r"\d+", raw)
                 raw = int(m.group()) if m else None
             kwargs[f.name] = raw
-        kwargs["needs_review"] = data.get("needs_review", {})
         return cls(**kwargs)

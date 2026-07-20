@@ -457,16 +457,12 @@ class AIClient:
             ))
 
         merged = {}
-        needs_review = {}
         for part in page_results:
             if not part:
                 continue
-            review = part.pop("needs_review", {}) or {}
-            needs_review.update(review)
             for k, v in part.items():
                 if v is not None:
                     merged.setdefault(k, v)
-        merged["needs_review"] = needs_review
 
         try:
             validated = MedicalSurvey.from_ai_json(merged)
@@ -475,7 +471,6 @@ class AIClient:
             raise
 
         result_dict = validated.model_dump()
-        result_dict["needs_review"] = validated.needs_review
         return result_dict
 
     async def analyze_batch(

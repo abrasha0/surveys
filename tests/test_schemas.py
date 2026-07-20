@@ -11,7 +11,6 @@ class TestMedicalSurveyFromAI:
         survey = MedicalSurvey.from_ai_json(ai_json_response)
         assert survey.p1_plec == "Kobieta"
         assert survey.p2_wiek == 23
-        assert survey.needs_review["p2_wiek"] is True
 
     def test_from_ai_json_sets_age_as_int(self, ai_json_response):
         survey = MedicalSurvey.from_ai_json(ai_json_response)

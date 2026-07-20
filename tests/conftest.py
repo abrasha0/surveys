@@ -167,5 +167,4 @@ def ai_json_response() -> dict:
         "depr_18": "Przez niedługi czas (1-2 dni)",
         "depr_19": "Rzadko lub wcale (mniej niż 1 dzień)",
         "depr_20": "Rzadko lub wcale (mniej niż 1 dzień)",
-        "needs_review": {"p2_wiek": True, "p7_uczelnia": False},
     }
