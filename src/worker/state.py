@@ -66,6 +66,13 @@ class ProcessingState:
             if status == "error":
                 self.global_state.errors += 1
 
+    def mark_verified(self, survey_id: int):
+        survey = self.surveys[survey_id]
+        if survey.status != "ready":
+            raise ValueError(f"Cannot verify survey in status '{survey.status}'")
+        survey.status = "verified"
+        survey.result = None
+
     def update_global(self, survey_id: int, page: int | None, stage: str | None):
         self.global_state.current_survey_id = survey_id
         self.global_state.current_page = page
@@ -94,7 +101,7 @@ class ProcessingState:
         self.global_state.eta_seconds = avg * remaining if remaining > 0 else 0
 
     def is_finished(self) -> bool:
-        return all(s.status in ("ready", "error") for s in self.surveys)
+        return all(s.status in ("ready", "error", "verified") for s in self.surveys)
 
     def to_global_dict(self) -> dict:
         return {

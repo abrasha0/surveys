@@ -1,17 +1,28 @@
 import logging
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, ValidationError
 
 from auth import get_current_user
 from config import config
+from data_handler import export_csv_path
+from domain.csv_export import save_survey_to_csv
+from domain.field_specs import ALL_FIELDS, FIELD_SPEC_BY_NAME
+from domain.schemas import MedicalSurvey
 from ingestion.file_grouping import scan_survey_directory
 from worker import get_worker
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
+
+
+class SaveRequest(BaseModel):
+    values: dict
+    force: Optional[bool] = False
 
 
 @router.get("/surveys")
@@ -118,5 +129,72 @@ async def processing_stop():
 
 
 @router.post("/surveys/{survey_id}/save")
-def save_survey(survey_id: int):
-    raise HTTPException(status_code=501, detail="Not implemented yet — Etap 4")
+def save_survey(survey_id: int, request: SaveRequest):
+    worker = get_worker()
+    survey = worker.state.get_survey_state(survey_id)
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+
+    if survey.status != "ready":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Survey not in 'ready' status (current: {survey.status})",
+        )
+
+    normalized = {}
+    validation_errors = {}
+    for f in ALL_FIELDS:
+        raw = request.values.get(f.name)
+        spec = FIELD_SPEC_BY_NAME.get(f.name)
+        if spec and spec.kind == "select":
+            if raw is not None and spec.choices and raw in spec.choices:
+                normalized[f.name] = raw
+            elif raw is not None and spec.choices:
+                matched = False
+                for choice in spec.choices:
+                    if raw.lower().strip() == choice.lower().strip():
+                        normalized[f.name] = choice
+                        matched = True
+                        break
+                if not matched:
+                    normalized[f.name] = None
+                    validation_errors[f.name] = f"Invalid choice: '{raw}'"
+            else:
+                normalized[f.name] = None
+        elif spec and spec.kind == "number":
+            try:
+                normalized[f.name] = int(raw) if raw is not None else None
+            except (ValueError, TypeError):
+                normalized[f.name] = None
+                validation_errors[f.name] = f"Invalid number: '{raw}'"
+        elif spec and spec.kind == "text":
+            normalized[f.name] = str(raw).strip() if raw is not None else ""
+        else:
+            normalized[f.name] = raw
+    try:
+        survey_data = MedicalSurvey(**normalized)
+    except ValidationError as e:
+        for error in e.errors():
+            field = ".".join(str(loc) for loc in error["loc"]) if error["loc"] else "unknown"
+            validation_errors[field] = error["msg"]
+
+    if validation_errors and not request.force:
+        raise HTTPException(status_code=422, detail={
+            "message": "Validation errors",
+            "errors": validation_errors,
+        })
+
+    if validation_errors and request.force:
+        survey_data = MedicalSurvey(**normalized)
+
+    csv_path = export_csv_path()
+    save_survey_to_csv(survey_data, csv_path)
+
+    worker.state.mark_verified(survey_id)
+
+    logger.info("Survey %d saved to CSV: %s", survey_id, csv_path)
+    return {
+        "status": "saved",
+        "survey_id": survey_id,
+        "csv_path": csv_path,
+    }
