@@ -52,6 +52,9 @@ processing:
   progress_vlm_weight: 0.3        # Waga postępu VLM w całkowitym progressie
   progress_text_weight: 0.6       # Waga postępu Text LLM w całkowitym progressie
   history_display_limit: 8        # Liczba ostatnich kroków w historii przetwarzania
+  worker_max_retries: 3           # Maksymalna liczba powtórzeń przetwarzania ankiety
+  eta_rolling_window: 10          # Liczba ostatnich czasów stron do obliczania ETA
+  survey_cache_dir: "logs/survey_cache"  # Katalog cache per-survey
 
 prompts:
   vlm: |                          # Prompt dla modelu wizyjnego (VLM)

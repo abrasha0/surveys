@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 import tempfile
@@ -65,3 +66,22 @@ def scan_survey_directory(dir_path: Path) -> List[List[Path]]:
 
     logger.debug("Scanned %s: %d files, %d groups", dir_path, len(files), len(groups))
     return groups
+
+
+def scan_surveys_with_cache_status(dir_path: Path, cache_dir: Path) -> list[tuple[int, list[Path], str]]:
+    """Skanuje katalog, sprawdza cache, zwraca (id, files, cached_status)."""
+    groups = scan_survey_directory(dir_path)
+    result = []
+    for idx, group in enumerate(groups):
+        cache_file = cache_dir / f"survey_{idx}.json"
+        if cache_file.exists():
+            try:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                status = data.get("status", "queued")
+            except (json.JSONDecodeError, KeyError):
+                status = "queued"
+        else:
+            status = "queued"
+        result.append((idx, group, status))
+    return result

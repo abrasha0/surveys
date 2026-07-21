@@ -12,6 +12,7 @@ from config import config
 from logger import setup_logging
 from auth import auth_router
 from routers.api import router as api_router
+from worker import get_worker
 
 
 @asynccontextmanager
@@ -21,6 +22,9 @@ async def lifespan(app: FastAPI):
         level=getattr(logging, config.logging["level"].upper(), logging.DEBUG),
     )
     yield
+    worker = get_worker()
+    if worker.state.is_running:
+        await worker.stop()
 
 
 app = FastAPI(title="AnkieterAI", lifespan=lifespan)

@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
@@ -8,6 +7,7 @@ from fastapi.responses import FileResponse
 from auth import get_current_user
 from config import config
 from ingestion.file_grouping import scan_survey_directory
+from worker import get_worker
 
 logger = logging.getLogger(__name__)
 
@@ -19,18 +19,21 @@ def list_surveys() -> list[dict]:
     surveys_dir = config.app.get("surveys_dir")
     if not surveys_dir:
         raise HTTPException(status_code=500, detail="surveys_dir not configured")
-
     dir_path = Path(surveys_dir)
     if not dir_path.is_dir():
         raise HTTPException(status_code=404, detail=f"Directory not found: {surveys_dir}")
 
     groups = scan_survey_directory(dir_path)
+    worker = get_worker()
+
     result = []
     for idx, group in enumerate(groups):
+        survey_state = worker.state.get_survey_state(idx)
+        status = survey_state.status if survey_state else "queued"
         result.append({
             "id": idx,
             "files": [p.name for p in group],
-            "status": "queued",
+            "status": status,
         })
     return result
 
@@ -40,7 +43,6 @@ def get_survey_image(survey_id: int, page_num: int):
     surveys_dir = config.app.get("surveys_dir")
     if not surveys_dir:
         raise HTTPException(status_code=500, detail="surveys_dir not configured")
-
     dir_path = Path(surveys_dir)
     if not dir_path.is_dir():
         raise HTTPException(status_code=404, detail=f"Directory not found: {surveys_dir}")
@@ -63,14 +65,56 @@ def get_survey_image(survey_id: int, page_num: int):
     return FileResponse(path=str(file_path), media_type="image/jpeg")
 
 
+@router.get("/surveys/{survey_id}/result")
+def get_survey_result(survey_id: int):
+    worker = get_worker()
+    survey = worker.state.get_survey_state(survey_id)
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+    if survey.status not in ("ready", "error"):
+        raise HTTPException(status_code=400, detail="Survey not yet processed")
+    return {
+        "id": survey_id,
+        "status": survey.status,
+        "result": survey.result,
+        "error": survey.error_message,
+    }
+
+
 @router.post("/processing/start")
-def processing_start():
-    raise HTTPException(status_code=501, detail="Not implemented yet — Etap 3")
+async def processing_start():
+    worker = get_worker()
+    if worker.state.is_running:
+        raise HTTPException(status_code=400, detail="Processing already in progress")
+
+    surveys_dir = config.app.get("surveys_dir")
+    if not surveys_dir:
+        raise HTTPException(status_code=500, detail="surveys_dir not configured")
+    dir_path = Path(surveys_dir)
+    if not dir_path.is_dir():
+        raise HTTPException(status_code=404, detail=f"Directory not found: {surveys_dir}")
+
+    groups = scan_survey_directory(dir_path)
+    if not groups:
+        raise HTTPException(status_code=404, detail="No surveys found")
+
+    await worker.start(groups)
+    return {"status": "started", "total": len(groups)}
 
 
 @router.get("/processing/status")
-def processing_status():
-    raise HTTPException(status_code=501, detail="Not implemented yet — Etap 3")
+async def processing_status():
+    worker = get_worker()
+    return worker.state.to_global_dict()
+
+
+@router.post("/processing/stop")
+async def processing_stop():
+    worker = get_worker()
+    if not worker.state.is_running:
+        raise HTTPException(status_code=400, detail="Worker not running")
+    await worker.stop()
+    return {"status": "stopping"}
 
 
 @router.post("/surveys/{survey_id}/save")
