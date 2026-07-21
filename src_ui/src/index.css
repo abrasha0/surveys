@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+:root {
+  --color-error: #ff4b4b;
+  --color-info: #1E88E5;
+  --color-success: #4CAF50;
+  --color-warning: #FFC107;
+}
+
+html, body, #root {
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, sans-serif;
+}

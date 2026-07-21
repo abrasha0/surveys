@@ -25,6 +25,23 @@ class SaveRequest(BaseModel):
     force: Optional[bool] = False
 
 
+@router.get("/field-specs")
+def get_field_specs():
+    return [
+        {
+            "name": f.name,
+            "label": f.label,
+            "page": f.page,
+            "kind": f.kind,
+            "choices": f.choices,
+            "min": f.min,
+            "max": f.max,
+            "csv_header": f.get_csv_header(),
+        }
+        for f in ALL_FIELDS
+    ]
+
+
 @router.get("/surveys")
 def list_surveys() -> list[dict]:
     surveys_dir = config.app.get("surveys_dir")

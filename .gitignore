@@ -9,3 +9,6 @@ tunnel_url.txt
 uploads/
 cache_results.json
 wyniki.csv
+node_modules/
+src_ui/dist/
+src/surveys_data
