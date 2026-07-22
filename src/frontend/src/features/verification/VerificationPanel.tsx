@@ -21,6 +21,10 @@ export default function VerificationPanel() {
   const [currentSurveyId, setCurrentSurveyId] = useState<number | null>(null);
 
   const allSurveys = useMemo(() => surveys ?? [], [surveys]);
+  const allDone = useMemo(
+    () => allSurveys.length > 0 && allSurveys.every((s) => s.status === 'verified' || s.status === 'error'),
+    [allSurveys]
+  );
 
   const clickableSurveys = useMemo(
     () => allSurveys.filter((s) => s.status === 'ready' || s.status === 'verified'),
@@ -43,10 +47,10 @@ export default function VerificationPanel() {
   }, [clickableSurveys, currentSurveyId, initSurvey]);
 
   useEffect(() => {
-    if (allSurveys.length > 0 && clickableSurveys.length === 0 && !isRunning) {
+    if (allDone && !isRunning) {
       navigate('/complete', { replace: true });
     }
-  }, [allSurveys, clickableSurveys, isRunning, navigate]);
+  }, [allDone, isRunning, navigate]);
 
   const handleSurveyChange = (surveyId: number) => {
     initSurvey(surveyId);

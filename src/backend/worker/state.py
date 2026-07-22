@@ -35,14 +35,53 @@ class ProcessingState:
         self.page_times: list[float] = []
         self._eta_rolling_window: int = config.processing["eta_rolling_window"]
 
-    def init_from_surveys(self, survey_groups: list[list[Path]]):
-        self.surveys = [
-            SurveyState(id=idx, files=group)
-            for idx, group in enumerate(survey_groups)
-        ]
+    @property
+    def is_running(self) -> bool:
+        return self.global_state.is_running
+
+    @is_running.setter
+    def is_running(self, value: bool):
+        self.global_state.is_running = value
+
+    def ensure_from_cache(self, survey_groups: list[list[Path]]):
+        if self.surveys:
+            return
+        from data_handler import load_all_survey_caches
+        cached = load_all_survey_caches()
+        self.surveys = []
+        for idx, group in enumerate(survey_groups):
+            if idx in cached:
+                cache_data = cached[idx]
+                status = cache_data.get("status", "queued")
+                result = cache_data.get("result")
+                error = cache_data.get("error")
+            else:
+                status = "queued"
+                result = None
+                error = None
+            self.surveys.append(SurveyState(id=idx, files=group, status=status, result=result, error_message=error))
         self.global_state.total = len(self.surveys)
-        self.global_state.processed = 0
-        self.global_state.errors = 0
+        self.global_state.processed = sum(1 for s in self.surveys if s.status in ("ready", "error"))
+        self.global_state.errors = sum(1 for s in self.surveys if s.status == "error")
+
+    def init_from_surveys(self, survey_groups: list[list[Path]]):
+        from data_handler import load_all_survey_caches
+        cached = load_all_survey_caches()
+        self.surveys = []
+        for idx, group in enumerate(survey_groups):
+            if idx in cached:
+                cache_data = cached[idx]
+                status = cache_data.get("status", "queued")
+                result = cache_data.get("result")
+                error = cache_data.get("error")
+            else:
+                status = "queued"
+                result = None
+                error = None
+            self.surveys.append(SurveyState(id=idx, files=group, status=status, result=result, error_message=error))
+        self.global_state.total = len(self.surveys)
+        self.global_state.processed = sum(1 for s in self.surveys if s.status in ("ready", "error"))
+        self.global_state.errors = sum(1 for s in self.surveys if s.status == "error")
         self.global_state.is_running = True
         self.global_state.started_at = time.time()
         self.page_times.clear()

@@ -35,7 +35,7 @@ class ProcessingWorker:
                     logger.info("Worker stop requested — finishing current survey")
                     break
 
-                if survey.status in ("ready", "error"):
+                if survey.status in ("ready", "error", "verified"):
                     continue
 
                 await self._process_survey_with_retry(idx, survey)

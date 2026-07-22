@@ -34,6 +34,7 @@
 - czekasz na moją akceptację/wskazówki dot. planu
 - po mojej akceptacji realizujesz poprawkę zgodnie z planem
 - dajesz mi przestrzeń do testowania
+- NIE zmieniasz niczego w known-issues.md, chyba że jasno i bezpośrednio o to poproszę
 
 7. ogólnie w trakcie implementacji i wprowadzania poprawek starasz się trzymać najnowszych standardów streamlit 1.59 - ./.opencode/basic-streamlit-guardrails.md
 

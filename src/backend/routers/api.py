@@ -8,7 +8,7 @@ from pydantic import BaseModel, ValidationError
 
 from auth import get_current_user
 from config import config
-from data_handler import export_csv_path
+from data_handler import export_csv_path, save_survey_cache
 from domain.csv_export import save_survey_to_csv
 from domain.field_specs import ALL_FIELDS, FIELD_SPEC_BY_NAME
 from domain.schemas import MedicalSurvey
@@ -53,6 +53,7 @@ def list_surveys() -> list[dict]:
 
     groups = scan_survey_directory(dir_path)
     worker = get_worker()
+    worker.state.ensure_from_cache(groups)
 
     result = []
     for idx, group in enumerate(groups):
@@ -221,6 +222,7 @@ def save_survey(survey_id: int, request: SaveRequest):
     save_survey_to_csv(survey_data, csv_path)
 
     worker.state.mark_verified(survey_id)
+    save_survey_cache(survey_id, {}, "verified")
 
     logger.info("Survey %d saved to CSV: %s", survey_id, csv_path)
     return {
