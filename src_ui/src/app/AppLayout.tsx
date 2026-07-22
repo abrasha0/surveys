@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import VerificationPanel from '../features/verification/VerificationPanel';
 
 export default function AppLayout() {
   const navigate = useNavigate();
@@ -22,8 +23,8 @@ export default function AppLayout() {
           Wyloguj
         </button>
       </header>
-      <main className="flex-1 flex items-center justify-center bg-gray-50 text-gray-400">
-        Panel weryfikacji — Etap 6+
+      <main className="flex-1 flex overflow-hidden">
+        <VerificationPanel />
       </main>
     </div>
   );
