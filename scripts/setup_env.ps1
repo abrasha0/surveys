@@ -132,8 +132,33 @@ if (-not (Test-Path -LiteralPath $FrontendDir)) {
         Write-Log "OK: zaleznosci frontendu zainstalowane."
     } catch {
         Write-Log "OSTROZNE: node/npm nie znajduja sie w PATH - pomijam npm install"
-        Write-Log "Zainstaluj Node.js: https://nodejs.org/"
+        Write-Log "Zainstaluj Node.js >=18: https://nodejs.org/"
     }
+}
+
+# --- Krok 8: Weryfikacja Node.js >= 18 ---
+Write-Log "Krok 8: Sprawdzanie Node.js >= 18..."
+try {
+    $nodeVersion = & node --version 2>&1
+    if ($nodeVersion -match 'v(\d+)\.') {
+        $nodeMajor = [int]$Matches[1]
+        if ($nodeMajor -lt 18) {
+            Write-Log "OSTROZNE: Node.js $nodeMajor < 18 (Vite 8 wymaga >= 18)"
+        } else {
+            Write-Log "OK: Node.js $nodeVersion"
+        }
+    }
+} catch {
+    Write-Log "OSTROZNE: Node.js nie znaleziony w PATH - pomijam weryfikacje"
+}
+
+# --- Krok 9: Weryfikacja src/main.py ---
+Write-Log "Krok 9: Sprawdzanie src/main.py..."
+$MainPy = Join-Path -Path $ProjectRoot -ChildPath "src\main.py"
+if (Test-Path -LiteralPath $MainPy) {
+    Write-Log "OK: $MainPy istnieje"
+} else {
+    Write-Log "OSTROZNE: Nie znaleziono src/main.py - FastAPI entry point brak"
 }
 
 Write-Log "=== Setup Environment - zakonczony pomyslnie ==="
@@ -141,11 +166,13 @@ Write-Log ""
 Write-Log "Aby aktywowac srodowisko recznie:"
 Write-Log "  .venv\Scripts\Activate.ps1"
 Write-Log ""
-Write-Log "Aby uruchomic aplikacje (dev):"
+Write-Log "Uruchomienie deweloperskie (API + frontend hot-reload):"
 Write-Log "  .\scripts\run_dev.ps1"
 Write-Log ""
-Write-Log "Aby uruchomic produkcyjnie:"
-Write-Log "  uvicorn main:app --port 8000"
-Write-Log "  (frontend zbuduj: npm run build --prefix src_ui)"
+Write-Log "Uruchomienie produkcyjne (API + frontend static na jednym porcie):"
+Write-Log "  .\scripts\full_setup.ps1"
+Write-Log ""
+Write-Log "Architektura: FastAPI na porcie 8000 serwuje API i statyczny frontend (dist/).
+Write-Log "W dev: dodatkowo Vite na porcie 5173 z proxy /api -> localhost:8000."
 
 exit 0

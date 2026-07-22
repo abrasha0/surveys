@@ -9,12 +9,23 @@ $TunnelUrlFile = Join-Path -Path $ProjectRoot -ChildPath "logs\tunnel_url.txt"
 $CloudflaredDir = "C:\tools"
 $CloudflaredPath = Join-Path -Path $CloudflaredDir -ChildPath "cloudflared.exe"
 
+$tunnelProcess = $null
+
 function Write-Log {
     param([string]$Message)
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $line = "[$timestamp] $Message"
     Write-Host $line
     Add-Content -Path $LogFile -Value $line
+}
+
+function Cleanup {
+    Write-Log "=== Cleanup: zatrzymywanie tunelu ==="
+    if ($tunnelProcess -and -not $tunnelProcess.HasExited) {
+        Write-Log "Zatrzymywanie cloudflared (PID: $($tunnelProcess.Id))..."
+        $tunnelProcess.Kill()
+    }
+    Write-Log "=== Cleanup zakonczony ==="
 }
 
 New-Item -Path $LogFile -ItemType File -Force | Out-Null
@@ -84,7 +95,7 @@ if (-not $cfPath) {
 Write-Log "Krok 2: Sprawdzanie czy uvicorn dziala na porcie 8000..."
 try {
     $r = Invoke-WebRequest -Uri "http://localhost:8000" -UseBasicParsing -TimeoutSec 5
-    if ($r.StatusCode -eq 200) {
+    if ($r.StatusCode -eq 200 -or $r.StatusCode -eq 401) {
         Write-Log "OK: uvicorn odpowiada na http://localhost:8000"
     } else {
         throw "uvicorn zwrocil kod $($r.StatusCode)"
@@ -103,39 +114,59 @@ $dateStr = Get-Date -Format "yyyyMMdd_HHmmss"
 $logOutput = Join-Path -Path $ProjectRoot -ChildPath "logs\tunnel_${dateStr}.log"
 
 try {
-    $proc = Start-Process -FilePath $cfPath -ArgumentList "tunnel --url http://localhost:8000" -NoNewWindow -PassThru -RedirectStandardOutput $logOutput -RedirectStandardError "${logOutput}.err"
+    $tunnelProcess = Start-Process -FilePath $cfPath -ArgumentList "tunnel --url http://localhost:8000" -NoNewWindow -PassThru -RedirectStandardOutput $logOutput -RedirectStandardError "${logOutput}.err"
 
     Start-Sleep -Seconds 6
 
+    Write-Log "Oczekiwanie na URL tunelu (do 60s)..."
     $tunnelUrl = $null
-    for ($i = 0; $i -lt 12; $i++) {
+    for ($i = 0; $i -lt 20; $i++) {
         if (Test-Path -LiteralPath $logOutput) {
             $content = Get-Content -Path $logOutput -Raw
-            if ($content -match 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com') {
+            if ($content -match 'https://[\w.-]+\.trycloudflare\.com') {
                 $tunnelUrl = $Matches[0]
                 break
             }
         }
+        if ($i -eq 0) { Write-Log "connecting..." }
         Start-Sleep -Seconds 3
     }
 
     if ($tunnelUrl) {
-        Write-Log "OK: Tunel aktywny!"
+        Write-Log "connected: Tunel aktywny!"
         Write-Log "URL: $tunnelUrl"
         $tunnelUrl | Set-Content -Path $TunnelUrlFile -Force
         Write-Log "URL zapisany do: $TunnelUrlFile"
+
+        # Petla monitorujaca z health check
+        try {
+            while ($true) {
+                Start-Sleep -Seconds 30
+                if ($tunnelProcess.HasExited) {
+                    Write-Log "failed: Proces cloudflared zakonczyl sie."
+                    break
+                }
+                try {
+                    $hc = Invoke-WebRequest -Uri $tunnelUrl -UseBasicParsing -TimeoutSec 10
+                    Write-Log "health: OK (HTTP $($hc.StatusCode))"
+                } catch {
+                    Write-Log "health: Tunel nie odpowiada - $_"
+                }
+            }
+        } finally {
+            Cleanup
+        }
     } else {
-        Write-Log "OSTROZNIE: Nie wykryto URL tunelu. Sprawdz log: $logOutput"
-        Write-Log "Tunel moze byc juz aktywny - sprawdz recznie."
+        Write-Log "failed: Nie wykryto URL tunelu po 60s. Sprawdz log: $logOutput"
+        Cleanup
+        exit 1
     }
 } catch {
     Write-Log "BLAD: Nie udalo sie uruchomic tunelu - $_"
     Write-Log "Sprawdz log: $logOutput"
+    Cleanup
     exit 1
 }
 
 Write-Log "=== Deploy Tunnel - zakonczony ==="
-Write-Log "Tunel: $tunnelUrl"
-Write-Log "Aby zatrzymac: .\scripts\deploy_tunnel.ps1 -Stop"
-
 exit 0

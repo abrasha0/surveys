@@ -81,10 +81,46 @@ if (-not (Test-Path -LiteralPath $Uvicorn)) {
 
 $uvicornProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --reload --port 8000" -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
 Write-Log "OK: Uvicorn uruchomiony (PID: $($uvicornProcess.Id))"
-Write-Log "API dostepne pod: http://localhost:8000"
 
-# --- Krok 4: Uruchomienie npm dev ---
-Write-Log "Krok 4: Uruchamianie npm dev (frontend)..."
+# --- Waitloop na uvicorn ---
+Write-Log "Czekam na gotowosc uvicorn..."
+$uvicornReady = $false
+for ($i = 0; $i -lt 10; $i++) {
+    Start-Sleep -Seconds 1
+    try {
+        $r = Invoke-WebRequest -Uri "http://localhost:8000" -UseBasicParsing -TimeoutSec 2
+        if ($r.StatusCode -eq 200 -or $r.StatusCode -eq 401) {
+            $uvicornReady = $true
+            break
+        }
+    } catch {
+        # still starting
+    }
+}
+if ($uvicornReady) {
+    Write-Log "OK: API gotowe na http://localhost:8000"
+} else {
+    Write-Log "OSTROZNE: API nie odpowiada po 10s - sprawdz log: $uvicornLog"
+}
+
+# --- Krok 4: Walidacja node/npm ---
+Write-Log "Krok 4: Sprawdzanie node i npm..."
+$nodePath = (Get-Command "node" -ErrorAction SilentlyContinue).Source
+$npmPath = (Get-Command "npm" -ErrorAction SilentlyContinue).Source
+if (-not $nodePath) {
+    Write-Log "BLAD: Node.js nie znaleziony w PATH. Zainstaluj Node.js >=18: https://nodejs.org/"
+    Cleanup
+    exit 1
+}
+if (-not $npmPath) {
+    Write-Log "BLAD: npm nie znaleziony w PATH."
+    Cleanup
+    exit 1
+}
+Write-Log "OK: node ($nodePath), npm ($npmPath)"
+
+# --- Krok 5: Uruchomienie npm dev ---
+Write-Log "Krok 5: Uruchamianie npm dev (frontend)..."
 $FrontendDir = Join-Path -Path $ProjectRoot -ChildPath "src_ui"
 $npmLog = Join-Path -Path $ProjectRoot -ChildPath "logs\npm_dev.log"
 
