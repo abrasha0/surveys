@@ -17,6 +17,9 @@ wynik do CSV.
 **Środowisko:** Windows, RTX 5070 Ti 16GB VRAM, 32GB RAM. Aplikacja uruchamiana
 u dewelopera, dostęp przez Cloudflare tunnel.
 
+**Model przetwarzania:** Jeden globalny asynchroniczny worker w tle (asyncio.Task),
+przetwarzający ankiety sekwencyjnie z retry do 3 razy na ankietę.
+
 ---
 
 ## Funkcjonalności
@@ -25,16 +28,19 @@ u dewelopera, dostęp przez Cloudflare tunnel.
 - Automatyczna analiza zdjęć ankiet przez VLM (Ollama) + Text LLM
 - Dwuetapowe przetwarzanie: VLM → tekst → Text LLM → JSON
 - Sekwencyjne przetwarzanie per-strona (jeden model naraz w pamięci GPU)
-- Globalny worker w tle z kolejkowaniem i ETA
+- Globalny worker w tle z kolejkowaniem, ETA i możliwością zatrzymania (POST /api/processing/stop)
 - Interleaved verification — weryfikacja gotowych ankiet w trakcie przetwarzania kolejnych
-- Batch processing z progress barem i cache'owaniem wyników
-- Weryfikacja i korekta odczytanych danych w interfejsie side-by-side
-- Podgląd zdjęć z zoomem (zakładki dla każdej strony)
-- Formularz z walidacją pól wymaganych
-- Skrót klawiszowy Spacja do szybkiego zatwierdzania
-- Eksport wyników do CSV (UTF-8 BOM, gotowy do Excela)
-- Lokalny katalog zdjęć (brak uploadu przez sieć)
-- Zapis do cache per-survey (wznawianie sesji po przerwie)
+- Batch processing z progress barem (liczony przez backend z rolling average) i cache'owaniem per-survey
+- Weryfikacja i korekta odczytanych danych w interfejsie side-by-side (podział 40/60)
+- Dwuetapowe zatwierdzanie: pierwsze kliknięcie uruchamia walidację, drugie "Zatwierdź mimo błędów" wymusza zapis
+- Persystencja draftów formularza (Zustand + localStorage) — zmiany nie giną przy nawigacji między ankietami
+- Dynamiczne generowanie formularza z definicji pól (field-specs z API)
+- Podgląd zdjęć z zakładkami dla każdej strony (5 stron), pamiętany wybór per ankieta
+- Skrót klawiszowy Spacja do szybkiego zatwierdzania (ignorowany przy focusie w polu tekstowym)
+- Eksport wyników do CSV (UTF-8 BOM, 71 kolumn, gotowy do Excela)
+- Lokalny katalog zdjęć (brak uploadu przez sieć — przetwarzanie bezpośrednio z dysku)
+- Cache per-survey (logs/survey_cache/survey_{idx}.json) — wznawianie sesji po restarcie serwera
+- Polling statusu co 2s (GET /api/processing/status + GET /api/surveys)
 
 ---
 
@@ -46,7 +52,7 @@ Aplikacja przetwarza każdą ankietę sekwencyjnie — stronę po stronie.
 Dla każdej strony kolejno:
 
 1. **Pre-processing obrazu** — resize (max 2000px), grayscale, contrast (Pillow)
-2. **VLM (deepseek-ocr)** — ekstrakcja surowego tekstu z obrazu
+2. **VLM (qwen3-vl:8b, alternatywnie deepseek-ocr)** — ekstrakcja surowego tekstu z obrazu
 3. **Text LLM (llama3.1)** — formatowanie surowego tekstu do struktury JSON
 
 Następnie: strona 2, strona 3, ..., strona 5. Wyniki 5 stron są merge'owane
@@ -55,10 +61,10 @@ do jednego obiektu MedicalSurvey.
 ### Architektura systemu
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
-│  React UI   │────▶│  FastAPI     │────▶│  Worker (tło)   │
-│  (src_ui/)  │◀────│  (src/)      │◀────│  + Ollama AI    │
-└─────────────┘     └──────┬───────┘     └─────────────────┘
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌──────────────┐
+│  React UI   │────▶│  FastAPI     │────▶│  Worker (tło)   │────▶│  Ollama AI   │
+│  (src_ui/)  │◀────│  (src/)      │◀────│  + kolejka      │     │  (VLM+Text)  │
+└─────────────┘     └──────┬───────┘     └─────────────────┘     └──────────────┘
                            │
                     ┌──────▼───────┐
                     │  dist/       │
@@ -80,23 +86,28 @@ gotowych wyników w trakcie przetwarzania kolejnych (interleaved).
 ### Prompty
 
 Prompty zdefiniowane w `config.yaml` (sekcja `prompts`), nie w kodzie.
-Dwa prompty:
-- `vlm` — ekstrakcja surowego tekstu z obrazu
-- `text_format` — formatowanie tekstu do JSON
+Struktura promptów:
+- `vlm` — ekstrakcja surowego tekstu z obrazu (z placeholders `{page_idx}`)
+- `text_format` — formatowanie tekstu do JSON (z placeholders `{vlm_output}`, `{page_json_schema}`)
+- `page_1_json_schema`..`page_5_json_schema` — 5 schematów JSON per-strona z dozwolonymi wartościami
+
+To oznacza, że zmiana formatu ankiety (np. dodanie/usunięcie pola) wymaga aktualizacji:
+1. `domain/field_specs.py` — definicja pola
+2. Odpowiedniego `page_N_json_schema` w `config.yaml` — dla ekstrakcji AI
 
 ---
 
 ## Model danych
 
-Aplikacja obsługuje ankietę złożoną z 63 pól na 5 stronach.
+Aplikacja obsługuje ankietę złożoną z **70 pól** na 5 stronach (63 oryginalne + 7 rozszerzonych pól "Inne").
 Szczegółowa struktura: patrz `docs/survey-structure.md`.
 
 Sekcje:
-- **Strona 1:** Demografia (7), aktywność zawodowa (4), styl życia (3) = 14 pól
-- **Strona 2:** CES-D — skala depresji = 20 pól
-- **Strona 3:** Athens — skala bezsenności = 8 pól
-- **Strona 4:** MFIS — skala zmęczenia (pozycje 1-15) = 15 pól
-- **Strona 5:** MFIS (16-21) + stan zdrowia = 10 pól
+- **Strona 1:** Demografia (8), aktywność zawodowa (6), styl życia (3) = **17 pól** (w tym 3x "Inne")
+- **Strona 2:** CES-D — skala depresji = **20 pól**
+- **Strona 3:** Athens — skala bezsenności = **8 pól**
+- **Strona 4:** MFIS — skala zmęczenia (pozycje 1-15) = **15 pól**
+- **Strona 5:** MFIS (16-21) + stan zdrowia = **10 pól**
 
 ---
 
@@ -117,16 +128,23 @@ Wyniki cache'owane w `logs/survey_cache/`. Użytkownik widzi pasek postępu z ET
 
 ### 4. Weryfikacja (interleaved)
 Ekran side-by-side — dostępny natychmiast po przetworzeniu pierwszej ankiety:
-- **Lewa kolumna:** Podgląd obrazu aktualnej strony (5 zakładek)
-- **Prawa kolumna:** Formularz z odczytanymi danymi
-- Formularz z walidacją pól wymaganych
-- Skrót klawiszowy Spacja = "Zatwierdź i Następna"
+- **Lewa kolumna (~40%):** Podgląd obrazu aktualnej strony (5 zakładek, wybór pamiętany per ankieta)
+- **Prawa kolumna (~60%):** Formularz z odczytanymi danymi AI (prefill), generowany dynamicznie z field-specs
+- Formularz z walidacją pól wymaganych (czerwone kropki po pierwszej próbie zatwierdzenia)
+- Skrót klawiszowy Spacja = "Zatwierdź" (ignorowany przy focusie w polu tekstowym)
+- **Dwuetapowe zatwierdzanie:** pierwsze kliknięcie → walidacja (jeśli błędy → pokaż kropki, nie wysyła);
+  przycisk "Zatwierdź mimo błędów" → force save do CSV
+- **Draft persistence:** wartości formularza zapisywane do localStorage (Zustand, debounce 500ms) —
+  przejście do innej ankiety i powrót nie traci wprowadzonych danych
 
 Możliwość przełączania między gotowymi ankietami w trakcie przetwarzania kolejnych.
+Pasek postępu przetwarzania (ProcessingProgressBar) widoczny na górze ekranu — pokazuje
+ETAs, aktualny etap modelu (VLM/format), liczbę przetworzonych/błędnych ankiet.
 
 ### 5. Zapis i następna ankieta
-Kliknięcie "Zatwierdź ankietę" → walidacja → zapis do CSV (`wyniki.csv`) →
-automatyczne przejście do następnej ankiety.
+Kliknięcie "Zatwierdź ankietę" (lub Spacja przy braku błędów) → walidacja przez
+`MedicalSurvey` → zapis wiersza do CSV (`wyniki.csv`) przez `save_survey_to_csv()` →
+status ankiety `ready` → `verified` → automatyczne przejście do następnej gotowej ankiety.
 
 ### 6. Ekran zakończenia
 Po zweryfikowaniu wszystkich ankiet: komunikat sukcesu, przycisk "Pobierz CSV"
@@ -148,13 +166,13 @@ Sekcje `config.yaml`:
 | Sekcja       | Opis                                                   |
 |--------------|--------------------------------------------------------|
 | `app`        | Tytuł, hasło, ścieżki, dozwolone typy plików           |
-| `ai`         | Modele, URL Ollama, retry, timeout, num_ctx, temperature, keep_alive |
+| `ai`         | Modele (VLM + Text), URL Ollama, retry, timeout, num_ctx, temperature, keep_alive |
 | `image`      | max_dimension, contrast_factor, jpeg_quality            |
 | `ingestion`  | survey_group_size                                       |
 | `logging`    | Plik, poziom, rotacja logów AI, skracanie I/O          |
 | `langsmith`  | tracing_v2, endpoint, api_key, project                  |
 | `processing` | Wagi progress bara, retry, ETA window, cache_dir       |
-| `prompts`    | VLM extraction, text format (szablony z placeholderami) |
+| `prompts`    | VLM, text_format + **5 schematów JSON per-strona** (`page_1_json_schema`..`page_5_json_schema`) |
 
 ### Zmienne środowiskowe
 Zmienne z prefiksem `ANKIETER_*` nadpisują wartości z pliku YAML.
@@ -183,8 +201,8 @@ zainstalowany, traces są pomijane (no-op).
 .\scripts\setup_ollama.ps1       # Instalacja Ollamy, pull modelu
 .venv\Scripts\Activate.ps1
 cd src_ui; npm run build; cd ..
-Copy-Item src_ui/dist/* dist/ -Recurse -Force
-uvicorn main:app --port 8000     # Start aplikacji (z katalogu src/)
+Copy-Item src_ui/dist/* dist/ -Recurse -Force  # (opcjonalne — build idzie do dist/)
+cd src; uvicorn main:app --port 8000            # Start aplikacji z katalogu src/
 ```
 
 ### Scenariusz 2: Automatyczny
@@ -216,6 +234,7 @@ Frontend deweloperski: `http://localhost:5173` (proxy `/api` → `localhost:8000
 Patrz `docs/known-issues.md`.
 
 ### Możliwe ulepszenia
-- Próg re-OCR dla niskiej jakości odczytu
-- Dynamiczne generowanie UI z `field_specs` (zamiast hardkodowanych zakładek)
-- Testy automatyczne dla nowego stacka (FastAPI + React)
+- Próg re-OCR dla niskiej jakości odczytu (issue #7)
+- Testy automatyczne (backend + frontend)
+- WebSocket/SSE zamiast pollingu (2s interwał) dla szybszej aktualizacji statusu
+- Autoodświeżanie tokena sesyjnego (obecnie stały 8h TTL bez refresh)

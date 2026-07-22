@@ -12,3 +12,5 @@ wyniki.csv
 node_modules/
 src_ui/dist/
 src/surveys_data
+dist/*
+config.yaml

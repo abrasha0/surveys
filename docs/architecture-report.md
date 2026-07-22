@@ -5,15 +5,14 @@
 | Pakiet | Wersja | Użycie |
 |--------|--------|--------|
 | fastapi | ≥0.115.0 | Backend framework |
-| uvicorn | ≥0.32.0 | ASGI server |
+| uvicorn[standard] | ≥0.32.0 | ASGI server |
 | pydantic | 2.13.4 | Modele danych, walidacja |
-| pydantic-settings | 2.14.2 | Konfiguracja z env vars |
 | httpx | 0.28.1 | Async HTTP → Ollama |
-| Pillow | 12.3.0 | Przetwarzanie obrazów |
-| python-multipart | 0.0.32 | Upload plików |
-| pyyaml | ≥6.0 | Parsowanie config.yaml |
+| Pillow | 12.3.0 | Przetwarzanie obrazów (resize, grayscale, contrast) |
+| python-multipart | 0.0.32 | Upload plików (nieużywane — przetwarzanie z lokalnego katalogu) |
+| pyyaml | ≥6.0 | Parsowanie `config.yaml` |
 
-Frontend: React 19, TypeScript, Vite, Tailwind CSS, React Router, TanStack Query, Zustand.
+Frontend: React 19, TypeScript 6, Vite 8, Tailwind CSS 4, React Router DOM 7, TanStack Query 5, Zustand 5, Oxlint.
 
 Zależności opcjonalne:
 - `langsmith` — tracing LangSmith (gdy włączony w `config.yaml`)
@@ -31,21 +30,21 @@ surveys/
 │   ├── data_handler.py          # Cache load/save, CSV path
 │   ├── logger.py                # Dual handler (file + console)
 │   ├── ai/                      # Warstwa AI
-│   │   ├── client.py            # Async klient Ollama (VLM + Text LLM)
-│   │   ├── prompts.py           # Budowniczy promptów z config.yaml
-│   │   └── tracing.py           # LangSmith integration
+│   │   ├── client.py            # Async klient Ollama (VLM + Text LLM), preprocessing obrazów
+│   │   ├── prompts.py           # Budowniczy promptów z config.yaml (vlm, text_format, page_*_json_schema)
+│   │   └── tracing.py           # Opcjonalny LangSmith tracing (vlm_trace, llm_trace, io_trace)
 │   ├── domain/                  # Logika biznesowa
-│   │   ├── field_specs.py       # FieldSpec, 63 pola (source of truth)
-│   │   ├── schemas.py           # MedicalSurvey, walidacja, CSV mapping
-│   │   └── csv_export.py        # Export do CSV
+│   │   ├── field_specs.py       # FieldSpec, 70 pól (source of truth) na 5 stronach
+│   │   ├── schemas.py           # MedicalSurvey (Pydantic), walidacja, normalizacja, CSV row
+│   │   └── csv_export.py        # Export do CSV (UTF-8 BOM, append)
 │   ├── ingestion/               # Przetwarzanie wejściowe
-│   │   └── file_grouping.py     # Grupowanie zdjęć po 5
+│   │   └── file_grouping.py     # Skanowanie katalogu + grupowanie zdjęć po 5
 │   ├── routers/                 # Endpointy REST
-│   │   └── api.py               # Wszystkie endpointy API
+│   │   └── api.py               # Wszystkie endpointy API (prefix /api)
 │   └── worker/                  # Worker w tle
-│       ├── __init__.py          # Singleton workera
-│       ├── processing_worker.py # Logika przetwarzania sekwencyjnego
-│       └── state.py             # Stan kolejki (SurveyState)
+│       ├── __init__.py          # Singleton workera (get_worker())
+│       ├── processing_worker.py # Asynchroniczny worker sekwencyjny z retry 3x
+│       └── state.py             # Stany: SurveyState, GlobalState, ProcessingState + ETA
 ├── src_ui/                      # Frontend (React + Vite)
 │   ├── src/
 │   │   ├── app/                 # Routing, layout, guard
@@ -90,30 +89,34 @@ surveys/
 ## Maszyna stanów
 
 ```
-UNAUTHENTICATED ──(login)──> AUTHENTICATED ──(scan dir)──> QUEUED
-                                                                │
-                                                        (start processing)
-                                                                │
-                                                                ▼
-                                                        PROCESSING
-                                                     (worker w tle)
-                                                     │           │
-                                                     │  (ankieta  │
-                                                     │   gotowa)  │
-                                                     │           │
-                                                     ▼           │
-                                                  READY ────────┘
-                                                     │
-                                               (weryfikacja)
-                                                     │
-                                                     ▼
-                                                VERIFIED ────────┘
-                                                     │
-                                          (wszystkie zrobione)
-                                                     │
-                                                     ▼
-                                                ALL_DONE
-                                              (ekran zakończenia)
+UNAUTHENTICATED ──(login)──> AUTHENTICATED
+                                    │
+                              (scan dir + start)
+                                    │
+                                    ▼
+                               QUEUED
+                                    │
+                            (start processing)
+                                    │
+                                    ▼
+                              PROCESSING
+                         (worker w tle, retry 3x)
+                          │                 │
+                          │  (sukces)       │  (3x fail)
+                          │                 │
+                          ▼                 ▼
+                        READY             ERROR
+                          │
+                    (weryfikacja + save)
+                          │
+                          ▼
+                      VERIFIED
+                          │
+              (wszystkie verified/error)
+                          │
+                          ▼
+                      ALL_DONE
+                (ekran zakończenia + CSV)
 ```
 
 `main.py` działa jako entry point FastAPI — montuje routery API oraz StaticFiles
@@ -126,22 +129,24 @@ ankiety sekwencyjnie.
 
 ### domain/field_specs.py — fundament systemu
 
-- **63 pola** na 5 stronach jako `FieldSpec` dataclassy
+- **70 pól** na 5 stronach jako `FieldSpec` dataclassy
 - Definiuje: nazwę, etykietę, stronę, typ (select/text/number), dozwolone wartości, nagłówek CSV
 - **Najczęściej importowany moduł** — napędza: walidację Pydantic, generowanie promptów,
   rendering formularzy, nagłówki CSV
-- `ALL_FIELDS` — lista wszystkich pól
+- `ALL_FIELDS` — lista wszystkich pól (70 sztuk: 17 + 20 + 8 + 15 + 10)
 - `PAGE_MAP` — mapowanie strony → lista pól
 - `FIELD_SPEC_BY_NAME` — słownik do szybkiego dostępu
+- `PAGE_DESCRIPTIONS` — opisy stron dla promptów (zakaz hardkodowania w prompts.py)
 
 ### ai/client.py — klient OCR
 
-- Async `httpx.AsyncClient` → lokalny Ollama (deepseek-ocr + llama3.1)
+- Async `httpx.AsyncClient` → lokalny Ollama (domyślnie qwen3-vl:8b + llama3.1)
 - **Sekwencyjne przetwarzanie per-strona**: VLM → Text LLM → następna strona
 - Pre-processing obrazów: resize (max 2000px), grayscale, contrast (Pillow)
-- Retry z exponential backoff
+- Retry z exponential backoff (per-request, osobny od retry workera)
 - `analyze_survey()` — 5 stron sekwenyjnie, merge wyników
 - `analyze_batch()` — iteruje po ankietach z callbackami progressu
+- Szczegółowy dual logging: główny log + dedykowany `ai_requests.log` z rotacją
 
 ### worker/processing_worker.py — worker w tle
 
@@ -153,15 +158,19 @@ ankiety sekwencyjnie.
 
 ### routers/api.py — REST API
 
-- `GET /api/field-specs` — schematy pól
-- `GET /api/surveys` — lista ankiet z statusami
-- `GET /api/surveys/export/csv` — download CSV
-- `GET /api/surveys/{id}/pages/{page}/image` — zdjęcie strony
-- `GET /api/surveys/{id}/result` — wynik przetwarzania AI
-- `POST /api/surveys/{id}/save` — zapis zweryfikowanych danych do CSV
-- `POST /api/processing/start` — uruchomienie workera
-- `GET /api/processing/status` — status + ETA
-- `POST /api/processing/stop` — zatrzymanie workera
+Wszystkie endpointy chronione przez `Depends(get_current_user)` (HMAC cookie):
+
+| Metoda | Ścieżka | Opis |
+|--------|---------|------|
+| GET | `/api/field-specs` | Schematy pól (70 specyfikacji) |
+| GET | `/api/surveys` | Lista ankiet z statusami z katalogu + cache |
+| GET | `/api/surveys/export/csv` | Download CSV (UTF-8 BOM) |
+| GET | `/api/surveys/{id}/pages/{page}/image` | Zdjęcie strony ankiety |
+| GET | `/api/surveys/{id}/result` | Wynik przetwarzania AI (tylko gdy status ready/error) |
+| POST | `/api/surveys/{id}/save` | Zapis zweryfikowanych danych do CSV (z opcją force) |
+| POST | `/api/processing/start` | Uruchomienie workera (skanuje katalog i przetwarza kolejkę) |
+| GET | `/api/processing/status` | Status workera + ETA (total, processed, errors, current_stage) |
+| POST | `/api/processing/stop` | Zatrzymanie workera (po bieżącej ankiecie) |
 
 ### domain/schemas.py — modele danych
 
@@ -228,13 +237,13 @@ Sekcje `config.yaml`:
 | Sekcja       | Opis                                                   |
 |--------------|--------------------------------------------------------|
 | `app`        | Tytuł, hasło, ścieżki, dozwolone typy plików           |
-| `ai`         | Modele, URL Ollama, retry, timeout, num_ctx, temperature, keep_alive |
+| `ai`         | Modele (VLM + Text), URL Ollama, retry, timeout, num_ctx, temperature, keep_alive |
 | `image`      | max_dimension, contrast_factor, jpeg_quality            |
 | `ingestion`  | survey_group_size                                       |
 | `logging`    | Plik, poziom, rotacja logów AI, skracanie I/O          |
 | `langsmith`  | tracing_v2, endpoint, api_key, project                  |
 | `processing` | progress_weights, history_limit, worker_max_retries, eta_rolling_window, survey_cache_dir |
-| `prompts`    | VLM extraction, text format (szablony z placeholderami) |
+| `prompts`    | VLM extraction, text format + **5 schematów JSON per-strona** (`page_1_json_schema`..`page_5_json_schema`) |
 
 Env vars: `ANKIETER_*` prefix nadpisuje wartości z YAML.
 Pełna specyfikacja z komentarzami: `config.yaml.example`.
