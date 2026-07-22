@@ -15,14 +15,16 @@ export default function VerificationPanel() {
 
   const [currentSurveyId, setCurrentSurveyId] = useState<number | null>(null);
 
+  const allSurveys = useMemo(() => surveys ?? [], [surveys]);
+
   const clickableSurveys = useMemo(
-    () => (surveys ?? []).filter((s) => s.status === 'ready' || s.status === 'verified'),
-    [surveys]
+    () => allSurveys.filter((s) => s.status === 'ready' || s.status === 'verified'),
+    [allSurveys]
   );
 
   const currentIndex = useMemo(
-    () => clickableSurveys.findIndex((s) => s.id === currentSurveyId),
-    [clickableSurveys, currentSurveyId]
+    () => allSurveys.findIndex((s) => s.id === currentSurveyId),
+    [allSurveys, currentSurveyId]
   );
 
   const { data: surveyResult } = useSurveyResult(currentSurveyId);
@@ -40,17 +42,16 @@ export default function VerificationPanel() {
     setCurrentSurveyId(surveyId);
   };
 
-  const handlePrevSurvey = () => {
-    if (currentIndex > 0) {
-      handleSurveyChange(clickableSurveys[currentIndex - 1].id);
+  const navigateToNextClickable = (direction: -1 | 1) => {
+    const currentClickableIndex = clickableSurveys.findIndex((s) => s.id === currentSurveyId);
+    const nextIndex = currentClickableIndex + direction;
+    if (nextIndex >= 0 && nextIndex < clickableSurveys.length) {
+      handleSurveyChange(clickableSurveys[nextIndex].id);
     }
   };
 
-  const handleNextSurvey = () => {
-    if (currentIndex < clickableSurveys.length - 1) {
-      handleSurveyChange(clickableSurveys[currentIndex + 1].id);
-    }
-  };
+  const handlePrevSurvey = () => navigateToNextClickable(-1);
+  const handleNextSurvey = () => navigateToNextClickable(1);
 
   const handleSave = async (values: Record<string, unknown>) => {
     await saveSurveyMutation.mutateAsync({
@@ -78,7 +79,8 @@ export default function VerificationPanel() {
     <div className="flex flex-col h-full">
       <SurveyHeader
         currentSurveyId={currentSurveyId}
-        clickableSurveys={clickableSurveys}
+        surveys={allSurveys}
+        totalSurveys={allSurveys.length}
         currentIndex={currentIndex}
         onPrev={handlePrevSurvey}
         onNext={handleNextSurvey}

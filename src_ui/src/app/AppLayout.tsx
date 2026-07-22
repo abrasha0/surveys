@@ -1,8 +1,12 @@
 import { useNavigate } from 'react-router-dom';
+import { useProcessingStatus, useStartProcessing } from '../api/hooks';
+import ProcessingProgressBar from '../features/verification/ProcessingProgressBar';
 import VerificationPanel from '../features/verification/VerificationPanel';
 
 export default function AppLayout() {
   const navigate = useNavigate();
+  const { data: processingStatus, isLoading: statusLoading } = useProcessingStatus();
+  const startMutation = useStartProcessing();
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', {
@@ -23,6 +27,12 @@ export default function AppLayout() {
           Wyloguj
         </button>
       </header>
+      <ProcessingProgressBar
+        status={processingStatus}
+        isLoading={statusLoading}
+        onStart={() => startMutation.mutate()}
+        isStarting={startMutation.isPending}
+      />
       <main className="flex-1 flex overflow-hidden">
         <VerificationPanel />
       </main>
