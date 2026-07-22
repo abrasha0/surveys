@@ -3,7 +3,7 @@ param(
 )
 
 $ProjectRoot = Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..")
-$LogFile = Join-Path -Path $ProjectRoot -ChildPath "logs\run_dev.log"
+$LogFile = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\run_dev.log"
 $VenvPath = Join-Path -Path $ProjectRoot -ChildPath ".venv"
 $SetupEnvScript = Join-Path -Path $PSScriptRoot -ChildPath "setup_env.ps1"
 
@@ -72,14 +72,14 @@ $ErrorActionPreference = "Continue"
 # --- Krok 3: Uruchomienie uvicorn ---
 Write-Log "Krok 3: Uruchamianie uvicorn (API)..."
 $Uvicorn = Join-Path -Path $VenvPath -ChildPath "Scripts\uvicorn.exe"
-$uvicornLog = Join-Path -Path $ProjectRoot -ChildPath "logs\uvicorn_dev.log"
+$uvicornLog = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\uvicorn_dev.log"
 
 if (-not (Test-Path -LiteralPath $Uvicorn)) {
     Write-Log "BLAD: Nie znaleziono uvicorn.exe w .venv"
     exit 1
 }
 
-$SrcDir = Join-Path -Path $ProjectRoot -ChildPath "src"
+$SrcDir = Join-Path -Path $ProjectRoot -ChildPath "src\backend"
 $uvicornProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --reload --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
 Write-Log "OK: Uvicorn uruchomiony (PID: $($uvicornProcess.Id))"
 
@@ -120,11 +120,11 @@ Write-Log "OK: node ($nodePath), npm ($npmPath)"
 
 # --- Krok 5: Uruchomienie npm dev ---
 Write-Log "Krok 5: Uruchamianie npm dev (frontend)..."
-$FrontendDir = Join-Path -Path $ProjectRoot -ChildPath "src_ui"
-$npmLog = Join-Path -Path $ProjectRoot -ChildPath "logs\npm_dev.log"
+$FrontendDir = Join-Path -Path $ProjectRoot -ChildPath "src\frontend"
+$npmLog = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\npm_dev.log"
 
 if (-not (Test-Path -LiteralPath $FrontendDir)) {
-    Write-Log "BLAD: Nie znaleziono katalogu src_ui"
+    Write-Log "BLAD: Nie znaleziono katalogu src/frontend"
     Cleanup
     exit 1
 }

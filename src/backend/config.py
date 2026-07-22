@@ -4,11 +4,12 @@ from pathlib import Path
 
 import yaml
 
-_ROOT = Path(__file__).resolve().parent.parent
+_ROOT = Path(__file__).resolve().parent.parent.parent
 _CONFIG_YAML = _ROOT / "config.yaml"
 _CONFIG_EXAMPLE = _ROOT / "config.yaml.example"
 
 _ENV_PREFIX = "ANKIETER_"
+APP_ROOT = _ROOT
 
 
 class Section(dict):
@@ -60,11 +61,27 @@ def _coerce(env_val: str, reference):
     return env_val
 
 
+def _resolve_config_paths(data: dict) -> None:
+    section_map = {
+        "app": ["csv_results", "cache_file", "surveys_dir"],
+        "logging": ["file"],
+        "processing": ["survey_cache_dir"],
+    }
+    for section_key, keys in section_map.items():
+        section = data.get(section_key, {})
+        if isinstance(section, dict):
+            for key in keys:
+                val = section.get(key)
+                if val and isinstance(val, str) and not Path(val).is_absolute():
+                    section[key] = str(_ROOT / val)
+
+
 def _load_config() -> Section:
     path = _CONFIG_YAML if _CONFIG_YAML.exists() else _CONFIG_EXAMPLE
     with open(path, "r", encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
     _apply_env_override(raw)
+    _resolve_config_paths(raw)
     return {k: Section(v) if isinstance(v, dict) else v for k, v in raw.items()}
 
 

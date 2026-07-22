@@ -8,7 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..")
-$LogFile = Join-Path -Path $ProjectRoot -ChildPath "logs\setup_ollama.log"
+$LogFile = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\setup_ollama.log"
 
 function Write-Log {
     param([string]$Message)

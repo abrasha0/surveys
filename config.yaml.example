@@ -6,9 +6,9 @@
 app:
   page_title: "surveysApp"        # Tytuł strony w przeglądarce
   password: "a"                   # Hasło do logowania
-  csv_results: "wyniki.csv"       # Nazwa pliku wynikowego CSV
-  cache_file: "logs/cache_results.json"  # Ścieżka do cache wyników AI (nieużywane od Etapu 3)
-  surveys_dir: "surveys_data"     # Katalog ze zdjęciami ankiet
+  csv_results: "working_vault/wyniki.csv"       # Nazwa pliku wynikowego CSV
+  cache_file: "working_vault/cache_results.json"  # Ścieżka do cache wyników AI (nieużywane od Etapu 3)
+  surveys_dir: "working_vault/surveys_data"     # Katalog ze zdjęciami ankiet
   accepted_file_types:            # Dozwolone rozszerzenia plików
     - jpg
     - png
@@ -35,7 +35,7 @@ ingestion:
   upload_dir_prefix: "ankieter_uploads_"  # Prefiks katalogu tymczasowego (nieużywane przy skanowaniu katalogu)
 
 logging:
-  file: "logs/ankieter.log"       # Ścieżka do głównego pliku logów
+  file: "working_vault/logs/ankieter.log"       # Ścieżka do głównego pliku logów
   level: "DEBUG"                  # Poziom logowania (DEBUG/INFO/WARNING/ERROR)
   ai_log_max_bytes: 10485760      # Maksymalny rozmiar logu AI (10MB)
   ai_log_backup_count: 3          # Liczba kopii zapasowych logu AI
@@ -54,7 +54,7 @@ processing:
   history_display_limit: 8        # Liczba ostatnich kroków w historii przetwarzania
   worker_max_retries: 3           # Maksymalna liczba powtórzeń przetwarzania ankiety
   eta_rolling_window: 10          # Liczba ostatnich czasów stron do obliczania ETA
-  survey_cache_dir: "logs/survey_cache"  # Katalog cache per-survey
+  survey_cache_dir: "working_vault/logs/survey_cache"  # Katalog cache per-survey
 
 prompts:
   vlm: |                          # Prompt dla modelu wizyjnego (VLM)

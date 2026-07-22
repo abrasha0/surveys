@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..")
-$LogFile = Join-Path -Path $ProjectRoot -ChildPath "logs\setup_env.log"
+$LogFile = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\setup_env.log"
 $VenvPath = Join-Path -Path $ProjectRoot -ChildPath ".venv"
 $RequirementsPath = Join-Path -Path $ProjectRoot -ChildPath "requirements.txt"
 
@@ -118,9 +118,9 @@ foreach ($pkg in $keyPackages) {
 
 # --- Krok 7: Instalacja zależności frontendu ---
 Write-Log "Krok 7: Instalacja zaleznosci frontendu (npm)..."
-$FrontendDir = Join-Path -Path $ProjectRoot -ChildPath "src_ui"
+$FrontendDir = Join-Path -Path $ProjectRoot -ChildPath "src\frontend"
 if (-not (Test-Path -LiteralPath $FrontendDir)) {
-    Write-Log "OSTROZNE: Katalog src_ui nie istnieje - pomijam npm install"
+    Write-Log "OSTROZNE: Katalog src/frontend nie istnieje - pomijam npm install"
 } else {
     try {
         $nodeVersion = & node --version 2>&1
@@ -152,13 +152,13 @@ try {
     Write-Log "OSTROZNE: Node.js nie znaleziony w PATH - pomijam weryfikacje"
 }
 
-# --- Krok 9: Weryfikacja src/main.py ---
-Write-Log "Krok 9: Sprawdzanie src/main.py..."
-$MainPy = Join-Path -Path $ProjectRoot -ChildPath "src\main.py"
+# --- Krok 9: Weryfikacja src/backend/main.py ---
+Write-Log "Krok 9: Sprawdzanie src/backend/main.py..."
+$MainPy = Join-Path -Path $ProjectRoot -ChildPath "src\backend\main.py"
 if (Test-Path -LiteralPath $MainPy) {
     Write-Log "OK: $MainPy istnieje"
 } else {
-    Write-Log "OSTROZNE: Nie znaleziono src/main.py - FastAPI entry point brak"
+    Write-Log "OSTROZNE: Nie znaleziono src/backend/main.py - FastAPI entry point brak"
 }
 
 Write-Log "=== Setup Environment - zakonczony pomyslnie ==="
@@ -172,7 +172,7 @@ Write-Log ""
 Write-Log "Uruchomienie produkcyjne (API + frontend static na jednym porcie):"
 Write-Log "  .\scripts\full_setup.ps1"
 Write-Log ""
-Write-Log "Architektura: FastAPI na porcie 8000 serwuje API i statyczny frontend (dist/)."
+Write-Log "Architektura: FastAPI na porcie 8000 serwuje API i statyczny frontend (working_vault/dist/)."
 Write-Log "W dev: dodatkowo Vite na porcie 5173 z proxy /api -> localhost:8000."
 
 exit 0

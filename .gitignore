@@ -14,3 +14,5 @@ src_ui/dist/
 src/surveys_data
 dist/*
 config.yaml
+working_vault/
+src/frontend/dist/

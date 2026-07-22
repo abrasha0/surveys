@@ -4,8 +4,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..")
-$LogFile = Join-Path -Path $ProjectRoot -ChildPath "logs\deploy_tunnel.log"
-$TunnelUrlFile = Join-Path -Path $ProjectRoot -ChildPath "logs\tunnel_url.txt"
+$LogFile = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\deploy_tunnel.log"
+$TunnelUrlFile = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\tunnel_url.txt"
 $CloudflaredDir = "C:\tools"
 $CloudflaredPath = Join-Path -Path $CloudflaredDir -ChildPath "cloudflared.exe"
 
@@ -111,7 +111,7 @@ Write-Log "Krok 3: Uruchamianie tunelu Cloudflare..."
 Write-Log "Lacze z Cloudflare..."
 
 $dateStr = Get-Date -Format "yyyyMMdd_HHmmss"
-$logOutput = Join-Path -Path $ProjectRoot -ChildPath "logs\tunnel_${dateStr}.log"
+$logOutput = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\tunnel_${dateStr}.log"
 
 try {
     $tunnelProcess = Start-Process -FilePath $cfPath -ArgumentList "tunnel --url http://localhost:8000" -NoNewWindow -PassThru -RedirectStandardOutput $logOutput -RedirectStandardError "${logOutput}.err"

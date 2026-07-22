@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..")
-$LogFile = Join-Path -Path $ProjectRoot -ChildPath "logs\full_setup.log"
+$LogFile = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\full_setup.log"
 $VenvPath = Join-Path -Path $ProjectRoot -ChildPath ".venv"
 
 $ScriptsDir = $PSScriptRoot
@@ -120,12 +120,12 @@ try {
     # --- Krok 3: Budowa frontendu ---
     if (-not $NoDev) {
         Write-Log "=== Krok 3/5: Budowa frontendu (npm run build) ==="
-        $FrontendDir = Join-Path -Path $ProjectRoot -ChildPath "src_ui"
-        $DistDir = Join-Path -Path $ProjectRoot -ChildPath "dist"
+        $FrontendDir = Join-Path -Path $ProjectRoot -ChildPath "src\frontend"
+        $DistDir = Join-Path -Path $ProjectRoot -ChildPath "working_vault\dist"
         $FrontendDist = Join-Path -Path $FrontendDir -ChildPath "dist"
 
         if (-not (Test-Path -LiteralPath $FrontendDir)) {
-            Write-Log "OSTROZNE: Katalog src_ui nie istnieje - pomijam budowe frontendu"
+            Write-Log "OSTROZNE: Katalog src/frontend nie istnieje - pomijam budowe frontendu"
         } else {
             try {
                 & npm install --prefix $FrontendDir 2>&1 | ForEach-Object { Write-Log "  $_" }
@@ -150,8 +150,8 @@ try {
     if (-not $NoDev) {
         Write-Log "=== Krok 4/5: Uruchamianie uvicorn (API + frontend static) ==="
         $Uvicorn = Join-Path -Path $VenvPath -ChildPath "Scripts\uvicorn.exe"
-        $appLog = Join-Path -Path $ProjectRoot -ChildPath "logs\uvicorn_full.log"
-        $SrcDir = Join-Path -Path $ProjectRoot -ChildPath "src"
+        $appLog = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\uvicorn_full.log"
+        $SrcDir = Join-Path -Path $ProjectRoot -ChildPath "src\backend"
 
         if (Test-Path -LiteralPath $Uvicorn) {
             try {
@@ -201,8 +201,8 @@ try {
                 Write-Log "OSTROZNE: Nie znaleziono deploy_tunnel.ps1 - pomijam tunel"
             }
         } else {
-            $tunnelLog = Join-Path -Path $ProjectRoot -ChildPath "logs\tunnel_full.log"
-            $tunnelUrlFile = Join-Path -Path $ProjectRoot -ChildPath "logs\tunnel_url.txt"
+            $tunnelLog = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\tunnel_full.log"
+            $tunnelUrlFile = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\tunnel_url.txt"
             Write-Log "Uruchamianie cloudflared z: $cfPath"
             $tunnelProcess = Start-Process -FilePath $cfPath -ArgumentList "tunnel --url http://localhost:8000" -NoNewWindow -PassThru -RedirectStandardOutput $tunnelLog -RedirectStandardError "${tunnelLog}.err"
             Track-Process -Name "Tunnel" -Process $tunnelProcess
