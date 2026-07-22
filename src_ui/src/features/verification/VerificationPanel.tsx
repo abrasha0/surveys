@@ -1,21 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSurveys } from '../../api/hooks';
+import { useSurveys, useFieldSpecs, useSurveyResult, useSaveSurvey } from '../../api/hooks';
 import { useVerificationStore } from '../../store/verificationStore';
 import ImageViewer from '../../components/ImageViewer';
 import PageTabs from '../../components/PageTabs';
-import SurveyTabs from './SurveyTabs';
+import SurveyHeader from './SurveyHeader';
+import DynamicForm from './DynamicForm';
 
 export default function VerificationPanel() {
   const { data: surveys } = useSurveys();
+  const { data: fieldSpecs } = useFieldSpecs();
+  const saveSurveyMutation = useSaveSurvey();
   const initSurvey = useVerificationStore((s) => s.initSurvey);
   const getSurveyUI = useVerificationStore((s) => s.getSurveyUI);
+
+  const [currentSurveyId, setCurrentSurveyId] = useState<number | null>(null);
 
   const clickableSurveys = useMemo(
     () => (surveys ?? []).filter((s) => s.status === 'ready' || s.status === 'verified'),
     [surveys]
   );
 
-  const [currentSurveyId, setCurrentSurveyId] = useState<number | null>(null);
+  const currentIndex = useMemo(
+    () => clickableSurveys.findIndex((s) => s.id === currentSurveyId),
+    [clickableSurveys, currentSurveyId]
+  );
+
+  const { data: surveyResult } = useSurveyResult(currentSurveyId);
 
   useEffect(() => {
     if (currentSurveyId === null && clickableSurveys.length > 0) {
@@ -26,15 +36,35 @@ export default function VerificationPanel() {
   }, [clickableSurveys, currentSurveyId, initSurvey]);
 
   const handleSurveyChange = (surveyId: number) => {
+    initSurvey(surveyId);
     setCurrentSurveyId(surveyId);
+  };
+
+  const handlePrevSurvey = () => {
+    if (currentIndex > 0) {
+      handleSurveyChange(clickableSurveys[currentIndex - 1].id);
+    }
+  };
+
+  const handleNextSurvey = () => {
+    if (currentIndex < clickableSurveys.length - 1) {
+      handleSurveyChange(clickableSurveys[currentIndex + 1].id);
+    }
+  };
+
+  const handleSave = async (values: Record<string, unknown>) => {
+    await saveSurveyMutation.mutateAsync({
+      surveyId: currentSurveyId!,
+      values,
+      force: false,
+    });
   };
 
   const currentPage = currentSurveyId !== null
     ? getSurveyUI(currentSurveyId).selectedPage
     : 0;
 
-  const handlePageChange = (_page: number) => {
-  };
+  const handlePageChange = () => {};
 
   if (currentSurveyId === null) {
     return (
@@ -46,8 +76,13 @@ export default function VerificationPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <SurveyTabs
+      <SurveyHeader
         currentSurveyId={currentSurveyId}
+        clickableSurveys={clickableSurveys}
+        currentIndex={currentIndex}
+        onPrev={handlePrevSurvey}
+        onNext={handleNextSurvey}
+        onSave={() => {}}
         onSurveyChange={handleSurveyChange}
       />
 
@@ -64,9 +99,14 @@ export default function VerificationPanel() {
         </div>
 
         <div className="flex-1 flex flex-col overflow-y-auto bg-gray-50 p-4">
-          <div className="text-gray-400 text-center py-8">
-            Formularz dynamiczny — Etap 7
-          </div>
+          <DynamicForm
+            surveyId={currentSurveyId}
+            fieldSpecs={fieldSpecs ?? []}
+            aiResult={surveyResult?.result ?? null}
+            onSave={handleSave}
+            onNextSurvey={handleNextSurvey}
+            disabled={saveSurveyMutation.isPending}
+          />
         </div>
       </div>
     </div>
