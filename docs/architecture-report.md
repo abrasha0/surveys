@@ -12,7 +12,7 @@
 | python-multipart | 0.0.32 | Upload plików (nieużywane — przetwarzanie z lokalnego katalogu) |
 | pyyaml | ≥6.0 | Parsowanie `config.yaml` |
 
-Frontend: React 19, TypeScript 6, Vite 8, Tailwind CSS 4, React Router DOM 7, TanStack Query 5, Zustand 5, Oxlint.
+Frontend: React 19.2.7, TypeScript 6.0.2, Vite 8.1.1, Tailwind CSS 4.3.3, React Router DOM 7.18.1, TanStack Query 5.101.4, Zustand 5.0.14, Oxlint.
 
 Zależności opcjonalne:
 - `langsmith` — tracing LangSmith (gdy włączony w `config.yaml`)
@@ -23,46 +23,48 @@ Zależności opcjonalne:
 
 ```
 surveys/
-├── src/                         # Backend (FastAPI)
-│   ├── main.py                  # Entry point, FastAPI app, StaticFiles mount
-│   ├── config.py                # YAML + env vars override
-│   ├── auth.py                  # Autoryzacja (login/logout sesyjny)
-│   ├── data_handler.py          # Cache load/save, CSV path
-│   ├── logger.py                # Dual handler (file + console)
-│   ├── ai/                      # Warstwa AI
-│   │   ├── client.py            # Async klient Ollama (VLM + Text LLM), preprocessing obrazów
-│   │   ├── prompts.py           # Budowniczy promptów z config.yaml (vlm, text_format, page_*_json_schema)
-│   │   └── tracing.py           # Opcjonalny LangSmith tracing (vlm_trace, llm_trace, io_trace)
-│   ├── domain/                  # Logika biznesowa
-│   │   ├── field_specs.py       # FieldSpec, 70 pól (source of truth) na 5 stronach
-│   │   ├── schemas.py           # MedicalSurvey (Pydantic), walidacja, normalizacja, CSV row
-│   │   └── csv_export.py        # Export do CSV (UTF-8 BOM, append)
-│   ├── ingestion/               # Przetwarzanie wejściowe
-│   │   └── file_grouping.py     # Skanowanie katalogu + grupowanie zdjęć po 5
-│   ├── routers/                 # Endpointy REST
-│   │   └── api.py               # Wszystkie endpointy API (prefix /api)
-│   └── worker/                  # Worker w tle
-│       ├── __init__.py          # Singleton workera (get_worker())
-│       ├── processing_worker.py # Asynchroniczny worker sekwencyjny z retry 3x
-│       └── state.py             # Stany: SurveyState, GlobalState, ProcessingState + ETA
-├── src_ui/                      # Frontend (React + Vite)
-│   ├── src/
-│   │   ├── app/                 # Routing, layout, guard
-│   │   ├── api/                 # Klient API + TanStack Query hooks
-│   │   ├── components/          # Współdzielone komponenty UI
-│   │   ├── features/            # Strony aplikacji
-│   │   │   ├── auth/            # Logowanie
-│   │   │   ├── verification/    # Weryfikacja (side-by-side)
-│   │   │   └── complete/        # Ekran zakończenia
-│   │   ├── hooks/               # Niestandardowe hooki
-│   │   └── store/               # Zustand store (drafty, UI state)
-│   ├── dist/                    # Zbudowane assety (dla dev servera)
-│   └── vite.config.ts           # Proxy /api → localhost:8000
-├── dist/                        # Zbudowany frontend (StaticFiles mount)
-├── scripts/                     # Skrypty PowerShell
-├── docs/                        # Dokumentacja
-├── config.yaml                  # Konfiguracja
-└── react-refactor-docs/         # Plany migracji (archiwum)
+├── src/
+│   ├── backend/                  # Backend (FastAPI)
+│   │   ├── main.py               # Entry point, FastAPI app, StaticFiles mount
+│   │   ├── config.py             # YAML + env vars override
+│   │   ├── auth.py               # Autoryzacja (login/logout sesyjny)
+│   │   ├── data_handler.py       # Cache load/save, CSV path
+│   │   ├── logger.py             # Dual handler (file + console)
+│   │   ├── ai/                   # Warstwa AI
+│   │   │   ├── client.py         # Async klient Ollama (VLM + Text LLM), preprocessing obrazów
+│   │   │   ├── prompts.py        # Budowniczy promptów z config.yaml (vlm, text_format, page_*_json_schema)
+│   │   │   └── tracing.py        # Opcjonalny LangSmith tracing (vlm_trace, llm_trace, io_trace)
+│   │   ├── domain/               # Logika biznesowa
+│   │   │   ├── field_specs.py    # FieldSpec, 70 pól (source of truth) na 5 stronach
+│   │   │   ├── schemas.py        # MedicalSurvey (Pydantic), walidacja, normalizacja, CSV row
+│   │   │   └── csv_export.py     # Export do CSV (UTF-8 BOM, append)
+│   │   ├── ingestion/            # Przetwarzanie wejściowe
+│   │   │   └── file_grouping.py  # Skanowanie katalogu + grupowanie zdjęć po 5
+│   │   ├── routers/              # Endpointy REST
+│   │   │   └── api.py            # Wszystkie endpointy API (prefix /api)
+│   │   └── worker/               # Worker w tle
+│   │       ├── __init__.py       # Singleton workera (get_worker())
+│   │       ├── processing_worker.py # Asynchroniczny worker sekwencyjny z retry 3x
+│   │       └── state.py          # Stany: SurveyState, GlobalState, ProcessingState + ETA
+│   └── frontend/                 # Frontend (React + Vite)
+│       ├── src/
+│       │   ├── app/              # Routing, layout, guard
+│       │   ├── api/              # Klient API + TanStack Query hooks
+│       │   ├── components/       # Współdzielone komponenty UI
+│       │   ├── features/         # Strony aplikacji
+│       │   │   ├── auth/         # Logowanie
+│       │   │   ├── verification/ # Weryfikacja (side-by-side)
+│       │   │   └── complete/     # Ekran zakończenia
+│       │   ├── hooks/            # Niestandardowe hooki
+│       │   └── store/            # Zustand store (drafty, UI state)
+│       └── vite.config.ts        # Proxy /api → localhost:8000
+├── working_vault/                # Runtime data
+│   ├── dist/                     # Zbudowany frontend (StaticFiles mount)
+│   ├── logs/                     # Logi aplikacji + survey_cache
+│   └── surveys_data/             # Katalog ze zdjęciami ankiet
+├── scripts/                      # Skrypty PowerShell
+├── docs/                         # Dokumentacja
+└── config.yaml                   # Konfiguracja
 ```
 
 ---
@@ -242,7 +244,7 @@ Sekcje `config.yaml`:
 | `ingestion`  | survey_group_size                                       |
 | `logging`    | Plik, poziom, rotacja logów AI, skracanie I/O          |
 | `langsmith`  | tracing_v2, endpoint, api_key, project                  |
-| `processing` | progress_weights, history_limit, worker_max_retries, eta_rolling_window, survey_cache_dir |
+| `processing` | progress_weights, history_display_limit, worker_max_retries, eta_rolling_window, survey_cache_dir |
 | `prompts`    | VLM extraction, text format + **5 schematów JSON per-strona** (`page_1_json_schema`..`page_5_json_schema`) |
 
 Env vars: `ANKIETER_*` prefix nadpisuje wartości z YAML.

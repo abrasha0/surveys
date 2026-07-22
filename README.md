@@ -65,7 +65,7 @@ Szczegóły: patrz `config.yaml.example` (skomentowane klucze) oraz `docs/main-d
 
 ## Architektura frontendu
 
-Frontend (React 19 + Vite 8 + TypeScript 6) znajduje się w `src_ui/`:
+Frontend (React 19 + Vite 8 + TypeScript 6) znajduje się w `src/frontend/`:
 - **Routing:** React Router DOM 7 (`/login`, `/app`, `/complete`)
 - **Stan serwerowy:** TanStack Query 5 (polling, cache, mutacje)
 - **Stan lokalny:** Zustand 5 (UI state, drafty formularzy, localStorage persistence)
@@ -81,4 +81,4 @@ Frontend (React 19 + Vite 8 + TypeScript 6) znajduje się w `src_ui/`:
 
 ## Uwagi
 
-- `react-refactor-docs/` — archiwum planów migracji Streamlit → FastAPI + React (nie odzwierciedla bieżącego stanu)
+- Dokumentacja: `docs/main-doc.md`, `docs/architecture-report.md`, `docs/survey-structure.md`, `docs/known-issues.md`

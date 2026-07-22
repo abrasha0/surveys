@@ -39,7 +39,7 @@ przetwarzający ankiety sekwencyjnie z retry do 3 razy na ankietę.
 - Skrót klawiszowy Spacja do szybkiego zatwierdzania (ignorowany przy focusie w polu tekstowym)
 - Eksport wyników do CSV (UTF-8 BOM, 71 kolumn, gotowy do Excela)
 - Lokalny katalog zdjęć (brak uploadu przez sieć — przetwarzanie bezpośrednio z dysku)
-- Cache per-survey (logs/survey_cache/survey_{idx}.json) — wznawianie sesji po restarcie serwera
+- Cache per-survey (working_vault/logs/survey_cache/survey_{idx}.json) — wznawianie sesji po restarcie serwera
 - Polling statusu co 2s (GET /api/processing/status + GET /api/surveys)
 
 ---
@@ -63,17 +63,17 @@ do jednego obiektu MedicalSurvey.
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌──────────────┐
 │  React UI   │────▶│  FastAPI     │────▶│  Worker (tło)   │────▶│  Ollama AI   │
-│  (src_ui/)  │◀────│  (src/)      │◀────│  + kolejka      │     │  (VLM+Text)  │
+│  (src/frontend/)│◀────│  (src/backend/)│◀────│  + kolejka      │     │  (VLM+Text)  │
 └─────────────┘     └──────┬───────┘     └─────────────────┘     └──────────────┘
                            │
                     ┌──────▼───────┐
-                    │  dist/       │
-                    │  (StaticFiles)│
+                    │  working_vault/│
+                    │  dist/        │
                     └──────────────┘
 ```
 
 Frontend (React) komunikuje się z backendem przez REST API na porcie 8000.
-W produkcji backend serwuje również zbudowane pliki frontendu z `dist/`.
+W produkcji backend serwuje również zbudowane pliki frontendu z `working_vault/dist/`.
 Worker działa w tle — przetwarza ankiety sekwencyjnie, umożliwiając weryfikację
 gotowych wyników w trakcie przetwarzania kolejnych (interleaved).
 
@@ -92,7 +92,7 @@ Struktura promptów:
 - `page_1_json_schema`..`page_5_json_schema` — 5 schematów JSON per-strona z dozwolonymi wartościami
 
 To oznacza, że zmiana formatu ankiety (np. dodanie/usunięcie pola) wymaga aktualizacji:
-1. `domain/field_specs.py` — definicja pola
+1. `src/backend/domain/field_specs.py` — definicja pola
 2. Odpowiedniego `page_N_json_schema` w `config.yaml` — dla ekstrakcji AI
 
 ---
@@ -124,7 +124,7 @@ są procesowane bezpośrednio z lokalnego dysku.
 ### 3. Przetwarzanie AI (worker w tle)
 Kliknięcie "Rozpocznij analizę" uruchamia worker w tle. Dla każdej ankiety
 (sekwencyjnie): 5 stron × (VLM → Text LLM) → merge → MedicalSurvey.
-Wyniki cache'owane w `logs/survey_cache/`. Użytkownik widzi pasek postępu z ETA.
+Wyniki cache'owane w `working_vault/logs/survey_cache/`. Użytkownik widzi pasek postępu z ETA.
 
 ### 4. Weryfikacja (interleaved)
 Ekran side-by-side — dostępny natychmiast po przetworzeniu pierwszej ankiety:
@@ -143,7 +143,7 @@ ETAs, aktualny etap modelu (VLM/format), liczbę przetworzonych/błędnych ankie
 
 ### 5. Zapis i następna ankieta
 Kliknięcie "Zatwierdź ankietę" (lub Spacja przy braku błędów) → walidacja przez
-`MedicalSurvey` → zapis wiersza do CSV (`wyniki.csv`) przez `save_survey_to_csv()` →
+`MedicalSurvey` → zapis wiersza do CSV (`working_vault/wyniki.csv`) przez `save_survey_to_csv()` →
 status ankiety `ready` → `verified` → automatyczne przejście do następnej gotowej ankiety.
 
 ### 6. Ekran zakończenia
@@ -168,10 +168,10 @@ Sekcje `config.yaml`:
 | `app`        | Tytuł, hasło, ścieżki, dozwolone typy plików           |
 | `ai`         | Modele (VLM + Text), URL Ollama, retry, timeout, num_ctx, temperature, keep_alive |
 | `image`      | max_dimension, contrast_factor, jpeg_quality            |
-| `ingestion`  | survey_group_size                                       |
+| `ingestion`  | survey_group_size, upload_dir_prefix                    |
 | `logging`    | Plik, poziom, rotacja logów AI, skracanie I/O          |
 | `langsmith`  | tracing_v2, endpoint, api_key, project                  |
-| `processing` | Wagi progress bara, retry, ETA window, cache_dir       |
+| `processing` | progress_vlm_weight, progress_text_weight, history_display_limit, worker_max_retries, eta_rolling_window, survey_cache_dir |
 | `prompts`    | VLM, text_format + **5 schematów JSON per-strona** (`page_1_json_schema`..`page_5_json_schema`) |
 
 ### Zmienne środowiskowe
@@ -200,9 +200,9 @@ zainstalowany, traces są pomijane (no-op).
 .\scripts\setup_env.ps1          # Tworzenie venv, pip install, npm install
 .\scripts\setup_ollama.ps1       # Instalacja Ollamy, pull modelu
 .venv\Scripts\Activate.ps1
-cd src_ui; npm run build; cd ..
-Copy-Item src_ui/dist/* dist/ -Recurse -Force  # (opcjonalne — build idzie do dist/)
-cd src; uvicorn main:app --port 8000            # Start aplikacji z katalogu src/
+cd src/frontend; npm run build; cd ../..
+Copy-Item src/frontend/dist/* working_vault/dist/ -Recurse -Force  # build do working_vault/dist/
+cd src/backend; uvicorn main:app --port 8000            # Start aplikacji
 ```
 
 ### Scenariusz 2: Automatyczny
