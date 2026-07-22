@@ -106,7 +106,7 @@ Write-Log "Zainstalowane pakiety:"
 $installed | ForEach-Object { Write-Log "  - $_" }
 
 # Sprawdz kluczowe pakiety
-$keyPackages = @("streamlit", "pydantic", "Pillow", "httpx")
+$keyPackages = @("fastapi", "uvicorn", "pydantic", "Pillow", "httpx")
 foreach ($pkg in $keyPackages) {
     $found = $installed -like "$pkg==*"
     if ($found) {
@@ -116,12 +116,36 @@ foreach ($pkg in $keyPackages) {
     }
 }
 
+# --- Krok 7: Instalacja zależności frontendu ---
+Write-Log "Krok 7: Instalacja zaleznosci frontendu (npm)..."
+$FrontendDir = Join-Path -Path $ProjectRoot -ChildPath "src_ui"
+if (-not (Test-Path -LiteralPath $FrontendDir)) {
+    Write-Log "OSTROZNE: Katalog src_ui nie istnieje - pomijam npm install"
+} else {
+    try {
+        $nodeVersion = & node --version 2>&1
+        Write-Log "Znaleziono: $nodeVersion"
+        $npmVersion = & npm --version 2>&1
+        Write-Log "npm: $npmVersion"
+        & npm install --prefix $FrontendDir 2>&1 | ForEach-Object { Write-Log "  $_" }
+        if ($LASTEXITCODE -ne 0) { throw "npm install nie powiodl sie (exit code: $LASTEXITCODE)" }
+        Write-Log "OK: zaleznosci frontendu zainstalowane."
+    } catch {
+        Write-Log "OSTROZNE: node/npm nie znajduja sie w PATH - pomijam npm install"
+        Write-Log "Zainstaluj Node.js: https://nodejs.org/"
+    }
+}
+
 Write-Log "=== Setup Environment - zakonczony pomyslnie ==="
 Write-Log ""
 Write-Log "Aby aktywowac srodowisko recznie:"
 Write-Log "  .venv\Scripts\Activate.ps1"
 Write-Log ""
-Write-Log "Aby uruchomic aplikacje:"
-Write-Log "  streamlit run src/app.py"
+Write-Log "Aby uruchomic aplikacje (dev):"
+Write-Log "  .\scripts\run_dev.ps1"
+Write-Log ""
+Write-Log "Aby uruchomic produkcyjnie:"
+Write-Log "  uvicorn main:app --port 8000"
+Write-Log "  (frontend zbuduj: npm run build --prefix src_ui)"
 
 exit 0

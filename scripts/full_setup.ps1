@@ -16,7 +16,7 @@ $RunDevScript = Join-Path -Path $ScriptsDir -ChildPath "run_dev.ps1"
 $DeployTunnelScript = Join-Path -Path $ScriptsDir -ChildPath "deploy_tunnel.ps1"
 
 $ollamaProcess = $null
-$streamlitProcess = $null
+$appProcess = $null
 $tunnelProcess = $null
 
 function Write-Log {
@@ -36,10 +36,10 @@ function Cleanup {
         $tunnelProc | Stop-Process -Force
     }
     
-    $streamlitProc = Get-Process -Name "streamlit" -ErrorAction SilentlyContinue
-    if ($streamlitProc) {
-        Write-Log "Zatrzymywanie Streamlit..."
-        $streamlitProc | Stop-Process -Force
+    $uvicornProc = Get-Process -Name "uvicorn" -ErrorAction SilentlyContinue
+    if ($uvicornProc) {
+        Write-Log "Zatrzymywanie uvicorn..."
+        $uvicornProc | Stop-Process -Force
     }
     
     $ollamaProc = Get-Process -Name "ollama" -ErrorAction SilentlyContinue
@@ -69,7 +69,7 @@ Write-Log "Flagi: NoEnv=$NoEnv NoOllama=$NoOllama NoDev=$NoDev NoTunnel=$NoTunne
 
 # --- Krok 1: Srodowisko Python ---
 if (-not $NoEnv) {
-    Write-Log "=== Krok 1/4: Konfiguracja srodowiska Python ==="
+    Write-Log "=== Krok 1/5: Konfiguracja srodowiska Python ==="
     if (Test-Path -LiteralPath $SetupEnvScript) {
         & $SetupEnvScript
         if ($LASTEXITCODE -ne 0) {
@@ -82,12 +82,12 @@ if (-not $NoEnv) {
         Write-Log "OSTROZNE: Nie znaleziono $SetupEnvScript - pomijam"
     }
 } else {
-    Write-Log "Krok 1/4: Pominieto (-NoEnv)"
+    Write-Log "Krok 1/5: Pominieto (-NoEnv)"
 }
 
 # --- Krok 2: Ollama ---
 if (-not $NoOllama) {
-    Write-Log "=== Krok 2/4: Konfiguracja Ollamy ==="
+    Write-Log "=== Krok 2/5: Konfiguracja Ollamy ==="
     if (Test-Path -LiteralPath $SetupOllamaScript) {
         & $SetupOllamaScript
         if ($LASTEXITCODE -ne 0) {
@@ -100,34 +100,66 @@ if (-not $NoOllama) {
         Write-Log "OSTROZNE: Nie znaleziono $SetupOllamaScript - pomijam"
     }
 } else {
-    Write-Log "Krok 2/4: Pominieto (-NoOllama)"
+    Write-Log "Krok 2/5: Pominieto (-NoOllama)"
 }
 
-# --- Krok 3: Uruchomienie aplikacji ---
+# --- Krok 3: Budowa frontendu ---
 if (-not $NoDev) {
-    Write-Log "=== Krok 3/4: Uruchamianie aplikacji Streamlit ==="
-    $streamlitLog = Join-Path -Path $ProjectRoot -ChildPath "logs\streamlit_full.log"
-    
-    if (Test-Path -LiteralPath $RunDevScript) {
+    Write-Log "=== Krok 3/5: Budowa frontendu (npm run build) ==="
+    $FrontendDir = Join-Path -Path $ProjectRoot -ChildPath "src_ui"
+    $DistDir = Join-Path -Path $ProjectRoot -ChildPath "dist"
+    $FrontendDist = Join-Path -Path $FrontendDir -ChildPath "dist"
+
+    if (-not (Test-Path -LiteralPath $FrontendDir)) {
+        Write-Log "OSTROZNE: Katalog src_ui nie istnieje - pomijam budowe frontendu"
+    } else {
         try {
-            $streamlitProcess = Start-Process -FilePath "powershell" -ArgumentList "-File `"$RunDevScript`"" -NoNewWindow -PassThru -RedirectStandardOutput $streamlitLog -RedirectStandardError "${streamlitLog}.err"
-            Write-Log "OK: Streamlit uruchomiony (PID: $($streamlitProcess.Id))"
-            Write-Log "Log: $streamlitLog"
+            & npm install --prefix $FrontendDir 2>&1 | ForEach-Object { Write-Log "  $_" }
+            if ($LASTEXITCODE -ne 0) { throw "npm install nie powiodl sie" }
+            & npm run build --prefix $FrontendDir 2>&1 | ForEach-Object { Write-Log "  $_" }
+            if ($LASTEXITCODE -ne 0) { throw "npm run build nie powiodl sie" }
+            if (Test-Path -LiteralPath $DistDir) {
+                Remove-Item -Path $DistDir -Recurse -Force
+            }
+            New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
+            Copy-Item -Path "$FrontendDist\*" -Destination $DistDir -Recurse -Force
+            Write-Log "OK: Frontend zbudowany i skopiowany do $DistDir"
         } catch {
-            Write-Log "BLAD: Nie udalo sie uruchomic run_dev.ps1 - $_"
+            Write-Log "BLAD: $_ - pomijam budowe frontendu"
+        }
+    }
+} else {
+    Write-Log "Krok 3/5: Pominieto (-NoDev)"
+}
+
+# --- Krok 4: Uruchomienie aplikacji ---
+if (-not $NoDev) {
+    Write-Log "=== Krok 4/5: Uruchamianie uvicorn (API + frontend static) ==="
+    $Uvicorn = Join-Path -Path $VenvPath -ChildPath "Scripts\uvicorn.exe"
+    $appLog = Join-Path -Path $ProjectRoot -ChildPath "logs\uvicorn_full.log"
+
+    if (Test-Path -LiteralPath $Uvicorn) {
+        try {
+            $appProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --port 8000" -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -RedirectStandardOutput $appLog -RedirectStandardError "${appLog}.err"
+            Write-Log "OK: Uvicorn uruchomiony (PID: $($appProcess.Id))"
+            Write-Log "Log: $appLog"
+        } catch {
+            Write-Log "BLAD: Nie udalo sie uruchomic uvicorn - $_"
             Cleanup
             exit 1
         }
     } else {
-        Write-Log "OSTROZNE: Nie znaleziono $RunDevScript - pomijam"
+        Write-Log "BLAD: Nie znaleziono uvicorn.exe w .venv"
+        Cleanup
+        exit 1
     }
 } else {
-    Write-Log "Krok 3/4: Pominieto (-NoDev)"
+    Write-Log "Krok 4/5: Pominieto (-NoDev)"
 }
 
 # --- Krok 4: Tunel Cloudflare ---
 if (-not $NoTunnel) {
-    Write-Log "=== Krok 4/4: Uruchamianie tunelu Cloudflare ==="
+    Write-Log "=== Krok 5/5: Uruchamianie tunelu Cloudflare ==="
     
     Start-Sleep -Seconds 3
     
@@ -157,7 +189,7 @@ if (-not $NoTunnel) {
         Write-Log "OSTROZNE: Nie znaleziono $DeployTunnelScript - pomijam"
     }
 } else {
-    Write-Log "Krok 4/4: Pominieto (-NoTunnel)"
+    Write-Log "Krok 5/5: Pominieto (-NoTunnel)"
 }
 
 # --- Podsumowanie ---
@@ -165,7 +197,7 @@ Write-Log ""
 Write-Log "========================================"
 Write-Log "  AnkieterAI - Gotowe!"
 Write-Log "========================================"
-Write-Log "  Aplikacja lokalna: http://localhost:8501"
+Write-Log "  Aplikacja lokalna: http://localhost:8000"
 
 if (-not $NoTunnel -and $tunnelUrl) {
     Write-Log "  Tunel publiczny:   $tunnelUrl"
@@ -187,7 +219,7 @@ try {
     while ($true) {
         Start-Sleep -Seconds 10
         $activeProcs = @()
-        if ($streamlitProcess -and -not $streamlitProcess.HasExited) { $activeProcs += "Streamlit" }
+        if ($appProcess -and -not $appProcess.HasExited) { $activeProcs += "Uvicorn" }
         if ($tunnelProcess -and -not $tunnelProcess.HasExited) { $activeProcs += "Tunnel" }
         if ($activeProcs.Count -eq 0) { break }
     }

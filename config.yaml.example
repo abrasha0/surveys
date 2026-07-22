@@ -5,7 +5,6 @@
 
 app:
   page_title: "surveyAI"          # Tytuł strony w przeglądarce
-  layout: "wide"                  # Layout Streamlit: "wide" lub "centered"
   password: "a"                   # Hasło do logowania
   csv_results: "wyniki.csv"       # Nazwa pliku wynikowego CSV
   cache_file: "logs/cache_results.json"  # Ścieżka do cache wyników AI

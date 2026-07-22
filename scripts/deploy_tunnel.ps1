@@ -80,17 +80,17 @@ if (-not $cfPath) {
     Write-Log "Znaleziono cloudflared: $cfPath"
 }
 
-# --- Krok 2: Sprawdzenie Streamlit ---
-Write-Log "Krok 2: Sprawdzanie czy Streamlit dziala na porcie 8501..."
+# --- Krok 2: Sprawdzenie uvicorn ---
+Write-Log "Krok 2: Sprawdzanie czy uvicorn dziala na porcie 8000..."
 try {
-    $r = Invoke-WebRequest -Uri "http://localhost:8501" -UseBasicParsing -TimeoutSec 5
+    $r = Invoke-WebRequest -Uri "http://localhost:8000" -UseBasicParsing -TimeoutSec 5
     if ($r.StatusCode -eq 200) {
-        Write-Log "OK: Streamlit odpowiada na http://localhost:8501"
+        Write-Log "OK: uvicorn odpowiada na http://localhost:8000"
     } else {
-        throw "Streamlit zwrocil kod $($r.StatusCode)"
+        throw "uvicorn zwrocil kod $($r.StatusCode)"
     }
 } catch {
-    Write-Log "BLAD: Streamlit nie odpowiada na porcie 8501."
+    Write-Log "BLAD: uvicorn nie odpowiada na porcie 8000."
     Write-Log "Uruchom najpierw: .\scripts\run_dev.ps1"
     exit 1
 }
@@ -103,7 +103,7 @@ $dateStr = Get-Date -Format "yyyyMMdd_HHmmss"
 $logOutput = Join-Path -Path $ProjectRoot -ChildPath "logs\tunnel_${dateStr}.log"
 
 try {
-    $proc = Start-Process -FilePath $cfPath -ArgumentList "tunnel --url http://localhost:8501" -NoNewWindow -PassThru -RedirectStandardOutput $logOutput -RedirectStandardError "${logOutput}.err"
+    $proc = Start-Process -FilePath $cfPath -ArgumentList "tunnel --url http://localhost:8000" -NoNewWindow -PassThru -RedirectStandardOutput $logOutput -RedirectStandardError "${logOutput}.err"
 
     Start-Sleep -Seconds 6
 

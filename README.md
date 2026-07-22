@@ -4,7 +4,7 @@ Automatyczny system wprowadzania ankiet papierowych do formy cyfrowej z wykorzys
 
 ## Quick Start
 
-1. Przygotowanie środowiska:
+1. Przygotowanie środowiska (Python + npm):
 
    ```powershell
    .\scripts\setup_env.ps1
@@ -16,28 +16,35 @@ Automatyczny system wprowadzania ankiet papierowych do formy cyfrowej z wykorzys
    .\scripts\setup_ollama.ps1
    ```
 
-3. Start aplikacji:
+3. Pełne uruchomienie produkcyjne:
 
    ```powershell
-   .venv\Scripts\Activate.ps1
-   streamlit run src/app.py
+   .\scripts\full_setup.ps1
    ```
 
-Aplikacja dostępna pod `http://localhost:8501`. Domyślne hasło: `a`.
+4. Uruchomienie deweloperskie (z hot-reloadem):
+
+   ```powershell
+   .\scripts\run_dev.ps1
+   ```
+
+Aplikacja dostępna pod `http://localhost:8000` (produkcja) lub `http://localhost:5173` (dev frontend z proxy API). Domyślne hasło: `a`.
+
+> **Wymagania:** Python ≥ 3.12, Node.js (dla frontendu React).
 
 ## Funkcjonalności
 
 - Logowanie hasłem do aplikacji
-- Upload zdjęć ankiet (jpg/png/webp)
-- Automatyczna analiza obrazów przez VLM (Ollama)
-- Dwuetapowe przetwarzanie: VLM → tekst → Text LLM → JSON
-- Sekwencyjne przetwarzanie per-strona (jeden model naraz)
-- Batch processing z progress barem i cache'owaniem wyników
+- Automatyczna analiza zdjęć ankiet przez VLM (Ollama) + Text LLM
+- Batch processing z progress barem, ETA i cache'owaniem wyników
+- Kolejka przetwarzania z równoległą weryfikacją gotowych ankiet
 - Weryfikacja i korekta odczytanych danych w interfejsie side-by-side
-- Podgląd zdjęć z zoomem (zakładki dla każdej strony)
-- Formularz z dynamicznym zaznaczaniem pól o niskiej pewności odczytu
+- Podgląd zdjęć z zakładkami dla każdej strony
+- Formularz z walidacją pól wymaganych
 - Skrót klawiszowy Spacja do szybkiego zatwierdzania
 - Eksport wyników do CSV (UTF-8 BOM, gotowy do Excela)
+- Tryb deweloperski z hot-reloadem (Vite + uvicorn --reload)
+- Cloudflare tunnel do udostępnienia publicznego
 
 ## Konfiguracja
 

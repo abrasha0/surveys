@@ -7,12 +7,28 @@ $LogFile = Join-Path -Path $ProjectRoot -ChildPath "logs\run_dev.log"
 $VenvPath = Join-Path -Path $ProjectRoot -ChildPath ".venv"
 $SetupEnvScript = Join-Path -Path $PSScriptRoot -ChildPath "setup_env.ps1"
 
+$uvicornProcess = $null
+$npmProcess = $null
+
 function Write-Log {
     param([string]$Message)
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $line = "[$timestamp] $Message"
     Write-Host $line
     Add-Content -Path $LogFile -Value $line
+}
+
+function Cleanup {
+    Write-Log "=== Cleanup: zatrzymywanie procesow ==="
+    if ($uvicornProcess -and -not $uvicornProcess.HasExited) {
+        Write-Log "Zatrzymywanie uvicorn (PID: $($uvicornProcess.Id))..."
+        $uvicornProcess.Kill()
+    }
+    if ($npmProcess -and -not $npmProcess.HasExited) {
+        Write-Log "Zatrzymywanie npm dev (PID: $($npmProcess.Id))..."
+        $npmProcess.Kill()
+    }
+    Write-Log "=== Cleanup zakonczony ==="
 }
 
 New-Item -Path $LogFile -ItemType File -Force | Out-Null
@@ -53,22 +69,50 @@ if (-not (Test-Path -LiteralPath $VenvPath)) {
 }
 $ErrorActionPreference = "Continue"
 
-# --- Krok 3: Uruchomienie Streamlit ---
-Write-Log "Krok 3: Uruchamianie Streamlit..."
-$PythonVenv = Join-Path -Path $VenvPath -ChildPath "Scripts\python.exe"
-$Streamlit = Join-Path -Path $VenvPath -ChildPath "Scripts\streamlit.exe"
-$MainPy = Join-Path -Path $ProjectRoot -ChildPath "src\app.py"
+# --- Krok 3: Uruchomienie uvicorn ---
+Write-Log "Krok 3: Uruchamianie uvicorn (API)..."
+$Uvicorn = Join-Path -Path $VenvPath -ChildPath "Scripts\uvicorn.exe"
+$uvicornLog = Join-Path -Path $ProjectRoot -ChildPath "logs\uvicorn_dev.log"
 
-if (-not (Test-Path -LiteralPath $MainPy)) {
-    Write-Log "BLAD: Nie znaleziono src\app.py w $ProjectRoot"
+if (-not (Test-Path -LiteralPath $Uvicorn)) {
+    Write-Log "BLAD: Nie znaleziono uvicorn.exe w .venv"
     exit 1
 }
 
-Write-Log "Uruchamianie: streamlit run src/app.py --server.port 8501"
-Write-Log "Aplikacja dostepna pod adresem: http://localhost:8501"
-Write-Log "=== Streamlit przejmuje konsole ==="
+$uvicornProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --reload --port 8000" -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
+Write-Log "OK: Uvicorn uruchomiony (PID: $($uvicornProcess.Id))"
+Write-Log "API dostepne pod: http://localhost:8000"
 
-& $Streamlit run $MainPy --server.port 8501
+# --- Krok 4: Uruchomienie npm dev ---
+Write-Log "Krok 4: Uruchamianie npm dev (frontend)..."
+$FrontendDir = Join-Path -Path $ProjectRoot -ChildPath "src_ui"
+$npmLog = Join-Path -Path $ProjectRoot -ChildPath "logs\npm_dev.log"
+
+if (-not (Test-Path -LiteralPath $FrontendDir)) {
+    Write-Log "BLAD: Nie znaleziono katalogu src_ui"
+    Cleanup
+    exit 1
+}
+
+$npmProcess = Start-Process -FilePath "npm" -ArgumentList "run dev" -WorkingDirectory $FrontendDir -NoNewWindow -PassThru -RedirectStandardOutput $npmLog -RedirectStandardError "${npmLog}.err"
+Write-Log "OK: npm dev uruchomiony (PID: $($npmProcess.Id))"
+Write-Log "Frontend dev: http://localhost:5173 (proxy /api -> localhost:8000)"
+Write-Log ""
+Write-Log "Nacisnij Ctrl+C aby zatrzymac wszystkie procesy."
+Write-Log ""
+
+# --- Krok 5: Monitorowanie ---
+try {
+    while ($true) {
+        Start-Sleep -Seconds 5
+        $activeProcs = @()
+        if ($uvicornProcess -and -not $uvicornProcess.HasExited) { $activeProcs += "uvicorn" }
+        if ($npmProcess -and -not $npmProcess.HasExited) { $activeProcs += "npm" }
+        if ($activeProcs.Count -eq 0) { break }
+    }
+} finally {
+    Cleanup
+}
 
 Write-Log "=== Run Dev - zakonczony ==="
 exit 0
