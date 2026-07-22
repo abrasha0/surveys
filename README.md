@@ -2,6 +2,8 @@
 
 Automatyczny system wprowadzania ankiet papierowych do formy cyfrowej z wykorzystaniem lokalnego modelu wizyjno-jężykowego (VLM).
 
+**Stack:** FastAPI (backend) + React + Vite (frontend) + Ollama (AI)
+
 ## Quick Start
 
 1. Przygotowanie środowiska (Python + npm):
@@ -36,13 +38,16 @@ Aplikacja dostępna pod `http://localhost:8000` (produkcja) lub `http://localhos
 
 - Logowanie hasłem do aplikacji
 - Automatyczna analiza zdjęć ankiet przez VLM (Ollama) + Text LLM
-- Batch processing z progress barem, ETA i cache'owaniem wyników
-- Kolejka przetwarzania z równoległą weryfikacją gotowych ankiet
+- Dwuetapowe przetwarzanie: VLM → tekst → Text LLM → JSON
+- Globalny worker w tle z kolejką, progress barem i ETA
+- Interleaved verification — weryfikacja gotowych ankiet w trakcie przetwarzania
 - Weryfikacja i korekta odczytanych danych w interfejsie side-by-side
 - Podgląd zdjęć z zakładkami dla każdej strony
 - Formularz z walidacją pól wymaganych
 - Skrót klawiszowy Spacja do szybkiego zatwierdzania
 - Eksport wyników do CSV (UTF-8 BOM, gotowy do Excela)
+- Lokalny katalog zdjęć (brak uploadu przez sieć)
+- Cache per-survey (wznawianie sesji po przerwie)
 - Tryb deweloperski z hot-reloadem (Vite + uvicorn --reload)
 - Cloudflare tunnel do udostępnienia publicznego
 
@@ -54,13 +59,6 @@ Skopiuj `config.yaml.example` i dostosuj do swojego środowiska.
 Zmienne środowiskowe z prefiksem `ANKIETER_*` nadpisują wartości z pliku YAML.
 
 Szczegóły: patrz `config.yaml.example` (skomentowane klucze) oraz `docs/main-doc.md`.
-
-## Testy
-
-```powershell
-.venv\Scripts\Activate.ps1
-pytest tests/
-```
 
 ## Dokumentacja
 

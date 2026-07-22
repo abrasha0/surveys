@@ -4,8 +4,9 @@
 
 AnkieterAI to automatyczny system wprowadzania ankiet papierowych do formy cyfrowej.
 System wykorzystuje lokalny model wizyjno-jężykowy (VLM) serwowany przez Ollamę
-do odczytywania danych z zdjęć 5-stronicowych ankiet medycznych.
+do odczytywania danych ze zdjęć 5-stronicowych ankiet medycznych.
 
+**Stack:** FastAPI (backend) + React + Vite (frontend) + Ollama (AI)
 **Cel:** Zdigitalizować ~150 ankiet (każda po 5 stron) przy minimalnym nakładzie pracy
 użytkownika końcowego (osoba nietechniczna).
 
@@ -21,17 +22,19 @@ u dewelopera, dostęp przez Cloudflare tunnel.
 ## Funkcjonalności
 
 - Logowanie hasłem do aplikacji
-- Upload zdjęć ankiet (jpg/png/webp)
-- Automatyczna analiza obrazów przez VLM (Ollama + deepseek-ocr)
+- Automatyczna analiza zdjęć ankiet przez VLM (Ollama) + Text LLM
 - Dwuetapowe przetwarzanie: VLM → tekst → Text LLM → JSON
 - Sekwencyjne przetwarzanie per-strona (jeden model naraz w pamięci GPU)
+- Globalny worker w tle z kolejkowaniem i ETA
+- Interleaved verification — weryfikacja gotowych ankiet w trakcie przetwarzania kolejnych
 - Batch processing z progress barem i cache'owaniem wyników
 - Weryfikacja i korekta odczytanych danych w interfejsie side-by-side
 - Podgląd zdjęć z zoomem (zakładki dla każdej strony)
-- Formularz z dynamicznym zaznaczaniem pól o niskiej pewności odczytu
+- Formularz z walidacją pól wymaganych
 - Skrót klawiszowy Spacja do szybkiego zatwierdzania
 - Eksport wyników do CSV (UTF-8 BOM, gotowy do Excela)
-- Zapis do cache (wznawianie sesji po przerwie)
+- Lokalny katalog zdjęć (brak uploadu przez sieć)
+- Zapis do cache per-survey (wznawianie sesji po przerwie)
 
 ---
 
@@ -49,11 +52,24 @@ Dla każdej strony kolejno:
 Następnie: strona 2, strona 3, ..., strona 5. Wyniki 5 stron są merge'owane
 do jednego obiektu MedicalSurvey.
 
-### Dlaczego sekwencyjnie (nie producer-consumer)?
+### Architektura systemu
 
-- Tylko jeden model naraz w pamięci GPU (mniejsze zużycie VRAM)
-- Przewidywalny, deterministyczny flow — łatwy w debugowaniu i logowaniu
-- Lepsza separacja odpowiedzialności (wizja vs. formatowanie)
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
+│  React UI   │────▶│  FastAPI     │────▶│  Worker (tło)   │
+│  (src_ui/)  │◀────│  (src/)      │◀────│  + Ollama AI    │
+└─────────────┘     └──────┬───────┘     └─────────────────┘
+                           │
+                    ┌──────▼───────┐
+                    │  dist/       │
+                    │  (StaticFiles)│
+                    └──────────────┘
+```
+
+Frontend (React) komunikuje się z backendem przez REST API na porcie 8000.
+W produkcji backend serwuje również zbudowane pliki frontendu z `dist/`.
+Worker działa w tle — przetwarza ankiety sekwencyjnie, umożliwiając weryfikację
+gotowych wyników w trakcie przetwarzania kolejnych (interleaved).
 
 ### Zarządzanie VRAM
 
@@ -89,28 +105,35 @@ Sekcje:
 ### 1. Logowanie
 Użytkownik wpisuje hasło (domyślne: `a`). Hasło skonfigurowane w `config.yaml`.
 
-### 2. Upload i grupowanie
-Użytkownik wybiera zdjęcia ankiet (jpg/png/webp). System sortuje je alfabetycznie
-i grupuje po 5 stron (1 ankieta = 5 zdjęć).
+### 2. Skanowanie lokalnego katalogu
+System skanuje katalog `surveys_data` (konfigurowalny w `config.yaml`) i grupuje
+zdjęcia alfabetycznie po 5 sztuk (1 ankieta = 5 zdjęć). Brak uploadu — zdjęcia
+są procesowane bezpośrednio z lokalnego dysku.
 
-### 3. Przetwarzanie AI (batch)
-Kliknięcie "Rozpocznij analizę" uruchamia batch AI. Dla każdej ankiety (sekwencyjnie):
-5 stron × (VLM → Text LLM) → merge → MedicalSurvey. Wyniki cache'owane
-w `logs/cache_results.json`. Użytkownik widzi pasek postępu.
+### 3. Przetwarzanie AI (worker w tle)
+Kliknięcie "Rozpocznij analizę" uruchamia worker w tle. Dla każdej ankiety
+(sekwencyjnie): 5 stron × (VLM → Text LLM) → merge → MedicalSurvey.
+Wyniki cache'owane w `logs/survey_cache/`. Użytkownik widzi pasek postępu z ETA.
 
-### 4. Weryfikacja
-Ekran side-by-side:
+### 4. Weryfikacja (interleaved)
+Ekran side-by-side — dostępny natychmiast po przetworzeniu pierwszej ankiety:
 - **Lewa kolumna:** Podgląd obrazu aktualnej strony (5 zakładek)
 - **Prawa kolumna:** Formularz z odczytanymi danymi
-- Pola oznaczone przez AI jako wątpliwe (`needs_review`) podświetlone na czerwono
+- Formularz z walidacją pól wymaganych
 - Skrót klawiszowy Spacja = "Zatwierdź i Następna"
 
-### 5. Zapis i następna ankieta
-Kliknięcie "Zatwierdź" → zapis do CSV (`wyniki.csv`) → następna ankieta.
-Przy błędach: możliwość zatwierdzenia mimo błędów.
+Możliwość przełączania między gotowymi ankietami w trakcie przetwarzania kolejnych.
 
-### 6. Eksport CSV
-Po przetworzeniu wszystkich ankiet: download CSV (UTF-8 BOM, gotowy do Excela).
+### 5. Zapis i następna ankieta
+Kliknięcie "Zatwierdź ankietę" → walidacja → zapis do CSV (`wyniki.csv`) →
+automatyczne przejście do następnej ankiety.
+
+### 6. Ekran zakończenia
+Po zweryfikowaniu wszystkich ankiet: komunikat sukcesu, przycisk "Pobierz CSV"
+i "Nowa sesja".
+
+### 7. Eksport CSV
+Download CSV (UTF-8 BOM, gotowy do Excela) z poziomu ekranu zakończenia.
 
 ---
 
@@ -124,13 +147,13 @@ Sekcje `config.yaml`:
 
 | Sekcja       | Opis                                                   |
 |--------------|--------------------------------------------------------|
-| `app`        | Tytuł, layout, hasło, ścieżki, dozwolone typy plików   |
+| `app`        | Tytuł, hasło, ścieżki, dozwolone typy plików           |
 | `ai`         | Modele, URL Ollama, retry, timeout, num_ctx, temperature, keep_alive |
 | `image`      | max_dimension, contrast_factor, jpeg_quality            |
-| `ingestion`  | survey_group_size, upload_dir_prefix                    |
+| `ingestion`  | survey_group_size                                       |
 | `logging`    | Plik, poziom, rotacja logów AI, skracanie I/O          |
 | `langsmith`  | tracing_v2, endpoint, api_key, project                  |
-| `processing` | Wagi progress bara, limit historii                      |
+| `processing` | Wagi progress bara, retry, ETA window, cache_dir       |
 | `prompts`    | VLM extraction, text format (szablony z placeholderami) |
 
 ### Zmienne środowiskowe
@@ -156,10 +179,12 @@ zainstalowany, traces są pomijane (no-op).
 
 ### Scenariusz 1: Ręczny
 ```powershell
-.\scripts\setup_env.ps1          # Tworzenie venv, instalacja deps
+.\scripts\setup_env.ps1          # Tworzenie venv, pip install, npm install
 .\scripts\setup_ollama.ps1       # Instalacja Ollamy, pull modelu
 .venv\Scripts\Activate.ps1
-streamlit run src/app.py         # Start aplikacji
+cd src_ui; npm run build; cd ..
+Copy-Item src_ui/dist/* dist/ -Recurse -Force
+uvicorn main:app --port 8000     # Start aplikacji (z katalogu src/)
 ```
 
 ### Scenariusz 2: Automatyczny
@@ -174,24 +199,14 @@ streamlit run src/app.py         # Start aplikacji
 .\scripts\deploy_tunnel.ps1      # Tylko tunel
 ```
 
-Aplikacja dostępna pod `http://localhost:8501`. Domyślne hasło: `a`.
+Aplikacja dostępna pod `http://localhost:8000`. Domyślne hasło: `a`.
 
----
-
-## Testy
-
+### Uruchomienie deweloperskie (hot-reload)
 ```powershell
-.venv\Scripts\Activate.ps1
-pytest tests/
+.\scripts\run_dev.ps1            # uvicorn --reload (port 8000) + Vite dev (port 5173)
 ```
 
-52 testy, 6 plików testowych:
-- `test_schemas.py` — testy modeli danych, normalizacji, CSV
-- `test_data_handler.py` — testy grupowania, cache, CSV
-- `test_state_manager.py` — testy stanu sesji
-- `test_ai_client.py` — testy klienta AI (base64, merge)
-- `test_csv_integrity.py` — testy spójności CSV
-- `conftest.py` — fixture'y
+Frontend deweloperski: `http://localhost:5173` (proxy `/api` → `localhost:8000`).
 
 ---
 
@@ -201,17 +216,6 @@ pytest tests/
 Patrz `docs/known-issues.md`.
 
 ### Możliwe ulepszenia
-- `@st.fragment` — izolacja rerunów UI (wydajność)
-- `st.form` — batchowanie inputów formularza
+- Próg re-OCR dla niskiej jakości odczytu
 - Dynamiczne generowanie UI z `field_specs` (zamiast hardkodowanych zakładek)
-
----
-
-## Historia projektu (krótko)
-
-- **Początek:** Pierwotny brief definiował architekturę flat, single-model, batch-first
-- **Optymalizacja:** 4 etapy — preprocessing obrazów, architektura dwuetapowa,
-  sekwencyjne przetwarzanie, LangSmith tracing
-- **Refaktor:** Przejście z flat struktury (`src/main.py`, `src/ai_client.py`...)
-  do modularnej (`src/ai/`, `src/domain/`, `src/ui/`, `src/state/`)
-- **Config:** Centralizacja konfiguracji do `config.yaml` (zamiast Pydantic Settings)
+- Testy automatyczne dla nowego stacka (FastAPI + React)

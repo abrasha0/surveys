@@ -66,6 +66,19 @@ def list_surveys() -> list[dict]:
     return result
 
 
+@router.get("/surveys/export/csv")
+def export_csv():
+    csv_path = export_csv_path()
+    if not Path(csv_path).exists():
+        raise HTTPException(status_code=404, detail="CSV not yet created")
+    return FileResponse(
+        path=csv_path,
+        media_type="text/csv",
+        filename="ankiety_wyniki.csv",
+        headers={"Content-Type": "text/csv; charset=utf-8"}
+    )
+
+
 @router.get("/surveys/{survey_id}/pages/{page_num}/image")
 def get_survey_image(survey_id: int, page_num: int):
     surveys_dir = config.app.get("surveys_dir")

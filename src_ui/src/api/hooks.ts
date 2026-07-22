@@ -123,3 +123,19 @@ export function useSaveSurvey() {
 export function surveyImageUrl(surveyId: number, page: number): string {
   return `/api/surveys/${surveyId}/pages/${page}/image`;
 }
+
+export function useExportCsv() {
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/surveys/export/csv', { credentials: 'include' });
+      if (!res.ok) throw new Error('CSV not available yet');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'ankiety_wyniki.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    },
+  });
+}

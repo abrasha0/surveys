@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSurveys, useFieldSpecs, useSurveyResult, useSaveSurvey } from '../../api/hooks';
+import { useNavigate } from 'react-router-dom';
+import { useSurveys, useFieldSpecs, useSurveyResult, useSaveSurvey, useProcessingStatus } from '../../api/hooks';
 import { useVerificationStore } from '../../store/verificationStore';
 import ImageViewer from '../../components/ImageViewer';
 import PageTabs from '../../components/PageTabs';
@@ -7,11 +8,15 @@ import SurveyHeader from './SurveyHeader';
 import DynamicForm from './DynamicForm';
 
 export default function VerificationPanel() {
+  const navigate = useNavigate();
   const { data: surveys } = useSurveys();
   const { data: fieldSpecs } = useFieldSpecs();
   const saveSurveyMutation = useSaveSurvey();
   const initSurvey = useVerificationStore((s) => s.initSurvey);
   const getSurveyUI = useVerificationStore((s) => s.getSurveyUI);
+
+  const { data: processingStatus } = useProcessingStatus();
+  const isRunning = processingStatus?.is_running ?? false;
 
   const [currentSurveyId, setCurrentSurveyId] = useState<number | null>(null);
 
@@ -36,6 +41,12 @@ export default function VerificationPanel() {
       setCurrentSurveyId(first);
     }
   }, [clickableSurveys, currentSurveyId, initSurvey]);
+
+  useEffect(() => {
+    if (allSurveys.length > 0 && clickableSurveys.length === 0 && !isRunning) {
+      navigate('/complete', { replace: true });
+    }
+  }, [allSurveys, clickableSurveys, isRunning, navigate]);
 
   const handleSurveyChange = (surveyId: number) => {
     initSurvey(surveyId);

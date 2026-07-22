@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AuthGuard from './AuthGuard';
 import AppLayout from './AppLayout';
 import LoginPage from '../features/auth/LoginPage';
+import CompletePage from '../features/complete/CompletePage';
 
 export default function App() {
   return (
@@ -13,6 +14,14 @@ export default function App() {
           element={
             <AuthGuard>
               <AppLayout />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/complete"
+          element={
+            <AuthGuard>
+              <CompletePage />
             </AuthGuard>
           }
         />
