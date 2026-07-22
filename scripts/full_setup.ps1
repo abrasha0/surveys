@@ -151,30 +151,29 @@ try {
         Write-Log "=== Krok 4/5: Uruchamianie uvicorn (API + frontend static) ==="
         $Uvicorn = Join-Path -Path $VenvPath -ChildPath "Scripts\uvicorn.exe"
         $appLog = Join-Path -Path $ProjectRoot -ChildPath "logs\uvicorn_full.log"
+        $SrcDir = Join-Path -Path $ProjectRoot -ChildPath "src"
 
         if (Test-Path -LiteralPath $Uvicorn) {
             try {
-                $appProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --port 8000" -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -RedirectStandardOutput $appLog -RedirectStandardError "${appLog}.err"
+                $appProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $appLog -RedirectStandardError "${appLog}.err"
                 Track-Process -Name "Uvicorn" -Process $appProcess
                 Write-Log "OK: Uvicorn uruchomiony (PID: $($appProcess.Id))"
 
                 # Wait na uvicorn
                 Write-Log "Czekam na gotowosc uvicorn..."
                 $uvicornReady = $false
-                for ($i = 0; $i -lt 10; $i++) {
+                for ($i = 0; $i -lt 15; $i++) {
                     Start-Sleep -Seconds 1
                     try {
                         $r = Invoke-WebRequest -Uri "http://localhost:8000" -UseBasicParsing -TimeoutSec 2
-                        if ($r.StatusCode -eq 200 -or $r.StatusCode -eq 401) {
-                            $uvicornReady = $true
-                            break
-                        }
+                        $uvicornReady = $true
+                        break
                     } catch { }
                 }
                 if ($uvicornReady) {
                     Write-Log "OK: API gotowe na http://localhost:8000"
                 } else {
-                    Write-Log "OSTROZNE: API nie odpowiada po 10s - sprawdz log: $appLog"
+                    Write-Log "OSTROZNE: API nie odpowiada po 15s - sprawdz log: $appLog"
                 }
             } catch {
                 throw "Nie udalo sie uruchomic uvicorn - $_"

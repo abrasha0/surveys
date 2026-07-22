@@ -172,7 +172,7 @@ Write-Log ""
 Write-Log "Uruchomienie produkcyjne (API + frontend static na jednym porcie):"
 Write-Log "  .\scripts\full_setup.ps1"
 Write-Log ""
-Write-Log "Architektura: FastAPI na porcie 8000 serwuje API i statyczny frontend (dist/).
+Write-Log "Architektura: FastAPI na porcie 8000 serwuje API i statyczny frontend (dist/)."
 Write-Log "W dev: dodatkowo Vite na porcie 5173 z proxy /api -> localhost:8000."
 
 exit 0

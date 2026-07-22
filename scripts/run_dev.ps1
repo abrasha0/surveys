@@ -79,20 +79,19 @@ if (-not (Test-Path -LiteralPath $Uvicorn)) {
     exit 1
 }
 
-$uvicornProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --reload --port 8000" -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
+$SrcDir = Join-Path -Path $ProjectRoot -ChildPath "src"
+$uvicornProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --reload --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
 Write-Log "OK: Uvicorn uruchomiony (PID: $($uvicornProcess.Id))"
 
 # --- Waitloop na uvicorn ---
 Write-Log "Czekam na gotowosc uvicorn..."
 $uvicornReady = $false
-for ($i = 0; $i -lt 10; $i++) {
+for ($i = 0; $i -lt 15; $i++) {
     Start-Sleep -Seconds 1
     try {
         $r = Invoke-WebRequest -Uri "http://localhost:8000" -UseBasicParsing -TimeoutSec 2
-        if ($r.StatusCode -eq 200 -or $r.StatusCode -eq 401) {
-            $uvicornReady = $true
-            break
-        }
+        $uvicornReady = $true
+        break
     } catch {
         # still starting
     }
@@ -100,7 +99,7 @@ for ($i = 0; $i -lt 10; $i++) {
 if ($uvicornReady) {
     Write-Log "OK: API gotowe na http://localhost:8000"
 } else {
-    Write-Log "OSTROZNE: API nie odpowiada po 10s - sprawdz log: $uvicornLog"
+    Write-Log "OSTROZNE: API nie odpowiada po 15s - sprawdz log: $uvicornLog"
 }
 
 # --- Krok 4: Walidacja node/npm ---
@@ -130,7 +129,8 @@ if (-not (Test-Path -LiteralPath $FrontendDir)) {
     exit 1
 }
 
-$npmProcess = Start-Process -FilePath "npm" -ArgumentList "run dev" -WorkingDirectory $FrontendDir -NoNewWindow -PassThru -RedirectStandardOutput $npmLog -RedirectStandardError "${npmLog}.err"
+# npm moze byc npm.ps1 (PS skrypt) - Start-Process wymaga exe, uzyj cmd /c
+$npmProcess = Start-Process -FilePath "cmd.exe" -ArgumentList "/c npm run dev" -WorkingDirectory $FrontendDir -NoNewWindow -PassThru -RedirectStandardOutput $npmLog -RedirectStandardError "${npmLog}.err"
 Write-Log "OK: npm dev uruchomiony (PID: $($npmProcess.Id))"
 Write-Log "Frontend dev: http://localhost:5173 (proxy /api -> localhost:8000)"
 Write-Log ""
