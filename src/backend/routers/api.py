@@ -104,7 +104,11 @@ def get_survey_image(survey_id: int, page_num: int):
     if not file_path.is_file():
         raise HTTPException(status_code=404, detail=f"File not found: {file_path.name}")
 
-    return FileResponse(path=str(file_path), media_type="image/jpeg")
+    return FileResponse(
+        path=str(file_path),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
 
 
 @router.get("/surveys/{survey_id}/result")

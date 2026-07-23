@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSurveys, useFieldSpecs, useSurveyResult, useSaveSurvey, useProcessingStatus } from '../../api/hooks';
+import { useSurveys, useFieldSpecs, useSurveyResult, useSaveSurvey, useProcessingStatus, surveyImageUrl } from '../../api/hooks';
 import { useVerificationStore } from '../../store/verificationStore';
 import ImageViewer from '../../components/ImageViewer';
 import PageTabs from '../../components/PageTabs';
@@ -9,6 +9,7 @@ import DynamicForm from './DynamicForm';
 
 export default function VerificationPanel() {
   const navigate = useNavigate();
+  const [currentSurveyId, setCurrentSurveyId] = useState<number | null>(null);
   const { data: surveys } = useSurveys();
   const { data: fieldSpecs } = useFieldSpecs();
   const saveSurveyMutation = useSaveSurvey();
@@ -19,8 +20,6 @@ export default function VerificationPanel() {
 
   const { data: processingStatus } = useProcessingStatus();
   const isRunning = processingStatus?.is_running ?? false;
-
-  const [currentSurveyId, setCurrentSurveyId] = useState<number | null>(null);
 
   const allSurveys = useMemo(() => surveys ?? [], [surveys]);
   const allDone = useMemo(
@@ -53,6 +52,18 @@ export default function VerificationPanel() {
       navigate('/complete', { replace: true });
     }
   }, [allDone, isRunning, navigate]);
+
+  const prevProcessingId = useRef<number | null>(null);
+  useEffect(() => {
+    const processingId = processingStatus?.current_survey_id ?? null;
+    if (processingId !== null && processingId !== prevProcessingId.current) {
+      for (let page = 0; page < 5; page++) {
+        const img = new Image();
+        img.src = surveyImageUrl(processingId, page);
+      }
+      prevProcessingId.current = processingId;
+    }
+  }, [processingStatus?.current_survey_id]);
 
   const handleSurveyChange = (surveyId: number) => {
     initSurvey(surveyId);
