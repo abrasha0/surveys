@@ -135,12 +135,73 @@ Write-Log "OK: npm dev uruchomiony (PID: $($npmProcess.Id))"
 Write-Log "Frontend dev: http://localhost:5173 (proxy /api -> localhost:8000)"
 Write-Log ""
 Write-Log "Nacisnij Ctrl+C aby zatrzymac wszystkie procesy."
+Write-Log "Nacisnij R aby recznie zrestartowac backend (po zmianie/usunieciu zdjec)."
 Write-Log ""
 
-# --- Krok 5: Monitorowanie ---
+# --- Krok 6: File watcher na katalog zdjec ---
+$SurveysDir = Join-Path -Path $ProjectRoot -ChildPath "working_vault\surveys_data"
+$lastSnapshot = $null
+$lastRestartTime = [DateTime]::UtcNow.AddSeconds(-10)
+
+function Get-DirSnapshot {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return "" }
+    $items = Get-ChildItem -Path $Path -File | ForEach-Object {
+        "$($_.Name):$($_.LastWriteTimeUtc.Ticks)"
+    }
+    return ($items -join '|')
+}
+
+if (Test-Path -LiteralPath $SurveysDir) {
+    $lastSnapshot = Get-DirSnapshot -Path $SurveysDir
+    Write-Log "OK: Watcher na katalog zdjec uruchomiony (polling co 2s)"
+    Write-Log "     $SurveysDir"
+} else {
+    Write-Log "OSTRZEZENIE: Katalog zdjec nie istnieje - watcher pominiety"
+    Write-Log "     $SurveysDir"
+}
+
+# --- Krok 7: Monitorowanie z reloadem ---
 try {
     while ($true) {
-        Start-Sleep -Seconds 5
+        Start-Sleep -Seconds 2
+
+        # --- 7a: Sprawdz zmiany w katalogu zdjec ---
+        if ($lastSnapshot) {
+            $currentSnapshot = Get-DirSnapshot -Path $SurveysDir
+            if ($currentSnapshot -ne $lastSnapshot) {
+                $lastSnapshot = $currentSnapshot
+                $now = [DateTime]::UtcNow
+                if (($now - $lastRestartTime).TotalSeconds -ge 3) {
+                    Write-Log "=== Zmiana w katalogu zdjec - restart backendu ==="
+                    if ($uvicornProcess -and -not $uvicornProcess.HasExited) {
+                        $uvicornProcess.Kill()
+                        $null = $uvicornProcess.WaitForExit(5000)
+                    }
+                    $uvicornProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --reload --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
+                    $lastRestartTime = $now
+                    Write-Log "OK: Uvicorn zrestartowany (PID: $($uvicornProcess.Id))"
+                }
+            }
+        }
+
+        # --- 7b: Reczny reload (klawisz R) ---
+        if ([Console]::KeyAvailable) {
+            $key = [Console]::ReadKey($true)
+            if ($key.Key -eq 'R') {
+                Write-Log "=== Reczny reload backendu (klawisz R) ==="
+                if ($uvicornProcess -and -not $uvicornProcess.HasExited) {
+                    $uvicornProcess.Kill()
+                    $null = $uvicornProcess.WaitForExit(5000)
+                }
+                $uvicornProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --reload --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
+                Write-Log "OK: Uvicorn zrestartowany (PID: $($uvicornProcess.Id))"
+                # Odswiez frontend przez Vite
+                Write-Log "INFO: Frontend Vite HMR odswiezy automatycznie po restarcie backendu"
+            }
+        }
+
+        # --- 7c: Sprawdz czy procesy zyja ---
         $activeProcs = @()
         if ($uvicornProcess -and -not $uvicornProcess.HasExited) { $activeProcs += "uvicorn" }
         if ($npmProcess -and -not $npmProcess.HasExited) { $activeProcs += "npm" }
