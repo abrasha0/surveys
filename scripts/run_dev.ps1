@@ -31,6 +31,11 @@ function Cleanup {
     Write-Log "=== Cleanup zakonczony ==="
 }
 
+$LogsDir = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs"
+if (Test-Path -LiteralPath $LogsDir) {
+    Remove-Item -LiteralPath $LogsDir -Recurse -Force
+}
+
 New-Item -Path $LogFile -ItemType File -Force | Out-Null
 Write-Log "=== Run Dev - start ==="
 
