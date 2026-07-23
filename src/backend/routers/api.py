@@ -107,7 +107,7 @@ def get_survey_image(survey_id: int, page_num: int):
     return FileResponse(
         path=str(file_path),
         media_type="image/jpeg",
-        headers={"Cache-Control": "no-cache"},
+        headers={"Cache-Control": "private, max-age=86400"},
     )
 
 

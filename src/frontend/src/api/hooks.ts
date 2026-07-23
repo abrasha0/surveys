@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 
@@ -50,7 +51,12 @@ export function useSurveys() {
   return useQuery({
     queryKey: ['surveys'],
     queryFn: () => apiFetch<SurveyListItem[]>('/api/surveys'),
-    refetchInterval: 2000,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return 2000;
+      const hasActive = data.some((s) => s.status === 'queued' || s.status === 'processing');
+      return hasActive ? 2000 : false;
+    },
   });
 }
 
@@ -58,8 +64,61 @@ export function useProcessingStatus() {
   return useQuery({
     queryKey: ['processing-status'],
     queryFn: () => apiFetch<ProcessingStatus>('/api/processing/status'),
-    refetchInterval: 2000,
+    refetchInterval: (query) => {
+      const data = query.state.data as ProcessingStatus | undefined;
+      return data?.is_running ? 2000 : false;
+    },
   });
+}
+
+export function useSurveyImages(surveyId: number | null) {
+  const [data, setData] = useState<Record<number, string | null> | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (surveyId === null) {
+      setData(null);
+      return;
+    }
+
+    setIsLoading(true);
+    let cancelled = false;
+
+    const load = async () => {
+      const pages = [0, 1, 2, 3, 4];
+      const entries = await Promise.all(
+        pages.map(async (page) => {
+          try {
+            const url = `/api/surveys/${surveyId}/pages/${page}/image`;
+            const res = await fetch(url, { credentials: 'include' });
+            if (!res.ok) return { page, url: null as string | null };
+            const blob = await res.blob();
+            return { page, url: URL.createObjectURL(blob) };
+          } catch {
+            return { page, url: null as string | null };
+          }
+        })
+      );
+
+      if (cancelled) {
+        entries.forEach((e) => { if (e.url) URL.revokeObjectURL(e.url); });
+        return;
+      }
+
+      const map: Record<number, string | null> = {};
+      entries.forEach((e) => { map[e.page] = e.url; });
+      setData(map);
+      setIsLoading(false);
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [surveyId]);
+
+  return { data, isLoading };
 }
 
 export function useSurveyResult(surveyId: number | null) {

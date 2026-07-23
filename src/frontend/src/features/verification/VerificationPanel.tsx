@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSurveys, useFieldSpecs, useSurveyResult, useSaveSurvey, useProcessingStatus, surveyImageUrl } from '../../api/hooks';
+import { useSurveys, useFieldSpecs, useSurveyResult, useSaveSurvey, useProcessingStatus, useSurveyImages } from '../../api/hooks';
 import { useVerificationStore } from '../../store/verificationStore';
 import ImageViewer from '../../components/ImageViewer';
 import PageTabs from '../../components/PageTabs';
@@ -38,6 +38,7 @@ export default function VerificationPanel() {
   );
 
   const { data: surveyResult } = useSurveyResult(currentSurveyId);
+  const { data: imageUrls } = useSurveyImages(currentSurveyId);
 
   useEffect(() => {
     if (currentSurveyId === null && clickableSurveys.length > 0) {
@@ -53,17 +54,15 @@ export default function VerificationPanel() {
     }
   }, [allDone, isRunning, navigate]);
 
-  const prevProcessingId = useRef<number | null>(null);
   useEffect(() => {
-    const processingId = processingStatus?.current_survey_id ?? null;
-    if (processingId !== null && processingId !== prevProcessingId.current) {
-      for (let page = 0; page < 5; page++) {
-        const img = new Image();
-        img.src = surveyImageUrl(processingId, page);
+    return () => {
+      if (imageUrls) {
+        Object.values(imageUrls).forEach((url) => {
+          if (url) URL.revokeObjectURL(url);
+        });
       }
-      prevProcessingId.current = processingId;
-    }
-  }, [processingStatus?.current_survey_id]);
+    };
+  }, [imageUrls]);
 
   const handleSurveyChange = (surveyId: number) => {
     initSurvey(surveyId);
@@ -122,7 +121,7 @@ export default function VerificationPanel() {
             onChange={handlePageChange}
           />
           <div className="flex-1 min-h-0">
-            <ImageViewer surveyId={currentSurveyId} page={currentPage} />
+            <ImageViewer imageUrl={imageUrls?.[currentPage] ?? null} page={currentPage} />
           </div>
         </div>
 
