@@ -19,6 +19,8 @@ class GlobalState:
     total: int = 0
     processed: int = 0
     errors: int = 0
+    total_pages: int = 0
+    processed_pages: int = 0
     current_survey_id: int | None = None
     current_page: int | None = None
     current_stage: str | None = None
@@ -33,6 +35,7 @@ class ProcessingState:
         self.global_state = GlobalState()
         self.results: dict[int, dict] = {}
         self.page_times: list[float] = []
+        self._counted_pages: set[tuple[int, int]] = set()
         self._eta_rolling_window: int = config.processing["eta_rolling_window"]
 
     @property
@@ -49,6 +52,7 @@ class ProcessingState:
         from data_handler import load_all_survey_caches
         cached = load_all_survey_caches()
         self.surveys = []
+        total_pages = 0
         for idx, group in enumerate(survey_groups):
             if idx in cached:
                 cache_data = cached[idx]
@@ -60,7 +64,9 @@ class ProcessingState:
                 result = None
                 error = None
             self.surveys.append(SurveyState(id=idx, files=group, status=status, result=result, error_message=error))
+            total_pages += len(group)
         self.global_state.total = len(self.surveys)
+        self.global_state.total_pages = total_pages
         self.global_state.processed = sum(1 for s in self.surveys if s.status in ("ready", "error"))
         self.global_state.errors = sum(1 for s in self.surveys if s.status == "error")
 
@@ -68,6 +74,7 @@ class ProcessingState:
         from data_handler import load_all_survey_caches
         cached = load_all_survey_caches()
         self.surveys = []
+        total_pages = 0
         for idx, group in enumerate(survey_groups):
             if idx in cached:
                 cache_data = cached[idx]
@@ -79,12 +86,15 @@ class ProcessingState:
                 result = None
                 error = None
             self.surveys.append(SurveyState(id=idx, files=group, status=status, result=result, error_message=error))
+            total_pages += len(group)
         self.global_state.total = len(self.surveys)
+        self.global_state.total_pages = total_pages
         self.global_state.processed = sum(1 for s in self.surveys if s.status in ("ready", "error"))
         self.global_state.errors = sum(1 for s in self.surveys if s.status == "error")
         self.global_state.is_running = True
         self.global_state.started_at = time.time()
         self.page_times.clear()
+        self._counted_pages.clear()
 
     def get_survey_state(self, survey_id: int) -> SurveyState | None:
         if 0 <= survey_id < len(self.surveys):
@@ -102,6 +112,10 @@ class ProcessingState:
             survey.error_message = error
         if status in ("ready", "error"):
             self.global_state.processed += 1
+            already_counted = sum(1 for (sid, _) in self._counted_pages if sid == survey_id)
+            uncounted = len(survey.files) - already_counted
+            if uncounted > 0:
+                self.global_state.processed_pages += uncounted
             if status == "error":
                 self.global_state.errors += 1
 
@@ -111,6 +125,12 @@ class ProcessingState:
             raise ValueError(f"Cannot verify survey in status '{survey.status}'")
         survey.status = "verified"
         survey.result = None
+
+    def mark_page_processed(self, survey_id: int, page_idx: int):
+        key = (survey_id, page_idx)
+        if key not in self._counted_pages:
+            self._counted_pages.add(key)
+            self.global_state.processed_pages += 1
 
     def update_global(self, survey_id: int, page: int | None, stage: str | None):
         self.global_state.current_survey_id = survey_id
@@ -147,6 +167,8 @@ class ProcessingState:
             "total": self.global_state.total,
             "processed": self.global_state.processed,
             "errors": self.global_state.errors,
+            "total_pages": self.global_state.total_pages,
+            "processed_pages": self.global_state.processed_pages,
             "current_survey_id": self.global_state.current_survey_id,
             "current_page": self.global_state.current_page,
             "current_stage": self.global_state.current_stage,

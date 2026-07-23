@@ -13,7 +13,9 @@ export default function VerificationPanel() {
   const { data: fieldSpecs } = useFieldSpecs();
   const saveSurveyMutation = useSaveSurvey();
   const initSurvey = useVerificationStore((s) => s.initSurvey);
-  const getSurveyUI = useVerificationStore((s) => s.getSurveyUI);
+  const surveyUI = useVerificationStore((s) =>
+    currentSurveyId !== null ? s.surveysUI[currentSurveyId] : undefined
+  );
 
   const { data: processingStatus } = useProcessingStatus();
   const isRunning = processingStatus?.is_running ?? false;
@@ -76,9 +78,7 @@ export default function VerificationPanel() {
     });
   };
 
-  const currentPage = currentSurveyId !== null
-    ? getSurveyUI(currentSurveyId).selectedPage
-    : 0;
+  const currentPage = surveyUI?.selectedPage ?? 0;
 
   const handlePageChange = () => {};
 
@@ -105,14 +105,14 @@ export default function VerificationPanel() {
 
       <div className="flex-1 flex overflow-hidden">
         <div className="w-[40%] flex flex-col border-r border-gray-200 bg-white">
-          <div className="flex-1 min-h-0">
-            <ImageViewer surveyId={currentSurveyId} page={currentPage} />
-          </div>
           <PageTabs
             surveyId={currentSurveyId}
             currentPage={currentPage}
             onChange={handlePageChange}
           />
+          <div className="flex-1 min-h-0">
+            <ImageViewer surveyId={currentSurveyId} page={currentPage} />
+          </div>
         </div>
 
         <div className="flex-1 flex flex-col overflow-y-auto bg-gray-50 p-4">

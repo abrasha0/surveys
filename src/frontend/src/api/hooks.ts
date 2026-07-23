@@ -22,6 +22,8 @@ export interface ProcessingStatus {
   total: number;
   processed: number;
   errors: number;
+  total_pages: number;
+  processed_pages: number;
   current_survey_id: number | null;
   current_page: number | null;
   current_stage: string | null;

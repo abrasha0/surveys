@@ -82,6 +82,8 @@ class ProcessingWorker:
             status.page_idx if status.page_idx >= 0 else None,
             self._map_stage(status.status),
         )
+        if status.status in ("text_formatting", "text_retrying", "page_error"):
+            self.state.mark_page_processed(status.survey_idx, status.page_idx)
         if status.extra and "elapsed_s" in status.extra:
             try:
                 self.state.record_page_time(float(status.extra["elapsed_s"]))

@@ -17,7 +17,7 @@ export default function PageTabs({ surveyId, currentPage, onChange }: PageTabsPr
   };
 
   return (
-    <div role="tablist" className="flex border-t border-gray-200">
+    <div role="tablist" className="flex border-b border-gray-200 shrink-0">
       {Array.from({ length: TOTAL_PAGES }, (_, i) => (
         <button
           key={i}
