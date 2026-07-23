@@ -367,6 +367,7 @@ class AIClient:
         page_results: list[dict] = []
 
         for page_idx, file_path in enumerate(survey_files):
+            page_start = time.perf_counter()
             logger.info(
                 "Processing page %d/%d for survey %d — step 1/2: VLM extraction",
                 page_idx + 1, total_pages, survey_idx + 1,
@@ -376,6 +377,7 @@ class AIClient:
                     file_path, page_idx, progress_callback, survey_idx, total_surveys, total_pages
                 )
             except Exception as e:
+                page_elapsed = time.perf_counter() - page_start
                 logger.error("VLM failed for page %d of survey %d: %s", page_idx + 1, survey_idx + 1, e)
                 if progress_callback:
                     progress_callback(ProcessingStatus(
@@ -383,6 +385,7 @@ class AIClient:
                         page_idx=page_idx, total_pages=total_pages,
                         status="page_error",
                         message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}: VLM błąd — pominięto",
+                        extra={"elapsed_s": f"{page_elapsed:.1f}"},
                     ))
                 page_results.append({})
                 continue
@@ -402,8 +405,18 @@ class AIClient:
                 result = await self._format_json_llm(
                     raw_text, page_idx, progress_callback, survey_idx, total_surveys, total_pages
                 )
+                page_elapsed = time.perf_counter() - page_start
+                if progress_callback:
+                    progress_callback(ProcessingStatus(
+                        survey_idx=survey_idx, total_surveys=total_surveys,
+                        page_idx=page_idx, total_pages=total_pages,
+                        status="page_done",
+                        message="",
+                        extra={"elapsed_s": f"{page_elapsed:.1f}"},
+                    ))
                 page_results.append(result)
             except Exception as e:
+                page_elapsed = time.perf_counter() - page_start
                 logger.error("Text LLM failed for page %d of survey %d: %s", page_idx + 1, survey_idx + 1, e)
                 if _logger_mod.ai_req_logger:
                     _logger_mod.ai_req_logger.error(
@@ -416,6 +429,7 @@ class AIClient:
                         page_idx=page_idx, total_pages=total_pages,
                         status="page_error",
                         message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}: Text LLM błąd — pominięto",
+                        extra={"elapsed_s": f"{page_elapsed:.1f}"},
                     ))
                 page_results.append({})
 

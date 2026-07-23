@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProcessingStatus } from "../../api/hooks";
 
 interface ProcessingProgressBarProps {
@@ -13,8 +13,7 @@ function formatEta(seconds: number | null): string {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   if (m > 0) return `zostało ~${m}min ${s}s`;
-  if (s > 0) return `zostało ~${s}s`;
-  return "za chwilę";
+  return `zostało ~${s}s`;
 }
 
 function stageLabel(
@@ -37,6 +36,7 @@ export default function ProcessingProgressBar({
 }: ProcessingProgressBarProps) {
   const [localEtaSeconds, setLocalEtaSeconds] = useState<number | null>(null);
   const [showCompletion, setShowCompletion] = useState(false);
+  const lastBackendEta = useRef<number | null>(null);
 
   const total = status?.total ?? 0;
   const processed = status?.processed ?? 0;
@@ -49,25 +49,23 @@ export default function ProcessingProgressBar({
   const current_survey_id = status?.current_survey_id ?? null;
 
   useEffect(() => {
-    if (status?.eta_seconds !== undefined && status?.eta_seconds !== null) {
-      setLocalEtaSeconds(status.eta_seconds);
+    const newEta = status?.eta_seconds ?? null;
+    if (newEta !== null && newEta !== lastBackendEta.current) {
+      lastBackendEta.current = newEta;
+      setLocalEtaSeconds(newEta);
     }
   }, [status?.eta_seconds]);
 
   useEffect(() => {
-    if (
-      !status?.is_running &&
-      localEtaSeconds !== null &&
-      localEtaSeconds > 0
-    ) {
-      const timer = setInterval(() => {
-        setLocalEtaSeconds((prev) =>
-          prev !== null && prev > 0 ? prev - 1 : 0,
-        );
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [status?.is_running, localEtaSeconds]);
+    if (!is_running) return;
+    const timer = setInterval(() => {
+      setLocalEtaSeconds((prev) => {
+        if (prev === null || prev <= 0) return prev;
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [is_running]);
 
   useEffect(() => {
     const isFinished = !is_running && total > 0 && processed + errors >= total;
@@ -122,9 +120,11 @@ export default function ProcessingProgressBar({
         <span className="text-gray-700 whitespace-nowrap shrink-0">
           przetworzono: {processed_pages} z {total_pages} stron
           {errors > 0 && <> · Błędy: {errors}</>}
-          {!is_running && pagesComplete >= 1
-            ? ""
-            : ` · pozostało ${formatEta(localEtaSeconds)}`}
+          {is_running && localEtaSeconds === null
+            ? " · obliczanie..."
+            : localEtaSeconds !== null && is_running
+              ? ` · ${formatEta(localEtaSeconds)}`
+              : ""}
         </span>
       </div>
 
