@@ -13,8 +13,6 @@ interface DynamicFormProps {
   disabled?: boolean;
 }
 
-const TOTAL_PAGES = 5;
-
 function validateField(field: FieldSpec, value: unknown): string | undefined {
   const strVal = String(value ?? '').trim();
   if (strVal === '') return undefined;
@@ -67,7 +65,6 @@ export default function DynamicForm({
   const updateDraft = useVerificationStore((s) => s.updateDraft);
   const saveDraft = useVerificationStore((s) => s.saveDraft);
   const clearDraft = useVerificationStore((s) => s.clearDraft);
-  const setSelectedPage = useVerificationStore((s) => s.setSelectedPage);
   const setShowErrors = useVerificationStore((s) => s.setShowErrors);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -135,9 +132,6 @@ export default function DynamicForm({
 
   useSpaceShortcut(!disabled && !saving, handleSave);
 
-  const prevPage = () => setSelectedPage(surveyId, selectedPage - 1);
-  const nextPage = () => setSelectedPage(surveyId, selectedPage + 1);
-
   return (
     <div className="flex flex-col w-full h-full">
       <div className={`flex-1 overflow-y-auto w-full px-3 py-1.5 ${pageFields.length > 8 ? 'grid grid-cols-2 gap-x-3' : 'space-y-0'}`}>
@@ -154,37 +148,6 @@ export default function DynamicForm({
         ))}
         {pageFields.length === 0 && (
           <p className="text-gray-400 text-center py-8">Brak pól na tej stronie</p>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between border-t border-gray-200 bg-white px-3 py-2">
-        <button
-          onClick={prevPage}
-          disabled={selectedPage === 0}
-          className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed"
-        >
-          ◀ Poprzednia strona
-        </button>
-
-        <span className="text-xs text-gray-500">
-          Strona {selectedPage + 1} z {TOTAL_PAGES}
-        </span>
-
-        {selectedPage < TOTAL_PAGES - 1 ? (
-          <button
-            onClick={nextPage}
-            className="px-3 py-1.5 text-xs font-medium text-white bg-[var(--color-info)] rounded hover:opacity-90"
-          >
-            Następna strona ▶
-          </button>
-        ) : (
-          <button
-            onClick={handleSave}
-            disabled={disabled || saving}
-            className="px-3 py-1.5 text-xs font-medium text-white bg-[var(--color-success)] rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? 'Zapisywanie...' : 'Zatwierdź ankietę'}
-          </button>
         )}
       </div>
     </div>
