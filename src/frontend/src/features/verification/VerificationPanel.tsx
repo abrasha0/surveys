@@ -102,7 +102,7 @@ export default function VerificationPanel() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full w-full">
       <SurveyHeader
         currentSurveyId={currentSurveyId}
         surveys={allSurveys}
@@ -115,7 +115,7 @@ export default function VerificationPanel() {
       />
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-[40%] flex flex-col border-r border-gray-200 bg-white">
+        <div className="w-[680px] shrink-0 flex flex-col border-r border-gray-200 bg-white">
           <PageTabs
             surveyId={currentSurveyId}
             currentPage={currentPage}
@@ -126,7 +126,7 @@ export default function VerificationPanel() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col overflow-y-auto bg-gray-50 p-4">
+<div className="flex-1 min-w-0 flex flex-col overflow-y-auto">
           <DynamicForm
             surveyId={currentSurveyId}
             fieldSpecs={fieldSpecs ?? []}

@@ -139,8 +139,8 @@ export default function DynamicForm({
   const nextPage = () => setSelectedPage(surveyId, selectedPage + 1);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto">
+    <div className="flex flex-col w-full h-full">
+      <div className={`flex-1 overflow-y-auto w-full px-3 py-1.5 ${pageFields.length > 8 ? 'grid grid-cols-2 gap-x-3' : 'space-y-0'}`}>
         {pageFields.map((field) => (
           <div key={field.name} onBlur={() => handleBlur(field)}>
             <FieldRenderer
@@ -157,23 +157,23 @@ export default function DynamicForm({
         )}
       </div>
 
-      <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3">
+      <div className="flex items-center justify-between border-t border-gray-200 bg-white px-3 py-2">
         <button
           onClick={prevPage}
           disabled={selectedPage === 0}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed"
         >
           ◀ Poprzednia strona
         </button>
 
-        <span className="text-sm text-gray-500">
+        <span className="text-xs text-gray-500">
           Strona {selectedPage + 1} z {TOTAL_PAGES}
         </span>
 
         {selectedPage < TOTAL_PAGES - 1 ? (
           <button
             onClick={nextPage}
-            className="px-4 py-2 text-sm font-medium text-white bg-[var(--color-info)] rounded hover:opacity-90"
+            className="px-3 py-1.5 text-xs font-medium text-white bg-[var(--color-info)] rounded hover:opacity-90"
           >
             Następna strona ▶
           </button>
@@ -181,7 +181,7 @@ export default function DynamicForm({
           <button
             onClick={handleSave}
             disabled={disabled || saving}
-            className="px-4 py-2 text-sm font-medium text-white bg-[var(--color-success)] rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-xs font-medium text-white bg-[var(--color-success)] rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? 'Zapisywanie...' : 'Zatwierdź ankietę'}
           </button>

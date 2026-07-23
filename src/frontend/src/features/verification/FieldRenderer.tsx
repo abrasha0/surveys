@@ -8,7 +8,7 @@ interface FieldRendererProps {
   showErrors: boolean;
 }
 
-const baseInputClass = 'w-full border rounded px-3 py-2 focus:ring-2 focus:ring-[var(--color-info)] focus:outline-none';
+const baseInputClass = 'w-full border rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-[var(--color-info)] focus:outline-none';
 const errorInputClass = 'border-red-500 focus:ring-red-500';
 
 export default function FieldRenderer({ field, value, onChange, error, showErrors }: FieldRendererProps) {
@@ -48,7 +48,7 @@ export default function FieldRenderer({ field, value, onChange, error, showError
       case 'text':
         return (
           <textarea
-            rows={3}
+            rows={2}
             value={String(value ?? '')}
             onChange={(e) => handleChange(e.target.value)}
             className={inputClass}
@@ -60,13 +60,13 @@ export default function FieldRenderer({ field, value, onChange, error, showError
   };
 
   return (
-    <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+    <div className="mb-1.5">
+      <label className="block text-xs font-medium text-gray-700 mb-0.5">
         {field.label}
       </label>
       {renderInput()}
       {showErrors && error && (
-        <p className="text-red-600 text-sm mt-1">{error}</p>
+        <p className="text-red-600 text-xs mt-0.5">{error}</p>
       )}
     </div>
   );
