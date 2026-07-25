@@ -6,11 +6,12 @@ export interface FieldSpec {
   name: string;
   label: string;
   page: number;
-  kind: 'select' | 'text' | 'number';
+  kind: 'radio' | 'text' | 'number';
   choices: string[] | null;
   min: number | null;
   max: number | null;
   csv_header: string;
+  conditional: string | null;
 }
 
 export interface SurveyListItem {

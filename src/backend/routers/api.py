@@ -37,6 +37,7 @@ def get_field_specs():
             "min": f.min,
             "max": f.max,
             "csv_header": f.get_csv_header(),
+            "conditional": f.conditional,
         }
         for f in ALL_FIELDS
     ]
@@ -181,7 +182,7 @@ def save_survey(survey_id: int, request: SaveRequest):
     for f in ALL_FIELDS:
         raw = request.values.get(f.name)
         spec = FIELD_SPEC_BY_NAME.get(f.name)
-        if spec and spec.kind == "select":
+        if spec and spec.kind == "radio":
             if raw is not None and spec.choices and raw in spec.choices:
                 normalized[f.name] = raw
             elif raw is not None and spec.choices:

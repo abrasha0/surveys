@@ -105,7 +105,7 @@ class MedicalSurvey(BaseModel):
         if not spec:
             return v
         # Jeśli to select, sprawdź czy wartość jest w dozwolonych
-        if spec.kind == "select":
+        if spec.kind == "radio":
             if v is None:
                 return None
             if isinstance(v, str):
