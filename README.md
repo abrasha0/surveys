@@ -30,7 +30,7 @@ Automatyczny system wprowadzania ankiet papierowych do formy cyfrowej z wykorzys
    .\scripts\run_dev.ps1
    ```
 
-Aplikacja dostępna pod `http://localhost:8000` (produkcja) lub `http://localhost:5173` (dev frontend z proxy API). Domyślne hasło: `a`.
+Aplikacja dostępna pod `http://localhost:8000` (produkcja) lub `http://localhost:5173` (dev frontend z proxy API). Hasło ustawiasz w `config.yaml` — `config.yaml.example` to szablon z pustym placeholderem, przed startem ustaw własne.
 
 > **Wymagania:** Python ≥ 3.12, Node.js (dla frontendu React).
 
@@ -39,7 +39,7 @@ Aplikacja dostępna pod `http://localhost:8000` (produkcja) lub `http://localhos
 - Logowanie hasłem do aplikacji (HMAC cookie, single-user session)
 - Automatyczna analiza zdjęć ankiet przez VLM (Ollama) + Text LLM
 - Dwuetapowe przetwarzanie: VLM → tekst → Text LLM → JSON (70 pól na 5 stronach)
-- Globalny asynchroniczny worker w tle z kolejką, retry 3x, ETA (rolling average) i możliwością zatrzymania
+- Globalny asynchroniczny worker w tle z kolejką, retry (per-request do Ollamy + per-survey w workerze), ETA (rolling average) i możliwością zatrzymania
 - Interleaved verification — weryfikacja gotowych ankiet w trakcie przetwarzania kolejnych
 - Weryfikacja i korekta odczytanych danych w interfejsie side-by-side (podział 40/60)
 - Dwuetapowe zatwierdzanie: walidacja → "Zatwierdź mimo błędów" (force save)
@@ -57,9 +57,22 @@ Aplikacja dostępna pod `http://localhost:8000` (produkcja) lub `http://localhos
 ## Konfiguracja
 
 Aplikacja wykorzystuje `config.yaml` jako główne źródło konfiguracji.
-Skopiuj `config.yaml.example` i dostosuj do swojego środowiska.
+Skopiuj `config.yaml.example` → `config.yaml` i **dostosuj do swojego środowiska**:
+- **Hasło:** ustaw własne w `app.password`
+- **Modele AI:** dobierz do swojego hardware (patrz niżej)
+- **Ścieżki:** opcjonalnie dostosuj katalogi
 
 Zmienne środowiskowe z prefiksem `ANKIETER_*` nadpisują wartości z pliku YAML.
+Przykład: `$env:ANKIETER_VLM_MODEL="moondream"` zmienia model VLM bez edycji pliku.
+
+System rozróżnia dwa osobne retry: `ai.max_retries` (ponawianie pojedynczego
+requestu do Ollamy) oraz `processing.worker_max_retries` (ponawianie całej
+ankiety po 3 nieudanych próbach).
+
+> **Dobór modeli AI:**
+> - GPU ≥8GB VRAM — sprawdź średnie modele, np. `qwen3-vl:8b` + `llama3.1`
+> - Słabszy sprzęt / testy — lekkie modele, np. `moondream` + `llama3.2:3b`
+> - Zestaw przykładowy i komentarze: `config.yaml.example`
 
 Szczegóły: patrz `config.yaml.example` (skomentowane klucze) oraz `docs/main-doc.md`.
 

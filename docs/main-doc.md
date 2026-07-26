@@ -18,7 +18,9 @@ wynik do CSV.
 u dewelopera, dostęp przez Cloudflare tunnel.
 
 **Model przetwarzania:** Jeden globalny asynchroniczny worker w tle (asyncio.Task),
-przetwarzający ankiety sekwencyjnie z retry do 3 razy na ankietę.
+przetwarzający ankiety sekwencyjnie. System rozróżnia dwa poziomy retry:
+`ai.max_retries` (ponawianie pojedynczego requestu do Ollamy) oraz
+`processing.worker_max_retries` (ponawianie całej ankiety w workerze).
 
 ---
 
@@ -52,8 +54,12 @@ Aplikacja przetwarza każdą ankietę sekwencyjnie — stronę po stronie.
 Dla każdej strony kolejno:
 
 1. **Pre-processing obrazu** — resize (max 2000px), grayscale, contrast (Pillow)
-2. **VLM (qwen3-vl:8b, alternatywnie deepseek-ocr)** — ekstrakcja surowego tekstu z obrazu
-3. **Text LLM (llama3.1)** — formatowanie surowego tekstu do struktury JSON
+2. **VLM** — ekstrakcja surowego tekstu z obrazu (model skonfigurowany w `config.yaml`)
+3. **Text LLM** — formatowanie surowego tekstu do struktury JSON
+
+    > **Dobór modeli:** `config.yaml.example` zawiera przykładowy zestaw. Na GPU ≥8GB VRAM
+    > sprawdź modele średniej wielkości (np. `qwen3-vl:8b` + `llama3.1`).
+    > Na słabszym sprzęcie lub do testów — lekkie modele (np. `moondream` + `llama3.2:3b`).
 
 Następnie: strona 2, strona 3, ..., strona 5. Wyniki 5 stron są merge'owane
 do jednego obiektu MedicalSurvey.
@@ -114,7 +120,7 @@ Sekcje:
 ## Flow użytkownika
 
 ### 1. Logowanie
-Użytkownik wpisuje hasło (domyślne: `a`). Hasło skonfigurowane w `config.yaml`.
+Użytkownik wpisuje hasło skonfigurowane w `config.yaml` (patrz `config.yaml.example` — szablon z pustym hasłem jako placeholder; przed uruchomieniem ustaw własne).
 
 ### 2. Skanowanie lokalnego katalogu
 System skanuje katalog `surveys_data` (konfigurowalny w `config.yaml`) i grupuje
@@ -174,6 +180,11 @@ Sekcje `config.yaml`:
 | `processing` | progress_vlm_weight, progress_text_weight, history_display_limit, worker_max_retries, eta_rolling_window, survey_cache_dir |
 | `prompts`    | VLM, text_format + **5 schematów JSON per-strona** (`page_1_json_schema`..`page_5_json_schema`) |
 
+> **Uwaga — dwa osobne retry:** System rozróżnia `ai.max_retries` (ponawianie
+> pojedynczego requestu do Ollamy, np. przy timeout) oraz
+> `processing.worker_max_retries` (ponawianie całej ankiety w workerze po 3
+> nieudanych próbach). Oba konfigurowalne w `config.yaml`.
+
 ### Zmienne środowiskowe
 Zmienne z prefiksem `ANKIETER_*` nadpisują wartości z pliku YAML.
 Przykład: `ANKIETER_VLM_MODEL=custom-model` zmienia model VLM.
@@ -217,7 +228,7 @@ cd src/backend; uvicorn main:app --port 8000            # Start aplikacji
 .\scripts\deploy_tunnel.ps1      # Tylko tunel
 ```
 
-Aplikacja dostępna pod `http://localhost:8000`. Domyślne hasło: `a`.
+Aplikacja dostępna pod `http://localhost:8000`. Hasło ustawiasz w `config.yaml` (szablon w `config.yaml.example` ma pusty placeholder).
 
 ### Uruchomienie deweloperskie (hot-reload)
 ```powershell

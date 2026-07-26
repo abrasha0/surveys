@@ -17,23 +17,23 @@ oraz stylu życia respondenta.
 
 | #  | Nazwa pola     | Etykieta                              | Typ    | Dozwolone wartości                                                                                         | Nagłówek CSV                                          |
 |----|----------------|---------------------------------------|--------|------------------------------------------------------------------------------------------------------------|-------------------------------------------------------|
-| 1  | `p1_plec`      | 1. Płeć                               | select | Kobieta, Mężczyzna, Nie chcę podawać                                                                      | Płeć                                                  |
+| 1  | `p1_plec`      | 1. Płeć                               | radio | Kobieta, Mężczyzna, Nie chcę podawać                                                                      | Płeć                                                  |
 | 2  | `p2_wiek`      | 2. Wiek                               | number | 18-80 (dowolny tekst z regex `\d+`)                                                                        | Wiek                                                  |
-| 3  | `p3_miejsce`   | 3. Miejsce zamieszkania               | select | Wieś, Miasto do 50 tys. mieszkańców, Miasto 50-100 tys. mieszkańców, Miasto powyżej 100 tys. mieszkańców    | Miejsce zamieszkania                                  |
-| 4  | `p4_stan`      | 4. Stan cywilny                       | select | Panna/kawaler, W związku nieformalnym, Mężatka/żonaty, Rozwiedziona/rozwiedziony, Wdowa/wdowiec            | Stan cywilny                                          |
-| 5  | `p5_forma`     | 5. Forma zamieszkania                 | select | Z rodziną, W akademiku, W wynajmowanym mieszkaniu/pokoju, Inne                                           | Forma zamieszkania w trakcie studiów                 |
+| 3  | `p3_miejsce`   | 3. Miejsce zamieszkania               | radio | Wieś, Miasto do 50 tys. mieszkańców, Miasto 50-100 tys. mieszkańców, Miasto powyżej 100 tys. mieszkańców    | Miejsce zamieszkania                                  |
+| 4  | `p4_stan`      | 4. Stan cywilny                       | radio | Panna/kawaler, W związku nieformalnym, Mężatka/żonaty, Rozwiedziona/rozwiedziony, Wdowa/wdowiec            | Stan cywilny                                          |
+| 5  | `p5_forma`     | 5. Forma zamieszkania                 | radio | Z rodziną, W akademiku, W wynajmowanym mieszkaniu/pokoju, Inne                                           | Forma zamieszkania w trakcie studiów                 |
 | 6  | `p5_inne`      | 5a. Inne (zamieszkanie)               | text   | (dowolny tekst)                                                                                            | Inne (forma zamieszkania)                             |
-| 7  | `p6_stopien`   | 6. Stopień studiów                    | select | Studia I stopnia, Studia II stopnia                                                                        | Stopień studiów                                       |
+| 7  | `p6_stopien`   | 6. Stopień studiów                    | radio | Studia I stopnia, Studia II stopnia                                                                        | Stopień studiów                                       |
 | 8  | `p7_uczelnia`  | 7. Uczelnia                           | text   | (dowolny tekst)                                                                                            | Na jakiej uczelni studiujesz?                          |
-| 9  | `p8_praca`     | 8. Praca w trakcie studiów?            | select | Tak, w zawodzie medycznym, Tak, poza zawodem, Nie (Jeśli zaznaczyłaś/eś tą odpowiedź, przejdź do pytania nr 12) | Czy pracujesz zawodowo w trakcie studiów?    |
-| 10 | `p9_system`    | 9. System pracy                       | select | Zmianowym, 12-godzinnym, Jednozmianowym, 8-godzinnym, Innym                                               | Jeśli pracujesz w zawodzie, to w jakim systemie       |
+| 9  | `p8_praca`     | 8. Praca w trakcie studiów?            | radio | Tak, w zawodzie medycznym, Tak, poza zawodem, Nie (Jeśli zaznaczyłaś/eś tą odpowiedź, przejdź do pytania nr 12) | Czy pracujesz zawodowo w trakcie studiów?    |
+| 10 | `p9_system`    | 9. System pracy                       | radio | Zmianowym, 12-godzinnym, Jednozmianowym, 8-godzinnym, Innym                                               | Jeśli pracujesz w zawodzie, to w jakim systemie       |
 | 11 | `p9_inne`      | 9a. Inne (system pracy)               | text   | (dowolny tekst)                                                                                            | Inne (system pracy)                                   |
-| 12 | `p10_oddzial`  | 10. Rodzaj oddziału                   | select | Zachowawczym, Zabiegowym, Inne                                                                             | Na jakim rodzaju oddziału pracujesz?                  |
+| 12 | `p10_oddzial`  | 10. Rodzaj oddziału                   | radio | Zachowawczym, Zabiegowym, Inne                                                                             | Na jakim rodzaju oddziału pracujesz?                  |
 | 13 | `p10_inne`     | 10a. Inne (oddział)                   | text   | (dowolny tekst)                                                                                            | Inne (oddział)                                        |
 | 14 | `p11_staz`     | 11. Staż pracy                        | text   | (dowolny tekst)                                                                                            | Jaki jest Twój staż pracy                             |
-| 15 | `p12_sen`      | 12. Średnia liczba godzin snu         | select | poniżej 5 godzin, 5-6 godzin, 7-8 godzin, Powyżej 8 godzin                                                | Jaka jest Twoja średnia liczba godzin snu w ciągu doby? |
-| 16 | `p13_ekran`    | 13. Godziny przed ekranem             | select | Mniej niż 1 godzinę, 1-3 godziny, Powyżej 3 godzin                                                        | Ile godzin dziennie spędzasz przed ekranem             |
-| 17 | `p14_kofeina`  | 14. Spożycie kofeiny                  | select | Nie, Tak, 1-2 porcje dziennie, Tak, 3 lub więcej porcji dziennie                                          | Czy pijesz napoje zawierające kofeinę (kawa, napoje energetyczne)? |
+| 15 | `p12_sen`      | 12. Średnia liczba godzin snu         | radio | poniżej 5 godzin, 5-6 godzin, 7-8 godzin, Powyżej 8 godzin                                                | Jaka jest Twoja średnia liczba godzin snu w ciągu doby? |
+| 16 | `p13_ekran`    | 13. Godziny przed ekranem             | radio | Mniej niż 1 godzinę, 1-3 godziny, Powyżej 3 godzin                                                        | Ile godzin dziennie spędzasz przed ekranem             |
+| 17 | `p14_kofeina`  | 14. Spożycie kofeiny                  | radio | Nie, Tak, 1-2 porcje dziennie, Tak, 3 lub więcej porcji dziennie                                          | Czy pijesz napoje zawierające kofeinę (kawa, napoje energetyczne)? |
 
 ---
 
@@ -144,8 +144,8 @@ Kontynuacja skali MFIS (6 pól) oraz pytania o stan zdrowia (4 pola).
 
 | #  | Nazwa pola          | Etykieta                      | Typ    | Dozwolone wartości | Nagłówek CSV                                               |
 |----|---------------------|-------------------------------|--------|--------------------|-------------------------------------------------------------|
-| 7  | `choroba_anemia`    | Czy stwierdzono anemię?       | select | TAK, NIE           | Czy w ostatnim czasie stwierdzono u Ciebie anemię?          |
-| 8  | `choroba_tarczyca`  | Problemy z tarczycą?          | select | TAK, NIE           | Czy w ostatnim czasie stwierdzono u Ciebie problemy z tarczycą? |
+| 7  | `choroba_anemia`    | Czy stwierdzono anemię?       | radio | TAK, NIE           | Czy w ostatnim czasie stwierdzono u Ciebie anemię?          |
+| 8  | `choroba_tarczyca`  | Problemy z tarczycą?          | radio | TAK, NIE           | Czy w ostatnim czasie stwierdzono u Ciebie problemy z tarczycą? |
 | 9  | `tarczyca_jakie`    | Jakie problemy z tarczycą?    | text   | (dowolny tekst)    | Jeśli odpowiedź na poprzednie pytanie brzmiało "tak", to jakie problemy stwierdzono: |
 | 10 | `choroba_inne`      | Inne choroby                  | text   | (dowolny tekst)    | Czy w ostatnim czasie stwierdzono u Ciebie inne choroby? Jeśli tak, to jakie: |
 
@@ -168,7 +168,7 @@ Encoding: **UTF-8 BOM** (`utf-8-sig`) dla poprawnego otwierania w Excelu.
 
 | Typ pola | Reguła walidacji backend | Wartość przy braku |
 |----------|--------------------------|--------------------|
-| `select` | Dokładne dopasowanie case-insensitive do dozwolonych wartości | `None` |
+| `radio` | Dokładne dopasowanie case-insensitive do dozwolonych wartości | `None` |
 | `number` | Konwersja na `int`, zakres 18-80 (dla wieku) | `None` |
 | `text` | `strip()`, zwraca string | `""` (pusty string) |
 

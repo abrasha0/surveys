@@ -132,7 +132,7 @@ ankiety sekwencyjnie.
 ### domain/field_specs.py — fundament systemu
 
 - **70 pól** na 5 stronach jako `FieldSpec` dataclassy
-- Definiuje: nazwę, etykietę, stronę, typ (select/text/number), dozwolone wartości, nagłówek CSV
+- Definiuje: nazwę, etykietę, stronę, typ (radio/text/number), dozwolone wartości, nagłówek CSV
 - **Najczęściej importowany moduł** — napędza: walidację Pydantic, generowanie promptów,
   rendering formularzy, nagłówki CSV
 - `ALL_FIELDS` — lista wszystkich pól (70 sztuk: 17 + 20 + 8 + 15 + 10)
@@ -142,7 +142,7 @@ ankiety sekwencyjnie.
 
 ### ai/client.py — klient OCR
 
-- Async `httpx.AsyncClient` → lokalny Ollama (domyślnie qwen3-vl:8b + llama3.1)
+- Async `httpx.AsyncClient` → lokalny Ollama (modele VLM + Text LLM skonfigurowane w `config.yaml`)
 - **Sekwencyjne przetwarzanie per-strona**: VLM → Text LLM → następna strona
 - Pre-processing obrazów: resize (max 2000px), grayscale, contrast (Pillow)
 - Retry z exponential backoff (per-request, osobny od retry workera)
@@ -180,6 +180,18 @@ Wszystkie endpointy chronione przez `Depends(get_current_user)` (HMAC cookie):
 - `from_ai_json()` — fabryka z normalizacją (regex wieku, fuzzy match)
 - `normalize_field()` — walidator z `field_specs`
 - `to_csv_row()` — generuje wiersz CSV z timestampem
+
+### domain/csv_export.py — eksport CSV
+
+- `save_survey_to_csv()` — dopisuje zweryfikowany wiersz do pliku CSV
+- Encoding: UTF-8 BOM (`utf-8-sig`) dla poprawnego otwierania w Excelu
+- Kolumny generowane dynamicznie z `ALL_FIELDS` + sygnatura czasowa
+
+### ingestion/file_grouping.py — przetwarzanie wejściowe
+
+- `scan_surveys_from_directory()` — skanuje katalog i grupuje zdjęcia alfabetycznie po 5 sztuk
+- `group_files_into_surveys()` — tworzy listę `SurveyFileGroup` z plików w katalogu
+- Wykrywa brakujące strony i duplikaty
 
 ### config.py — konfiguracja
 

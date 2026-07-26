@@ -1,11 +1,16 @@
 # =============================================================
-# surveysApp — konfiguracja aplikacji
-# Skopiuj do config.yaml i dostosuj do swojego środowiska
+# surveysApp — SZABLON konfiguracji aplikacji
+# 
+# 1. Skopiuj do config.yaml:  Copy-Item config.yaml.example config.yaml
+# 2. DOSTOSUJ do swojego środowiska:
+#    - Ustaw hasło (pole password) — aplikacja nie uruchomi się bez hasła
+#    - Dobierz modele AI do swojego hardware (patrz komentarz w sekcji ai)
+#    - Opcjonalnie: ścieżki, porty, logging
 # =============================================================
 
 app:
   page_title: "surveysApp"        # Tytuł strony w przeglądarce
-  password: "a"                   # Hasło do logowania
+  password: ""                    # Hasło do logowania — ustaw własne przed uruchomieniem
   csv_results: "working_vault/wyniki.csv"       # Nazwa pliku wynikowego CSV
   cache_file: "working_vault/cache_results.json"  # Ścieżka do cache wyników AI (nieużywane od Etapu 3)
   surveys_dir: "working_vault/surveys_data"     # Katalog ze zdjęciami ankiet
@@ -17,6 +22,8 @@ app:
 ai:
   vlm_model: "qwen3-vl:8b"       # Model wizyjny (VLM) do ekstrakcji tekstu
   # vlm_model: "deepseek-ocr"     # Alternatywny VLM
+  # Na mocnym GPU (>=8GB VRAM): qwen3-vl:8b + llama3.1
+  # Na słabszym sprzęcie / do testów: moondream + llama3.2:3b
   text_model: "llama3.1"          # Model tekstowy do formatowania JSON
   ollama_url: "http://localhost:11434"  # URL serwera Ollama
   max_retries: 3                  # Maksymalna liczba ponawiań przy błędach (per-request)

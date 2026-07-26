@@ -16,3 +16,4 @@ dist/*
 config.yaml
 working_vault/
 src/frontend/dist/
+.tmp/
