@@ -6,7 +6,6 @@ interface FieldRendererProps {
   onChange: (name: string, value: unknown) => void;
   error?: string;
   showErrors: boolean;
-  allValues?: Record<string, unknown>;
 }
 
 const baseInputClass = 'w-full border rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-[var(--color-info)] focus:outline-none';
@@ -16,15 +15,16 @@ function RadioCardGroup({
   choices,
   value,
   onChange,
-  inputClass,
 }: {
   choices: string[];
   value: unknown;
   onChange: (val: string) => void;
-  inputClass: string;
 }) {
+  const isBinaryTakNie = choices.length === 2 &&
+    choices.every((c) => c.toUpperCase() === 'TAK' || c.toUpperCase() === 'NIE');
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+    <div className={`grid gap-1.5 ${isBinaryTakNie ? 'grid-cols-2' : 'grid-cols-1'}`}>
       {choices.map((choice) => {
         const selected = String(value ?? '') === choice;
         return (
@@ -32,7 +32,7 @@ function RadioCardGroup({
             key={choice}
             type="button"
             onClick={() => onChange(choice)}
-            className={`flex items-center gap-2 px-2.5 py-2 rounded border text-xs text-left transition-all cursor-pointer
+            className={`flex items-center gap-2 px-3 py-2.5 rounded border text-xs text-left transition-all cursor-pointer
               ${selected
                 ? 'border-[var(--color-info)] bg-[var(--color-info)]/10'
                 : 'border-gray-200 bg-white hover:border-gray-400 hover:bg-gray-50'
@@ -51,55 +51,23 @@ function RadioCardGroup({
   );
 }
 
-function checkCondition(conditional: string, allValues: Record<string, unknown>): boolean {
-  const eqIdx = conditional.indexOf('=');
-  if (eqIdx === -1) return false;
-  const sourceField = conditional.slice(0, eqIdx);
-  const expectedValue = conditional.slice(eqIdx + 1);
-  return String(allValues[sourceField] ?? '') === expectedValue;
-}
-
-export default function FieldRenderer({ field, value, onChange, error, showErrors, allValues = {} }: FieldRendererProps) {
+export default function FieldRenderer({ field, value, onChange, error, showErrors }: FieldRendererProps) {
   const inputClass = `${baseInputClass} ${showErrors && error ? errorInputClass : 'border-gray-300'}`;
 
   const handleChange = (val: string) => {
     onChange(field.name, val);
   };
 
-  if (field.conditional && !checkCondition(field.conditional, allValues)) {
-    return null;
-  }
-
   if (field.kind === 'radio') {
     return (
-      <div className="mb-1.5">
-        <label className="block text-xs font-medium text-gray-700 mb-0.5">
+      <div className="mb-2.5">
+        <label className="block text-xs font-medium text-gray-700 mb-1.5">
           {field.label}
         </label>
         <RadioCardGroup
           choices={field.choices ?? []}
           value={value}
           onChange={handleChange}
-          inputClass={inputClass}
-        />
-        {showErrors && error && (
-          <p className="text-red-600 text-xs mt-0.5">{error}</p>
-        )}
-      </div>
-    );
-  }
-
-  if (field.kind === 'text' && field.conditional) {
-    return (
-      <div className="mb-1.5 ml-4">
-        <label className="block text-xs font-medium text-gray-700 mb-0.5">
-          {field.label}
-        </label>
-        <textarea
-          rows={2}
-          value={String(value ?? '')}
-          onChange={(e) => handleChange(e.target.value)}
-          className={inputClass}
         />
         {showErrors && error && (
           <p className="text-red-600 text-xs mt-0.5">{error}</p>
@@ -119,7 +87,7 @@ export default function FieldRenderer({ field, value, onChange, error, showError
             min={field.min ?? undefined}
             max={field.max ?? undefined}
             step={1}
-            className={inputClass}
+            className={`${inputClass} ${field.name === 'p2_wiek' ? 'max-w-[100px]' : ''}`}
           />
         );
       case 'text':
@@ -137,13 +105,13 @@ export default function FieldRenderer({ field, value, onChange, error, showError
   };
 
   return (
-    <div className="mb-1.5">
-      <label className="block text-xs font-medium text-gray-700 mb-0.5">
+    <div className="mb-2.5">
+      <label className="block text-xs font-medium text-gray-700 mb-1.5">
         {field.label}
       </label>
       {renderInput()}
       {showErrors && error && (
-        <p className="text-red-600 text-xs mt-0.5">{error}</p>
+        <p className="text-red-600 text-sm mt-0.5">{error}</p>
       )}
     </div>
   );
