@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator
-from domain.field_specs import FIELD_SPEC_BY_NAME, ALL_FIELDS
+from domain.field_specs import FIELD_SPEC_BY_NAME, ALL_FIELDS, CSV_FIELDS
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -134,9 +134,10 @@ class MedicalSurvey(BaseModel):
         return v
 
     def to_csv_row(self) -> list:
-        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        dt = datetime.now()
+        ts = f"{dt.month}/{dt.day}/{dt.year} {dt.hour:02d}:{dt.minute:02d}:{dt.second:02d}"
         row = [ts]
-        for f in ALL_FIELDS:
+        for f in CSV_FIELDS:
             val = getattr(self, f.name, "")
             row.append(str(val) if val is not None else "")
         return row

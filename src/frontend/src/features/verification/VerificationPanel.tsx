@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSurveys, useFieldSpecs, useSurveyResult, useSaveSurvey, useProcessingStatus, useSurveyImages } from '../../api/hooks';
 import { useVerificationStore } from '../../store/verificationStore';
@@ -10,6 +10,7 @@ import DynamicForm from './DynamicForm';
 export default function VerificationPanel() {
   const navigate = useNavigate();
   const [currentSurveyId, setCurrentSurveyId] = useState<number | null>(null);
+  const formRef = useRef<{ save: () => void }>(null);
   const { data: surveys } = useSurveys();
   const { data: fieldSpecs } = useFieldSpecs();
   const saveSurveyMutation = useSaveSurvey();
@@ -109,7 +110,7 @@ export default function VerificationPanel() {
         currentIndex={currentIndex}
         onPrev={handlePrevSurvey}
         onNext={handleNextSurvey}
-        onSave={() => {}}
+        onSave={() => formRef.current?.save()}
         onSurveyChange={handleSurveyChange}
       />
 
@@ -127,6 +128,7 @@ export default function VerificationPanel() {
 
 <div className="flex-1 min-w-0 flex flex-col overflow-y-auto">
           <DynamicForm
+            ref={formRef}
             surveyId={currentSurveyId}
             fieldSpecs={fieldSpecs ?? []}
             aiResult={surveyResult?.result ?? null}

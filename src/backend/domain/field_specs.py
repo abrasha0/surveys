@@ -231,7 +231,19 @@ PAGE4_FIELDS = [
 
 
 # ============================================================
-# Zbiór wszystkich pól
+# Kolejność kolumn dla exportu CSV: Demografia → MFIS → Health → Sen → CES-D
+# ============================================================
+CSV_FIELDS = (
+    PAGE0_FIELDS +                                           # Demografia (17)
+    PAGE3_FIELDS +                                           # MFIS 1-15
+    [f for f in PAGE4_FIELDS if f.name.startswith("mfis_")] +  # MFIS 16-21
+    [f for f in PAGE4_FIELDS if not f.name.startswith("mfis_")] +  # Health (4)
+    PAGE2_FIELDS +                                           # Sen (8)
+    PAGE1_FIELDS                                             # CES-D (20)
+)
+
+# ============================================================
+# Zbiór wszystkich pól (do UI / promptów / walidacji)
 # ============================================================
 ALL_FIELDS = (
     PAGE0_FIELDS +

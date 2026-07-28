@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useMemo, useState } from 'react';
 import type { FieldSpec } from '../../api/hooks';
 import { useVerificationStore } from '../../store/verificationStore';
 import { useSpaceShortcut } from '../../hooks/useSpaceShortcut';
@@ -62,14 +62,14 @@ function validateFields(
   return errors;
 }
 
-export default function DynamicForm({
+const DynamicForm = forwardRef<{ save: () => void }, DynamicFormProps>(function DynamicForm({
   surveyId,
   fieldSpecs,
   aiResult,
   onSave,
   onNextSurvey,
   disabled = false,
-}: DynamicFormProps) {
+}, ref) {
   const selectedPage = useVerificationStore((s) => s.getSurveyUI(surveyId).selectedPage);
   const showErrors = useVerificationStore((s) => s.getSurveyUI(surveyId).showErrors);
   const draftValues = useVerificationStore((s) => s.getSurveyUI(surveyId).draftValues);
@@ -135,7 +135,7 @@ export default function DynamicForm({
   );
 
   const handleSave = useCallback(async () => {
-    const allErrors = validateFields(fieldSpecs, draftValues);
+    const allErrors = validateFields(fieldSpecs, allValues);
     setErrors(allErrors);
     setShowErrors(surveyId, true);
 
@@ -143,7 +143,7 @@ export default function DynamicForm({
 
     setSaving(true);
     try {
-      await onSave({ ...draftValues });
+      await onSave({ ...allValues });
       clearDraft(surveyId);
       setErrors({});
       setShowErrors(surveyId, false);
@@ -151,7 +151,9 @@ export default function DynamicForm({
     } finally {
       setSaving(false);
     }
-  }, [fieldSpecs, draftValues, onSave, clearDraft, surveyId, setShowErrors, onNextSurvey]);
+  }, [fieldSpecs, allValues, onSave, clearDraft, surveyId, setShowErrors, onNextSurvey]);
+
+  useImperativeHandle(ref, () => ({ save: handleSave }), [handleSave]);
 
   useSpaceShortcut(!disabled && !saving, handleSave);
 
@@ -243,4 +245,6 @@ export default function DynamicForm({
       </div>
     </div>
   );
-}
+});
+
+export default DynamicForm;
