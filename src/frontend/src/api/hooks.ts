@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 
@@ -75,6 +75,7 @@ export function useProcessingStatus() {
 export function useSurveyImages(surveyId: number | null) {
   const [data, setData] = useState<Record<number, string | null> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const cacheBustRef = useRef(Date.now());
 
   useEffect(() => {
     if (surveyId === null) {
@@ -82,6 +83,7 @@ export function useSurveyImages(surveyId: number | null) {
       return;
     }
 
+    cacheBustRef.current = Date.now();
     setIsLoading(true);
     let cancelled = false;
 
@@ -90,7 +92,7 @@ export function useSurveyImages(surveyId: number | null) {
       const entries = await Promise.all(
         pages.map(async (page) => {
           try {
-            const url = `/api/surveys/${surveyId}/pages/${page}/image`;
+            const url = `/api/surveys/${surveyId}/pages/${page}/image?_=${cacheBustRef.current}`;
             const res = await fetch(url, { credentials: 'include' });
             if (!res.ok) return { page, url: null as string | null };
             const blob = await res.blob();
@@ -184,6 +186,17 @@ export function useSaveSurvey() {
 
 export function surveyImageUrl(surveyId: number, page: number): string {
   return `/api/surveys/${surveyId}/pages/${page}/image`;
+}
+
+export function useClearSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ status: string }>('/api/session/clear', { method: 'POST' }),
+    onSettled: () => {
+      queryClient.clear();
+    },
+  });
 }
 
 export function useExportCsv() {

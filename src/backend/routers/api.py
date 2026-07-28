@@ -1,14 +1,21 @@
 import logging
+import hashlib
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, ValidationError
 
 from auth import get_current_user
 from config import config
-from data_handler import export_csv_path, save_survey_cache
+from data_handler import (
+    archive_csv,
+    archive_processed,
+    clear_cache_file,
+    clear_survey_cache_dir,
+    export_csv_path,
+)
 from domain.csv_export import save_survey_to_csv
 from domain.field_specs import ALL_FIELDS, FIELD_SPEC_BY_NAME
 from domain.schemas import MedicalSurvey
@@ -82,7 +89,7 @@ def export_csv():
 
 
 @router.get("/surveys/{survey_id}/pages/{page_num}/image")
-def get_survey_image(survey_id: int, page_num: int):
+def get_survey_image(survey_id: int, page_num: int, if_none_match: Optional[str] = None):
     surveys_dir = config.app.get("surveys_dir")
     if not surveys_dir:
         raise HTTPException(status_code=500, detail="surveys_dir not configured")
@@ -92,23 +99,35 @@ def get_survey_image(survey_id: int, page_num: int):
 
     groups = scan_survey_directory(dir_path)
     if survey_id < 0 or survey_id >= len(groups):
-        raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
+        return Response(status_code=404, headers={"Cache-Control": "no-store, private"})
 
     group = groups[survey_id]
     if page_num < 0 or page_num >= len(group):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Page {page_num} out of range (0-{len(group) - 1})",
+        return Response(
+            status_code=410,
+            headers={"Cache-Control": "no-store, private"},
         )
 
     file_path = group[page_num]
     if not file_path.is_file():
-        raise HTTPException(status_code=404, detail=f"File not found: {file_path.name}")
+        return Response(status_code=404, headers={"Cache-Control": "no-store, private"})
+
+    stat = file_path.stat()
+    etag = hashlib.md5(f"{file_path.name}:{stat.st_mtime_ns}:{stat.st_size}".encode()).hexdigest()
+
+    if if_none_match and if_none_match.strip('"') == etag:
+        return Response(status_code=304, headers={
+            "ETag": f'"{etag}"',
+            "Cache-Control": "no-store, private",
+        })
 
     return FileResponse(
         path=str(file_path),
         media_type="image/jpeg",
-        headers={"Cache-Control": "private, max-age=86400"},
+        headers={
+            "Cache-Control": "no-store, private",
+            "ETag": f'"{etag}"',
+        },
     )
 
 
@@ -162,6 +181,23 @@ async def processing_stop():
         raise HTTPException(status_code=400, detail="Worker not running")
     await worker.stop()
     return {"status": "stopping"}
+
+
+@router.post("/session/clear")
+def clear_session():
+    worker = get_worker()
+    if worker.state.is_running:
+        raise HTTPException(status_code=400, detail="Cannot clear session while processing")
+
+    archive_processed()
+    archive_csv()
+    clear_survey_cache_dir()
+    clear_cache_file()
+
+    worker.state.reset()
+
+    logger.info("Session cleared and archived")
+    return {"status": "cleared"}
 
 
 @router.post("/surveys/{survey_id}/save")
@@ -226,8 +262,7 @@ def save_survey(survey_id: int, request: SaveRequest):
     csv_path = export_csv_path()
     save_survey_to_csv(survey_data, csv_path)
 
-    worker.state.mark_verified(survey_id)
-    save_survey_cache(survey_id, {}, "verified")
+    worker.state.mark_verified(survey_id, result=normalized)
 
     logger.info("Survey %d saved to CSV: %s", survey_id, csv_path)
     return {

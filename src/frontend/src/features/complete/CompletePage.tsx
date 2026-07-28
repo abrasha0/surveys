@@ -1,10 +1,18 @@
-import { useExportCsv } from '../../api/hooks';
+import { useClearSession, useExportCsv } from '../../api/hooks';
+import { useVerificationStore } from '../../store/verificationStore';
 
 export default function CompletePage() {
   const exportCsv = useExportCsv();
+  const clearSession = useClearSession();
+  const clearCache = useVerificationStore((s) => s.clearAllCache);
 
   const handleNewSession = () => {
-    window.location.href = '/app';
+    clearCache();
+    clearSession.mutate(undefined, {
+      onSettled: () => {
+        window.location.href = '/app';
+      },
+    });
   };
 
   return (

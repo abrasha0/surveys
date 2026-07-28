@@ -22,6 +22,7 @@ interface VerificationStore {
   clearDraft: (surveyId: number) => void;
   initSurvey: (surveyId: number) => void;
   hydrate: () => void;
+  clearAllCache: () => void;
   hydrateDrafts: () => void;
 }
 
@@ -172,6 +173,12 @@ export const useVerificationStore = create<VerificationStore>((set, get) => ({
       surveysUI[Number(key)] = { selectedPage: page, showErrors: false, draftValues, lastSaved: 0 };
     }
     set({ surveysUI });
+  },
+
+  clearAllCache: () => {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(DRAFTS_KEY);
+    set({ surveysUI: {}, draftTimers: {} });
   },
 
   hydrateDrafts: () => {

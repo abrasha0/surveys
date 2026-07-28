@@ -1,61 +1,68 @@
 import json
 import logging
+import shutil
+import time
 from pathlib import Path
 from config import config
 
 logger = logging.getLogger(__name__)
 
-def save_cache(results: dict):
-    """Zapisuje słownik wyników do pliku JSON."""
-    cache_path = Path(config.app["cache_file"])
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(cache_path, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
-    logger.debug("Cache saved to %s", config.app["cache_file"])
+PROCESSED_FILE = "processed.json"
 
-def load_cache() -> dict:
-    """Ładuje słownik wyników z pliku JSON."""
-    cache_path = Path(config.app["cache_file"])
-    if not cache_path.exists():
+def _processed_path() -> Path:
+    p = Path(config.app["processing_dir"]) / PROCESSED_FILE
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+def load_processed_data() -> dict:
+    path = _processed_path()
+    if not path.exists():
         return {}
-    with open(cache_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    # Klucze mogą być stringami – konwertujemy na int
-    return {int(k): v for k, v in data.items()}
-
-def get_cache_dir() -> Path:
-    cache_dir = Path(config.processing.get("survey_cache_dir", "logs/survey_cache"))
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir
-
-def save_survey_cache(survey_idx: int, result: dict, status: str, error: str | None = None):
-    cache_dir = get_cache_dir()
-    cache_file = cache_dir / f"survey_{survey_idx}.json"
-    data = {"status": status, "result": result, "error": error}
-    with open(cache_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    logger.debug("Survey cache saved: %s", cache_file)
-
-def load_survey_cache(survey_idx: int) -> dict | None:
-    cache_dir = get_cache_dir()
-    cache_file = cache_dir / f"survey_{survey_idx}.json"
-    if not cache_file.exists():
-        return None
-    with open(cache_file, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def load_all_survey_caches() -> dict[int, dict]:
-    cache_dir = get_cache_dir()
-    results = {}
-    for cache_file in cache_dir.glob("survey_*.json"):
-        try:
-            idx = int(cache_file.stem.split("_")[1])
-            with open(cache_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            results[idx] = data
-        except (ValueError, json.JSONDecodeError):
-            continue
-    return results
+def save_processed_data(data: dict):
+    path = _processed_path()
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    logger.debug("Processed data saved to %s", path)
+
+def update_survey_in_processed(survey_id: int, update: dict):
+    data = load_processed_data()
+    surveys = data.setdefault("surveys", {})
+    if str(survey_id) in surveys:
+        surveys[str(survey_id)].update(update)
+    else:
+        surveys[str(survey_id)] = update
+    data["updated_at"] = time.time()
+    save_processed_data(data)
+
+def archive_processed():
+    path = _processed_path()
+    if path.exists():
+        archived = path.with_suffix(".json.old")
+        shutil.move(str(path), str(archived))
+        logger.info("Archived %s -> %s", path.name, archived.name)
+
+def archive_csv():
+    csv_path = Path(config.app["csv_results"])
+    if csv_path.exists():
+        archived = csv_path.with_suffix(".csv.old")
+        shutil.move(str(csv_path), str(archived))
+        logger.info("Archived %s -> %s", csv_path.name, archived.name)
+
+def clear_survey_cache_dir():
+    cache_dir = Path(config.processing.get("survey_cache_dir", "logs/survey_cache"))
+    if cache_dir.exists():
+        for f in cache_dir.glob("survey_*.json"):
+            f.unlink()
+            logger.debug("Removed cache: %s", f.name)
+
+def clear_cache_file():
+    cache_path = Path(config.app["cache_file"])
+    if cache_path.exists():
+        cache_path.unlink()
+        logger.debug("Removed cache file: %s", cache_path.name)
 
 def export_csv_path() -> str:
     return config.app["csv_results"]

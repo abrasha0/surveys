@@ -3,7 +3,6 @@ import logging
 
 from ai.client import AIClient, ProcessingStatus
 from config import config
-from data_handler import save_survey_cache
 from worker.state import ProcessingState, SurveyState
 
 logger = logging.getLogger(__name__)
@@ -61,7 +60,6 @@ class ProcessingWorker:
                     progress_callback=self._progress_callback,
                 )
                 self.state.set_survey_status(idx, "ready", result=result)
-                save_survey_cache(idx, result, "ready")
                 return
             except Exception as e:
                 last_error = e
@@ -74,7 +72,6 @@ class ProcessingWorker:
 
         error_msg = str(last_error)[:200] if last_error else "Unknown error"
         self.state.set_survey_status(idx, "error", error=error_msg)
-        save_survey_cache(idx, {}, "error", error_msg)
 
     def _progress_callback(self, status: ProcessingStatus):
         self.state.update_global(

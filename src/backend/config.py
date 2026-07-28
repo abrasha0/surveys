@@ -63,7 +63,7 @@ def _coerce(env_val: str, reference):
 
 def _resolve_config_paths(data: dict) -> None:
     section_map = {
-        "app": ["csv_results", "cache_file", "surveys_dir"],
+        "app": ["csv_results", "cache_file", "surveys_dir", "processing_dir"],
         "logging": ["file"],
         "processing": ["survey_cache_dir"],
     }

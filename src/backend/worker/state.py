@@ -46,60 +46,78 @@ class ProcessingState:
     def is_running(self, value: bool):
         self.global_state.is_running = value
 
+    def _build_from_processed(self, survey_groups: list[list[Path]]):
+        from data_handler import load_processed_data, save_processed_data
+        processed = load_processed_data()
+        cached_surveys = processed.get("surveys", {})
+        self.surveys = []
+        total_pages = 0
+        fresh_surveys = {}
+        for idx, group in enumerate(survey_groups):
+            key = str(idx)
+            s = cached_surveys.get(key)
+            actual_files = [p.name for p in group]
+            if s is not None and s.get("files") == actual_files:
+                status = s.get("status", "queued")
+                result = s.get("result")
+                error = s.get("error_message")
+                fresh_surveys[key] = s
+            else:
+                status = "queued"
+                result = None
+                error = None
+            self.surveys.append(SurveyState(id=idx, files=group, status=status, result=result, error_message=error))
+            total_pages += len(group)
+        self.global_state.total = len(self.surveys)
+        self.global_state.total_pages = total_pages
+        self.global_state.processed = sum(1 for s in self.surveys if s.status in ("ready", "error"))
+        self.global_state.errors = sum(1 for s in self.surveys if s.status == "error")
+        if fresh_surveys != cached_surveys:
+            processed["surveys"] = fresh_surveys
+            save_processed_data(processed)
+
     def ensure_from_cache(self, survey_groups: list[list[Path]]):
         if self.surveys:
             return
-        from data_handler import load_all_survey_caches
-        cached = load_all_survey_caches()
-        self.surveys = []
-        total_pages = 0
-        for idx, group in enumerate(survey_groups):
-            if idx in cached:
-                cache_data = cached[idx]
-                status = cache_data.get("status", "queued")
-                result = cache_data.get("result")
-                error = cache_data.get("error")
-            else:
-                status = "queued"
-                result = None
-                error = None
-            self.surveys.append(SurveyState(id=idx, files=group, status=status, result=result, error_message=error))
-            total_pages += len(group)
-        self.global_state.total = len(self.surveys)
-        self.global_state.total_pages = total_pages
-        self.global_state.processed = sum(1 for s in self.surveys if s.status in ("ready", "error"))
-        self.global_state.errors = sum(1 for s in self.surveys if s.status == "error")
+        self._build_from_processed(survey_groups)
 
     def init_from_surveys(self, survey_groups: list[list[Path]]):
-        from data_handler import load_all_survey_caches
-        cached = load_all_survey_caches()
+        from data_handler import save_processed_data
         self.surveys = []
         total_pages = 0
         for idx, group in enumerate(survey_groups):
-            if idx in cached:
-                cache_data = cached[idx]
-                status = cache_data.get("status", "queued")
-                result = cache_data.get("result")
-                error = cache_data.get("error")
-            else:
-                status = "queued"
-                result = None
-                error = None
-            self.surveys.append(SurveyState(id=idx, files=group, status=status, result=result, error_message=error))
+            self.surveys.append(SurveyState(id=idx, files=group))
             total_pages += len(group)
-        self.global_state.total = len(self.surveys)
-        self.global_state.total_pages = total_pages
-        self.global_state.processed = sum(1 for s in self.surveys if s.status in ("ready", "error"))
-        self.global_state.errors = sum(1 for s in self.surveys if s.status == "error")
-        self.global_state.is_running = True
-        self.global_state.started_at = time.time()
+        self.global_state = GlobalState(
+            total=len(survey_groups),
+            total_pages=total_pages,
+            is_running=True,
+            started_at=time.time(),
+        )
         self.page_times.clear()
         self._counted_pages.clear()
+        save_processed_data({
+            "session_started_at": self.global_state.started_at,
+            "surveys": {},
+            "total_surveys": len(survey_groups),
+            "total_pages": self.global_state.total_pages,
+        })
 
     def get_survey_state(self, survey_id: int) -> SurveyState | None:
         if 0 <= survey_id < len(self.surveys):
             return self.surveys[survey_id]
         return None
+
+    def _persist_survey_to_processed(self, survey_id: int):
+        from data_handler import update_survey_in_processed
+        survey = self.surveys[survey_id]
+        update_survey_in_processed(survey_id, {
+            "status": survey.status,
+            "result": survey.result,
+            "error_message": survey.error_message,
+            "files": [str(p.name) for p in survey.files],
+            "survey_id": survey_id,
+        })
 
     def set_survey_status(self, survey_id: int, status: str,
                           result: dict | None = None, error: str | None = None):
@@ -118,13 +136,15 @@ class ProcessingState:
                 self.global_state.processed_pages += uncounted
             if status == "error":
                 self.global_state.errors += 1
+        self._persist_survey_to_processed(survey_id)
 
-    def mark_verified(self, survey_id: int):
+    def mark_verified(self, survey_id: int, result: dict | None = None):
         survey = self.surveys[survey_id]
         if survey.status != "ready":
             raise ValueError(f"Cannot verify survey in status '{survey.status}'")
         survey.status = "verified"
-        survey.result = None
+        survey.result = result
+        self._persist_survey_to_processed(survey_id)
 
     def mark_page_processed(self, survey_id: int, page_idx: int):
         key = (survey_id, page_idx)
@@ -161,6 +181,13 @@ class ProcessingState:
 
     def is_finished(self) -> bool:
         return all(s.status in ("ready", "error", "verified") for s in self.surveys)
+
+    def reset(self):
+        self.surveys.clear()
+        self.results.clear()
+        self.page_times.clear()
+        self._counted_pages.clear()
+        self.global_state = GlobalState()
 
     def to_global_dict(self) -> dict:
         return {
