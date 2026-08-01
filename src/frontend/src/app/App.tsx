@@ -3,12 +3,21 @@ import AuthGuard from './AuthGuard';
 import AppLayout from './AppLayout';
 import LoginPage from '../features/auth/LoginPage';
 import CompletePage from '../features/complete/CompletePage';
+import WelcomePage from '../features/welcome/WelcomePage';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/welcome"
+          element={
+            <AuthGuard>
+              <WelcomePage />
+            </AuthGuard>
+          }
+        />
         <Route
           path="/app"
           element={
@@ -25,7 +34,7 @@ export default function App() {
             </AuthGuard>
           }
         />
-        <Route path="*" element={<Navigate to="/app" replace />} />
+        <Route path="*" element={<Navigate to="/welcome" replace />} />
       </Routes>
     </BrowserRouter>
   );

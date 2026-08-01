@@ -1,18 +1,12 @@
-import { useClearSession, useExportCsv } from '../../api/hooks';
-import { useVerificationStore } from '../../store/verificationStore';
+import { useNavigate } from 'react-router-dom';
+import { useExportCsv } from '../../api/hooks';
 
 export default function CompletePage() {
+  const navigate = useNavigate();
   const exportCsv = useExportCsv();
-  const clearSession = useClearSession();
-  const clearCache = useVerificationStore((s) => s.clearAllCache);
 
   const handleNewSession = () => {
-    clearCache();
-    clearSession.mutate(undefined, {
-      onSettled: () => {
-        window.location.href = '/app';
-      },
-    });
+    navigate('/welcome');
   };
 
   return (

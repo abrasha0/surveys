@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 
 from ai.client import AIClient, ProcessingStatus
 from config import config
@@ -19,7 +20,18 @@ class ProcessingWorker:
         if self.state.is_running:
             raise RuntimeError("Worker already running")
 
-        self.state.init_from_surveys(survey_groups)
+        self.state.ensure_from_cache(survey_groups)
+
+        if any(s.status in ("ready", "error", "verified") for s in self.state.surveys):
+            self.state.global_state.is_running = True
+            self.state.global_state.started_at = time.time()
+            self.state.global_state.total = len(self.state.surveys)
+            self.state.global_state.total_pages = sum(
+                len(s.files) for s in self.state.surveys
+            )
+        else:
+            self.state.init_from_surveys(survey_groups)
+
         self._stop_event.clear()
         self._task = asyncio.create_task(self._run())
 

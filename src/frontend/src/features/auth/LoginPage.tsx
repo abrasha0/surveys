@@ -12,7 +12,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     login.mutate(password, {
-      onSuccess: () => navigate('/app'),
+      onSuccess: () => navigate('/welcome'),
       onError: (err) => {
         if (err instanceof Error) {
           setError(err.message);

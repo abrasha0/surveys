@@ -70,7 +70,9 @@ class ProcessingState:
             total_pages += len(group)
         self.global_state.total = len(self.surveys)
         self.global_state.total_pages = total_pages
-        self.global_state.processed = sum(1 for s in self.surveys if s.status in ("ready", "error"))
+        processed_surveys = [s for s in self.surveys if s.status in ("ready", "error", "verified")]
+        self.global_state.processed = len(processed_surveys)
+        self.global_state.processed_pages = sum(len(s.files) for s in processed_surveys)
         self.global_state.errors = sum(1 for s in self.surveys if s.status == "error")
         if fresh_surveys != cached_surveys:
             processed["surveys"] = fresh_surveys
