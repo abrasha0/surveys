@@ -40,9 +40,9 @@ if (Test-Path -LiteralPath $WorkingDir) {
         Remove-Item -LiteralPath $LogsDir -Recurse -Force
     }
 
-    if (Test-Path -LiteralPath $ProcessedJson) {
-        Remove-Item -LiteralPath $ProcessedJson -Force
-    }
+    # if (Test-Path -LiteralPath $ProcessedJson) {
+    #     Remove-Item -LiteralPath $ProcessedJson -Force
+    # }
 }
 
 

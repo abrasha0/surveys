@@ -50,6 +50,7 @@ class ProcessingState:
         from data_handler import load_processed_data, save_processed_data
         processed = load_processed_data()
         cached_surveys = processed.get("surveys", {})
+        self.page_times = processed.get("page_times", [])
         self.surveys = []
         total_pages = 0
         fresh_surveys = {}
@@ -77,6 +78,7 @@ class ProcessingState:
         if fresh_surveys != cached_surveys:
             processed["surveys"] = fresh_surveys
             save_processed_data(processed)
+        self._recalculate_eta()
 
     def ensure_from_cache(self, survey_groups: list[list[Path]]):
         if self.surveys:
@@ -119,7 +121,7 @@ class ProcessingState:
             "error_message": survey.error_message,
             "files": [str(p.name) for p in survey.files],
             "survey_id": survey_id,
-        })
+        }, page_times=self.page_times)
 
     def set_survey_status(self, survey_id: int, status: str,
                           result: dict | None = None, error: str | None = None):
@@ -179,6 +181,8 @@ class ProcessingState:
                 remaining += len(current_survey.files) - current_page - 1
             for s in self.surveys[current_survey_id + 1:]:
                 remaining += len(s.files)
+        else:
+            remaining = self.global_state.total_pages - self.global_state.processed_pages
         self.global_state.eta_seconds = avg * remaining if remaining > 0 else 0
 
     def is_finished(self) -> bool:

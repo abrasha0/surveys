@@ -27,13 +27,15 @@ def save_processed_data(data: dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
     logger.debug("Processed data saved to %s", path)
 
-def update_survey_in_processed(survey_id: int, update: dict):
+def update_survey_in_processed(survey_id: int, update: dict, page_times: list[float] | None = None):
     data = load_processed_data()
     surveys = data.setdefault("surveys", {})
     if str(survey_id) in surveys:
         surveys[str(survey_id)].update(update)
     else:
         surveys[str(survey_id)] = update
+    if page_times is not None:
+        data["page_times"] = page_times
     data["updated_at"] = time.time()
     save_processed_data(data)
 
