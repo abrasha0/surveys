@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import {
   useClearSession,
@@ -20,12 +20,23 @@ function formatEta(seconds: number | null | undefined): string {
 export default function WelcomePage() {
   const navigate = useNavigate();
   const [error, setError] = useState('');
+  const [waitingForRunning, setWaitingForRunning] = useState(false);
+  const waitingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { data: surveys } = useSurveys();
   const { data: processingStatus } = useProcessingStatus();
   const startProcessing = useStartProcessing();
   const clearSession = useClearSession();
   const exportCsv = useExportCsv();
   const clearCache = useVerificationStore((s) => s.clearAllCache);
+
+  useEffect(() => {
+    return () => {
+      if (waitingIntervalRef.current) {
+        clearInterval(waitingIntervalRef.current);
+        waitingIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const isRunning = processingStatus?.is_running ?? false;
 
@@ -68,9 +79,27 @@ export default function WelcomePage() {
 
   const handleStart = () => {
     setError('');
+    setWaitingForRunning(true);
     startProcessing.mutate(undefined, {
-      onSuccess: () => navigate('/app'),
+      onSuccess: () => {
+        waitingIntervalRef.current = setInterval(async () => {
+          try {
+            const res = await fetch('/api/processing/status');
+            const data = await res.json();
+            if (data.is_running) {
+              if (waitingIntervalRef.current) {
+                clearInterval(waitingIntervalRef.current);
+                waitingIntervalRef.current = null;
+              }
+              navigate('/app');
+            }
+          } catch {
+            /* keep polling */
+          }
+        }, 500);
+      },
       onError: (err) => {
+        setWaitingForRunning(false);
         if (err instanceof Error) setError(err.message);
       },
     });
@@ -78,17 +107,36 @@ export default function WelcomePage() {
 
   const handleRestart = () => {
     setError('');
+    setWaitingForRunning(true);
     clearCache();
     clearSession.mutate(undefined, {
       onSuccess: () => {
         startProcessing.mutate(undefined, {
-          onSuccess: () => navigate('/app'),
+          onSuccess: () => {
+            waitingIntervalRef.current = setInterval(async () => {
+              try {
+                const res = await fetch('/api/processing/status');
+                const data = await res.json();
+                if (data.is_running) {
+                  if (waitingIntervalRef.current) {
+                    clearInterval(waitingIntervalRef.current);
+                    waitingIntervalRef.current = null;
+                  }
+                  navigate('/app');
+                }
+              } catch {
+                /* keep polling */
+              }
+            }, 500);
+          },
           onError: (err) => {
+            setWaitingForRunning(false);
             if (err instanceof Error) setError(err.message);
           },
         });
       },
       onError: (err) => {
+        setWaitingForRunning(false);
         if (err instanceof Error) setError(err.message);
       },
     });
@@ -153,11 +201,11 @@ export default function WelcomePage() {
           System wprowadzania ankiet papierowych
         </p>
 
-        {stats.total === 0 && (
+        {!waitingForRunning && stats.total === 0 && (
           <p className="text-center text-gray-500">Brak ankiet w katalogu.</p>
         )}
 
-        {stats.total > 0 && stats.processed === 0 && (
+        {!waitingForRunning && stats.total > 0 && stats.processed === 0 && (
           <>
             <p className="text-center text-gray-600 mb-6">
               Znaleziono {stats.total} ankiet. Rozpocznij analizę, aby wygenerować wyniki.
@@ -169,7 +217,7 @@ export default function WelcomePage() {
           </>
         )}
 
-        {stats.total > 0 && stats.processed > 0 && !isCovered && (
+        {!waitingForRunning && stats.total > 0 && stats.processed > 0 && !isCovered && (
           <>
             {statsBlock}
             {etaBlock}
@@ -179,7 +227,7 @@ export default function WelcomePage() {
           </>
         )}
 
-        {isCovered && (
+        {!waitingForRunning && isCovered && (
           <>
             <h2 className="text-lg font-semibold text-center mb-4">
               Wszystkie ankiety przeprocesowane
@@ -226,6 +274,14 @@ export default function WelcomePage() {
               </div>
             </div>
           </>
+        )}
+
+        {waitingForRunning && (
+          <div className="text-center py-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-info)] mx-auto mb-4" />
+            <p className="text-gray-600 font-medium">Uruchamianie procesowania w tle...</p>
+            <p className="text-gray-400 text-sm mt-1">Przygotowywanie ankiet do analizy</p>
+          </div>
         )}
 
         {error && (

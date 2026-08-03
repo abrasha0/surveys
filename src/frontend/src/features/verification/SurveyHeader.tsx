@@ -11,14 +11,19 @@ interface SurveyHeaderProps {
   onSurveyChange: (surveyId: number) => void;
 }
 
-function statusIcon(status: SurveyListItem['status']): string {
+function statusIcon(status: SurveyListItem['status']): React.ReactNode {
   switch (status) {
-    case 'verified': return '\u2713';
-    case 'ready': return '\u27F3';
-    case 'processing': return '\u23F3';
-    case 'queued': return '\u23F8';
-    case 'error': return '\u2717';
-    default: return '';
+    case 'verified': return <span className="text-xs">✓</span>;
+    case 'ready': return <span className="text-xs">↻</span>;
+    case 'processing': return (
+      <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      </svg>
+    );
+    case 'queued': return <span className="text-xs">⏸</span>;
+    case 'error': return <span className="text-xs">✗</span>;
+    default: return null;
   }
 }
 
@@ -76,11 +81,36 @@ export default function SurveyHeader({
   onSave,
   onSurveyChange,
 }: SurveyHeaderProps) {
+  const queuedCount = surveys.filter((s) => s.status === 'queued').length;
+  const processingCount = surveys.filter((s) => s.status === 'processing').length;
+  const readyCount = surveys.filter((s) => s.status === 'ready' || s.status === 'verified').length;
+
   return (
     <div className="flex items-center justify-between px-2 py-2 border-b border-gray-200 bg-white">
-      <span className="font-medium text-sm min-w-fit">
-        Ankieta {currentIndex + 1} z {totalSurveys}
-      </span>
+      <div className="flex items-center gap-3 min-w-fit">
+        <span className="font-medium text-sm">
+          Ankieta {currentIndex + 1} z {totalSurveys}
+        </span>
+        {(queuedCount > 0 || processingCount > 0) && (
+          <div className="flex items-center gap-1.5 text-xs">
+            {queuedCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 font-medium">
+                kolejka: {queuedCount}
+              </span>
+            )}
+            {processingCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                przetwarzanie: {processingCount}
+              </span>
+            )}
+            {readyCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium">
+                gotowe: {readyCount}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="flex-1 flex overflow-x-auto mx-4 gap-1">
         {surveys.map((survey) => {

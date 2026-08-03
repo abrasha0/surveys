@@ -82,7 +82,7 @@ export default function ProcessingProgressBar({
 
   if (isLoading || !status) {
     return (
-      <div className="flex items-center h-12 px-4 bg-gray-100 border-b border-gray-200 text-sm text-gray-400">
+      <div className="flex items-center h-16 px-4 bg-gray-100 border-b border-gray-200 text-sm text-gray-400">
         Ładowanie statusu...
       </div>
     );
@@ -95,16 +95,16 @@ export default function ProcessingProgressBar({
 
   if (total === 0) {
     return (
-      <div className="flex items-center h-12 px-4 bg-gray-100 border-b border-gray-200 text-sm text-gray-400">
+      <div className="flex items-center h-16 px-4 bg-gray-100 border-b border-gray-200 text-sm text-gray-400">
         Brak ankiet do przetworzenia
       </div>
     );
   }
 
   return (
-    <div className="flex items-center h-12 px-4 bg-gray-100 border-b border-gray-200 text-sm gap-4">
+    <div className={`flex items-center h-16 px-4 border-b border-gray-200 text-sm gap-4 ${is_running ? 'bg-blue-50 border-l-4 border-l-[var(--color-info)]' : 'bg-gray-100'}`}>
       <div className="flex-1 flex items-center gap-3 min-w-0">
-        <div className="w-32 h-2.5 bg-gray-300 rounded-full overflow-hidden shrink-0">
+        <div className="w-40 h-3 bg-gray-300 rounded-full overflow-hidden shrink-0">
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
@@ -117,7 +117,7 @@ export default function ProcessingProgressBar({
           />
         </div>
 
-        <span className="text-gray-700 whitespace-nowrap shrink-0">
+        <span className="text-gray-700 whitespace-nowrap shrink-0 text-sm">
           przetworzono: {processed_pages} z {total_pages} stron
           {errors > 0 && <> · Błędy: {errors}</>}
           {is_running && localEtaSeconds === null
@@ -130,25 +130,25 @@ export default function ProcessingProgressBar({
 
       <div className="flex items-center gap-3 shrink-0">
         {activity && (
-          <span className="text-gray-500 truncate max-w-64">{activity}</span>
+          <span className="text-gray-700 truncate max-w-72 text-sm font-medium">{activity}</span>
         )}
 
         {is_running ? (
-          <span className="flex items-center gap-1.5 text-[var(--color-info)] font-medium">
-            <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-info)] animate-pulse" />
+          <span className="flex items-center gap-1.5 text-[var(--color-info)] font-semibold text-sm">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[var(--color-info)] animate-pulse" />
             przetwarzanie w tle...
           </span>
         ) : unprocessed > 0 && onStart ? (
           <button
             onClick={onStart}
             disabled={isStarting}
-            className="px-3 py-1 text-sm font-medium text-white bg-[var(--color-info)] rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-sm font-medium text-white bg-[var(--color-info)] rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isStarting ? "uruchamianie..." : "rozpocznij analizę"}
           </button>
         ) : pagesComplete >= 1 && showCompletion ? (
           <span
-            className="text-[var(--color-success)] font-medium transition-opacity duration-1000"
+            className="text-[var(--color-success)] font-medium transition-opacity duration-1000 text-sm"
             style={{ opacity: showCompletion ? 1 : 0 }}
           >
             wszystkie ankiety przetworzone ✓
