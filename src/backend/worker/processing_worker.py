@@ -70,6 +70,7 @@ class ProcessingWorker:
                     idx,
                     self.state.global_state.total,
                     progress_callback=self._progress_callback,
+                    page_done_callback=self.state.mark_page_processed,
                 )
                 self.state.set_survey_status(idx, "ready", result=result)
                 return
@@ -91,8 +92,6 @@ class ProcessingWorker:
             status.page_idx if status.page_idx >= 0 else None,
             self._map_stage(status.status),
         )
-        if status.status in ("text_formatting", "text_retrying", "page_error", "page_done"):
-            self.state.mark_page_processed(status.survey_idx, status.page_idx)
         if status.extra and "elapsed_s" in status.extra:
             try:
                 elapsed = float(status.extra["elapsed_s"])

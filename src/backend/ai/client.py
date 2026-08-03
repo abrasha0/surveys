@@ -361,8 +361,10 @@ class AIClient:
         survey_idx: int,
         total_surveys: int,
         progress_callback: Callable[[ProcessingStatus], None] | None = None,
+        page_done_callback: Callable[[int, int], None] | None = None,
     ) -> list[dict]:
-        """Przetwarza strony sekwencyjnie: dla każdej strony VLM → Text LLM → result."""
+        """Przetwarza strony sekwencyjnie: dla każdej strony VLM → Text LLM → result.
+        page_done_callback(survey_id, page_idx) wywoływane przy przejściu do kolejnej strony."""
         total_pages = len(survey_files)
         page_results: list[dict] = []
 
@@ -370,6 +372,9 @@ class AIClient:
         re_ocr_max_attempts = config.processing.get("re_ocr_max_attempts", 0)
 
         for page_idx, file_path in enumerate(survey_files):
+            if page_idx > 0 and page_done_callback:
+                page_done_callback(survey_idx, page_idx - 1)
+
             page_start = time.perf_counter()
             logger.info(
                 "Processing page %d/%d for survey %d — step 1/2: VLM extraction",
@@ -466,6 +471,9 @@ class AIClient:
                     page_results.append({})
                     break
 
+        if page_done_callback:
+            page_done_callback(survey_idx, total_pages - 1)
+
         return page_results
 
     def _compute_page_fill_ratio(self, page_result: dict, expected_fields: set[str]) -> float:
@@ -485,6 +493,7 @@ class AIClient:
         survey_idx: int,
         total_surveys: int,
         progress_callback: Callable[[ProcessingStatus], None] | None = None,
+        page_done_callback: Callable[[int, int], None] | None = None,
     ) -> dict:
         """Zwraca słownik ze scalonymi danymi ankiety."""
         total_pages = len(survey_files)
@@ -500,7 +509,7 @@ class AIClient:
         t0 = time.perf_counter()
 
         page_results = await self._process_pages_sequential(
-            survey_files, survey_idx, total_surveys, progress_callback
+            survey_files, survey_idx, total_surveys, progress_callback, page_done_callback
         )
 
         elapsed_total = time.perf_counter() - t0
