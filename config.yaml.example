@@ -63,6 +63,8 @@ processing:
   worker_max_retries: 3           # Maksymalna liczba powtórzeń przetwarzania ankiety
   eta_rolling_window: 10          # Liczba ostatnich czasów stron do obliczania ETA
   survey_cache_dir: "working_vault/logs/survey_cache"  # Katalog cache per-survey
+  re_ocr_threshold: 0.3           # Minimalny współczynnik wypełnienia pól strony (0.0=wyłączone)
+  re_ocr_max_attempts: 2          # Maksymalna liczba re-OCR dla jednej strony
 
 prompts:
   vlm: |                          # Prompt dla modelu wizyjnego (VLM)

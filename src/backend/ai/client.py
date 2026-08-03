@@ -15,7 +15,7 @@ from PIL import Image, ImageEnhance
 from config import config
 from domain.schemas import MedicalSurvey
 from ai.prompts import build_vlm_prompt, build_text_format_prompt
-from domain.field_specs import ALL_FIELDS
+from domain.field_specs import ALL_FIELDS, PAGE_MAP
 import logger as _logger_mod
 
 try:
@@ -74,7 +74,7 @@ class ProcessingStatus:
     total_surveys: int
     page_idx: int
     total_pages: int
-    status: str          # "survey_start", "vlm_extracting", "vlm_retrying", "text_formatting", "text_retrying",
+    status: str          # "survey_start", "vlm_extracting", "vlm_retrying", "vlm_reocr", "text_formatting", "text_retrying",
                          # "page_error", "survey_done", "batch_done", "survey_error"
     message: str
     extra: dict[str, Any] | None = None
@@ -366,6 +366,9 @@ class AIClient:
         total_pages = len(survey_files)
         page_results: list[dict] = []
 
+        re_ocr_threshold = config.processing.get("re_ocr_threshold", 0.0)
+        re_ocr_max_attempts = config.processing.get("re_ocr_max_attempts", 0)
+
         for page_idx, file_path in enumerate(survey_files):
             page_start = time.perf_counter()
             logger.info(
@@ -394,46 +397,87 @@ class AIClient:
                 "Processing page %d/%d for survey %d — step 2/2: Text LLM formatting (raw_text=%d chars)",
                 page_idx + 1, total_pages, survey_idx + 1, len(raw_text),
             )
-            if progress_callback:
-                progress_callback(ProcessingStatus(
-                    survey_idx=survey_idx, total_surveys=total_surveys,
-                    page_idx=page_idx, total_pages=total_pages,
-                    status="text_formatting",
-                    message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}/{total_pages}: Text LLM formatowanie JSON...",
-                ))
-            try:
-                result = await self._format_json_llm(
-                    raw_text, page_idx, progress_callback, survey_idx, total_surveys, total_pages
-                )
-                page_elapsed = time.perf_counter() - page_start
+
+            page_fields = PAGE_MAP.get(page_idx, [])
+            page_field_names = {f.name for f in page_fields}
+
+            re_ocr_attempt = 0
+            while True:
                 if progress_callback:
                     progress_callback(ProcessingStatus(
                         survey_idx=survey_idx, total_surveys=total_surveys,
                         page_idx=page_idx, total_pages=total_pages,
-                        status="page_done",
-                        message="",
-                        extra={"elapsed_s": f"{page_elapsed:.1f}"},
+                        status="text_formatting",
+                        message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}/{total_pages}: Text LLM formatowanie JSON...",
                     ))
-                page_results.append(result)
-            except Exception as e:
-                page_elapsed = time.perf_counter() - page_start
-                logger.error("Text LLM failed for page %d of survey %d: %s", page_idx + 1, survey_idx + 1, e)
-                if _logger_mod.ai_req_logger:
-                    _logger_mod.ai_req_logger.error(
-                        "text_format_err | model=%s | page=%d | survey=%d | error_type=%s | error=%s",
-                        self.text_model, page_idx, survey_idx, type(e).__name__, _truncate(str(e)),
+                try:
+                    result = await self._format_json_llm(
+                        raw_text, page_idx, progress_callback, survey_idx, total_surveys, total_pages
                     )
-                if progress_callback:
-                    progress_callback(ProcessingStatus(
-                        survey_idx=survey_idx, total_surveys=total_surveys,
-                        page_idx=page_idx, total_pages=total_pages,
-                        status="page_error",
-                        message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}: Text LLM błąd — pominięto",
-                        extra={"elapsed_s": f"{page_elapsed:.1f}"},
-                    ))
-                page_results.append({})
+                    page_elapsed = time.perf_counter() - page_start
+
+                    if re_ocr_threshold > 0.0 and re_ocr_attempt < re_ocr_max_attempts:
+                        fill_ratio = self._compute_page_fill_ratio(result, page_field_names)
+                        if fill_ratio < re_ocr_threshold:
+                            re_ocr_attempt += 1
+                            logger.info(
+                                "Page %d fill ratio %.0f%% below threshold %.0f%% — re-OCR attempt %d/%d",
+                                page_idx, fill_ratio * 100, re_ocr_threshold * 100,
+                                re_ocr_attempt, re_ocr_max_attempts,
+                            )
+                            if progress_callback:
+                                progress_callback(ProcessingStatus(
+                                    survey_idx=survey_idx, total_surveys=total_surveys,
+                                    page_idx=page_idx, total_pages=total_pages,
+                                    status="vlm_reocr",
+                                    message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}: ponowna analiza VLM ({re_ocr_attempt}/{re_ocr_max_attempts})",
+                                ))
+                            raw_text = await self._extract_text_vlm(
+                                file_path, page_idx, progress_callback, survey_idx, total_surveys, total_pages
+                            )
+                            continue
+
+                    if progress_callback:
+                        progress_callback(ProcessingStatus(
+                            survey_idx=survey_idx, total_surveys=total_surveys,
+                            page_idx=page_idx, total_pages=total_pages,
+                            status="page_done",
+                            message="",
+                            extra={"elapsed_s": f"{page_elapsed:.1f}"},
+                        ))
+                    page_results.append(result)
+                    break
+                except Exception as e:
+                    page_elapsed = time.perf_counter() - page_start
+                    logger.error("Text LLM failed for page %d of survey %d: %s", page_idx + 1, survey_idx + 1, e)
+                    if _logger_mod.ai_req_logger:
+                        _logger_mod.ai_req_logger.error(
+                            "text_format_err | model=%s | page=%d | survey=%d | error_type=%s | error=%s",
+                            self.text_model, page_idx, survey_idx, type(e).__name__, _truncate(str(e)),
+                        )
+                    if progress_callback:
+                        progress_callback(ProcessingStatus(
+                            survey_idx=survey_idx, total_surveys=total_surveys,
+                            page_idx=page_idx, total_pages=total_pages,
+                            status="page_error",
+                            message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}: Text LLM błąd — pominięto",
+                            extra={"elapsed_s": f"{page_elapsed:.1f}"},
+                        ))
+                    page_results.append({})
+                    break
 
         return page_results
+
+    def _compute_page_fill_ratio(self, page_result: dict, expected_fields: set[str]) -> float:
+        if not expected_fields:
+            return 1.0
+        if not page_result:
+            return 0.0
+        filled = sum(
+            1 for name in expected_fields
+            if page_result.get(name) not in (None, "", [], {})
+        )
+        return filled / len(expected_fields)
 
     async def analyze_survey(
         self,
