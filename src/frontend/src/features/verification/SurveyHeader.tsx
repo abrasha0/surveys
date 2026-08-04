@@ -8,6 +8,8 @@ interface SurveyHeaderProps {
   onPrev: () => void;
   onNext: () => void;
   onSave: () => void;
+  onUnverify: () => void;
+  onForceSave: () => void;
   onSurveyChange: (surveyId: number) => void;
 }
 
@@ -79,6 +81,8 @@ export default function SurveyHeader({
   onPrev,
   onNext,
   onSave,
+  onUnverify,
+  onForceSave,
   onSurveyChange,
 }: SurveyHeaderProps) {
   const queuedCount = surveys.filter((s) => s.status === 'queued').length;
@@ -142,12 +146,39 @@ export default function SurveyHeader({
         >
           Poprzednia ankieta
         </button>
-        <button
-          onClick={onSave}
-          className="px-3 py-1.5 text-sm font-medium text-white bg-[var(--color-success)] rounded hover:opacity-90"
-        >
-          Zatwierdź ankietę
-        </button>
+        {(() => {
+          const currentSurvey = surveys.find(s => s.id === currentSurveyId);
+          switch (currentSurvey?.status) {
+            case 'ready':
+              return (
+                <button onClick={onSave}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-[var(--color-success)] rounded hover:opacity-90">
+                  Zatwierdź ankietę
+                </button>
+              );
+            case 'verified':
+              return (
+                <button onClick={onUnverify}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-[var(--color-warning)] rounded hover:opacity-90">
+                  Cofnij zatwierdzenie
+                </button>
+              );
+            case 'error':
+              return (
+                <button onClick={onForceSave}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-[var(--color-error)] rounded hover:opacity-90">
+                  Zatwierdź mimo błędów
+                </button>
+              );
+            default:
+              return (
+                <button disabled
+                  className="px-3 py-1.5 text-sm font-medium text-gray-300 bg-gray-100 rounded cursor-not-allowed">
+                  {currentSurvey?.status === 'queued' ? 'W kolejce' : 'Przetwarzanie...'}
+                </button>
+              );
+          }
+        })()}
         <button
           onClick={onNext}
           disabled={currentIndex === surveys.length - 1}

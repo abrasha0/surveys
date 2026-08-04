@@ -20,8 +20,10 @@ interface DynamicFormProps {
   fieldSpecs: FieldSpec[];
   aiResult: Record<string, unknown> | null;
   onSave: (values: Record<string, unknown>) => Promise<void>;
+  onForceSave: () => Promise<void>;
   onNextSurvey: () => void;
   disabled?: boolean;
+  readOnly?: boolean;
 }
 
 function validateField(field: FieldSpec, value: unknown): string | undefined {
@@ -62,13 +64,15 @@ function validateFields(
   return errors;
 }
 
-const DynamicForm = forwardRef<{ save: () => void }, DynamicFormProps>(function DynamicForm({
+const DynamicForm = forwardRef<{ save: () => void; forceSave: () => void }, DynamicFormProps>(function DynamicForm({
   surveyId,
   fieldSpecs,
   aiResult,
   onSave,
+  onForceSave,
   onNextSurvey,
   disabled = false,
+  readOnly = false,
 }, ref) {
   const selectedPage = useVerificationStore((s) => s.getSurveyUI(surveyId).selectedPage);
   const showErrors = useVerificationStore((s) => s.getSurveyUI(surveyId).showErrors);
@@ -105,6 +109,7 @@ const DynamicForm = forwardRef<{ save: () => void }, DynamicFormProps>(function 
 
   const handleChange = useCallback(
     (name: string, value: unknown) => {
+      if (readOnly) return;
       updateDraft(surveyId, { [name]: value });
       saveDraft(surveyId);
       const field = fieldSpecs.find((f) => f.name === name);
@@ -118,7 +123,7 @@ const DynamicForm = forwardRef<{ save: () => void }, DynamicFormProps>(function 
         });
       }
     },
-    [surveyId, fieldSpecs, updateDraft, saveDraft]
+    [surveyId, fieldSpecs, updateDraft, saveDraft, readOnly]
   );
 
   const handleBlur = useCallback(
@@ -153,9 +158,23 @@ const DynamicForm = forwardRef<{ save: () => void }, DynamicFormProps>(function 
     }
   }, [fieldSpecs, allValues, onSave, clearDraft, surveyId, setShowErrors, onNextSurvey]);
 
-  useImperativeHandle(ref, () => ({ save: handleSave }), [handleSave]);
+  const handleForceSave = useCallback(async () => {
+    setSaving(true);
+    setShowErrors(surveyId, false);
+    try {
+      await onSave({ ...allValues, ...draftValues });
+      clearDraft(surveyId);
+      setErrors({});
+      setShowErrors(surveyId, false);
+      onNextSurvey();
+    } finally {
+      setSaving(false);
+    }
+  }, [allValues, draftValues, onSave, clearDraft, surveyId, setShowErrors, onNextSurvey]);
 
-  useSpaceShortcut(!disabled && !saving, handleSave);
+  useImperativeHandle(ref, () => ({ save: handleSave, forceSave: handleForceSave }), [handleSave, handleForceSave]);
+
+  useSpaceShortcut(!disabled && !saving && !readOnly, handleSave);
 
   const layout = PAGE_LAYOUT[selectedPage] ?? 'grid-2';
 
@@ -167,6 +186,7 @@ const DynamicForm = forwardRef<{ save: () => void }, DynamicFormProps>(function 
         onChange={handleChange}
         error={errors[field.name]}
         showErrors={showErrors}
+        disabled={readOnly}
       />
     </div>
   );

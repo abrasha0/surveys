@@ -12,6 +12,7 @@ class SurveyState:
     status: str = "queued"
     result: dict | None = None
     error_message: str | None = None
+    draft_values: dict | None = None
 
 
 @dataclass
@@ -69,6 +70,20 @@ class ProcessingState:
                 error = None
             self.surveys.append(SurveyState(id=idx, files=group, status=status, result=result, error_message=error))
             total_pages += len(group)
+
+        # Load drafts from disk
+        draft_dir = Path(config.processing.get("survey_cache_dir", "working_vault/logs/survey_cache")) / "drafts"
+        if draft_dir.exists():
+            import json
+            for survey in self.surveys:
+                draft_path = draft_dir / f"survey_{survey.id}.json"
+                if draft_path.exists():
+                    try:
+                        with open(draft_path, "r", encoding="utf-8") as f:
+                            survey.draft_values = json.load(f)
+                    except Exception:
+                        pass
+
         self.global_state.total = len(self.surveys)
         self.global_state.total_pages = total_pages
         processed_surveys = [s for s in self.surveys if s.status in ("ready", "error", "verified")]
@@ -148,6 +163,13 @@ class ProcessingState:
             raise ValueError(f"Cannot verify survey in status '{survey.status}'")
         survey.status = "verified"
         survey.result = result
+        self._persist_survey_to_processed(survey_id)
+
+    def unverify(self, survey_id: int):
+        survey = self.surveys[survey_id]
+        if survey.status != "verified":
+            raise ValueError(f"Cannot unverify survey in status '{survey.status}'")
+        survey.status = "ready"
         self._persist_survey_to_processed(survey_id)
 
     def mark_page_processed(self, survey_id: int, page_idx: int):

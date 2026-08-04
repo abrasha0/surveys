@@ -6,6 +6,7 @@ interface FieldRendererProps {
   onChange: (name: string, value: unknown) => void;
   error?: string;
   showErrors: boolean;
+  disabled?: boolean;
 }
 
 const baseInputClass = 'w-full border rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-[var(--color-info)] focus:outline-none';
@@ -15,16 +16,18 @@ function RadioCardGroup({
   choices,
   value,
   onChange,
+  disabled,
 }: {
   choices: string[];
   value: unknown;
   onChange: (val: string) => void;
+  disabled?: boolean;
 }) {
   const isBinaryTakNie = choices.length === 2 &&
     choices.every((c) => c.toUpperCase() === 'TAK' || c.toUpperCase() === 'NIE');
 
   return (
-    <div className={`grid gap-1.5 ${isBinaryTakNie ? 'grid-cols-2' : 'grid-cols-1'}`}>
+    <div className={`grid gap-1.5 ${isBinaryTakNie ? 'grid-cols-2' : 'grid-cols-1'} ${disabled ? 'pointer-events-none opacity-70' : ''}`}>
       {choices.map((choice) => {
         const selected = String(value ?? '') === choice;
         return (
@@ -51,7 +54,7 @@ function RadioCardGroup({
   );
 }
 
-export default function FieldRenderer({ field, value, onChange, error, showErrors }: FieldRendererProps) {
+export default function FieldRenderer({ field, value, onChange, error, showErrors, disabled = false }: FieldRendererProps) {
   const inputClass = `${baseInputClass} ${showErrors && error ? errorInputClass : 'border-gray-300'}`;
 
   const handleChange = (val: string) => {
@@ -68,6 +71,7 @@ export default function FieldRenderer({ field, value, onChange, error, showError
           choices={field.choices ?? []}
           value={value}
           onChange={handleChange}
+          disabled={disabled}
         />
         {showErrors && error && (
           <p className="text-red-600 text-xs mt-0.5">{error}</p>
@@ -87,6 +91,7 @@ export default function FieldRenderer({ field, value, onChange, error, showError
             min={field.min ?? undefined}
             max={field.max ?? undefined}
             step={1}
+            disabled={disabled}
             className={`${inputClass} ${field.name === 'p2_wiek' ? 'max-w-[100px]' : ''}`}
           />
         );
@@ -96,6 +101,7 @@ export default function FieldRenderer({ field, value, onChange, error, showError
             rows={2}
             value={String(value ?? '')}
             onChange={(e) => handleChange(e.target.value)}
+            disabled={disabled}
             className={inputClass}
           />
         );

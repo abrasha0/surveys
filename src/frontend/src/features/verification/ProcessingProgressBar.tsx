@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { ProcessingStatus } from "../../api/hooks";
+import { useSurveys, useFinalizeSession } from "../../api/hooks";
 
 interface ProcessingProgressBarProps {
   status: ProcessingStatus | undefined;
@@ -37,6 +39,22 @@ export default function ProcessingProgressBar({
   const [localEtaSeconds, setLocalEtaSeconds] = useState<number | null>(null);
   const [showCompletion, setShowCompletion] = useState(false);
   const lastBackendEta = useRef<number | null>(null);
+  const { data: surveys } = useSurveys();
+  const finalizeMutation = useFinalizeSession();
+  const navigate = useNavigate();
+
+  const isFinalizeReady = useMemo(
+    () => (surveys ?? []).length > 0 && (surveys ?? []).every((s) => s.status === 'verified' || s.status === 'error'),
+    [surveys]
+  );
+
+  const handleFinalize = () => {
+    finalizeMutation.mutate(undefined, {
+      onSuccess: () => {
+        navigate('/complete', { replace: true });
+      },
+    });
+  };
 
   const total = status?.total ?? 0;
   const processed = status?.processed ?? 0;
@@ -145,6 +163,14 @@ export default function ProcessingProgressBar({
             className="px-3 py-1.5 text-sm font-medium text-white bg-[var(--color-info)] rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isStarting ? "uruchamianie..." : "rozpocznij analizę"}
+          </button>
+        ) : isFinalizeReady ? (
+          <button
+            onClick={handleFinalize}
+            disabled={finalizeMutation.isPending}
+            className="px-4 py-1.5 text-sm font-bold text-white bg-[var(--color-info)] rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {finalizeMutation.isPending ? "Finalizowanie..." : "Zakończ sesję"}
           </button>
         ) : pagesComplete >= 1 && showCompletion ? (
           <span

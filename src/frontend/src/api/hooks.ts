@@ -18,6 +18,7 @@ export interface SurveyListItem {
   id: number;
   files: string[];
   status: 'queued' | 'processing' | 'ready' | 'error' | 'verified';
+  can_edit: boolean;
 }
 
 export interface ProcessingStatus {
@@ -153,9 +154,50 @@ export function useStartProcessing() {
       apiFetch<{ status: string; total: number }>('/api/processing/start', {
         method: 'POST',
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['processing-status'] });
+onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['surveys'] });
     },
+  });
+}
+
+export function useUnverifySurvey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (surveyId: number) =>
+      apiFetch<{ status: string; survey_id: number }>(
+        `/api/surveys/${surveyId}/unverify`,
+        { method: 'POST' }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['surveys'] });
+    },
+  });
+}
+
+export function useFinalizeSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ status: string; csv_path: string; total_verified: number; total_errors: number }>(
+        '/api/session/finalize',
+        { method: 'POST' }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['surveys'] });
+    },
+  });
+}
+
+export function useSaveDraft() {
+  return useMutation({
+    mutationFn: ({ surveyId, values }: { surveyId: number; values: Record<string, unknown> }) =>
+      apiFetch<{ status: string }>(
+        `/api/surveys/${surveyId}/draft`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ values }),
+        }
+      ),
   });
 }
 

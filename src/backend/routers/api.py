@@ -1,5 +1,7 @@
 import logging
 import hashlib
+import json
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -71,6 +73,7 @@ def list_surveys() -> list[dict]:
             "id": idx,
             "files": [p.name for p in group],
             "status": status,
+            "can_edit": status in ("ready", "queued"),
         })
     return result
 
@@ -194,10 +197,72 @@ def clear_session():
     clear_survey_cache_dir()
     clear_cache_file()
 
+    draft_dir = Path(config.processing.get("survey_cache_dir", "working_vault/logs/survey_cache")) / "drafts"
+    if draft_dir.exists():
+        shutil.rmtree(draft_dir)
+
     worker.state.reset()
 
     logger.info("Session cleared and archived")
     return {"status": "cleared"}
+
+
+@router.post("/surveys/{survey_id}/unverify")
+def unverify_survey(survey_id: int):
+    worker = get_worker()
+    survey = worker.state.get_survey_state(survey_id)
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+    if survey.status != "verified":
+        raise HTTPException(status_code=400, detail=f"Survey not in 'verified' status (current: {survey.status})")
+    worker.state.unverify(survey_id)
+    return {"status": "unverified", "survey_id": survey_id}
+
+
+class DraftRequest(BaseModel):
+    values: dict
+
+
+@router.post("/surveys/{survey_id}/draft")
+def save_draft(survey_id: int, request: DraftRequest):
+    worker = get_worker()
+    survey = worker.state.get_survey_state(survey_id)
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+    draft_dir = Path(config.processing.get("survey_cache_dir", "working_vault/logs/survey_cache")) / "drafts"
+    draft_dir.mkdir(parents=True, exist_ok=True)
+    draft_path = draft_dir / f"survey_{survey_id}.json"
+    with open(draft_path, "w", encoding="utf-8") as f:
+        json.dump(request.values, f, ensure_ascii=False, indent=2)
+    return {"status": "saved"}
+
+
+@router.post("/session/finalize")
+def finalize_session():
+    worker = get_worker()
+    if worker.state.is_running:
+        raise HTTPException(status_code=400, detail="Cannot finalize while worker is running")
+
+    verified = [s for s in worker.state.surveys if s.status == "verified"]
+    if not verified:
+        raise HTTPException(status_code=400, detail="No verified surveys to finalize")
+
+    csv_path = export_csv_path()
+    for survey in verified:
+        if survey.result:
+            try:
+                survey_data = MedicalSurvey(**survey.result)
+                save_survey_to_csv(survey_data, csv_path)
+            except Exception as e:
+                logger.error("Failed to save survey %d to CSV: %s", survey.id, e)
+
+    total_errors = sum(1 for s in worker.state.surveys if s.status == "error")
+    return {
+        "status": "finalized",
+        "csv_path": csv_path,
+        "total_verified": len(verified),
+        "total_errors": total_errors,
+    }
 
 
 @router.post("/surveys/{survey_id}/save")
@@ -207,10 +272,16 @@ def save_survey(survey_id: int, request: SaveRequest):
     if not survey:
         raise HTTPException(status_code=404, detail="Survey not found")
 
-    if survey.status != "ready":
+    if survey.status not in ("ready", "error"):
         raise HTTPException(
             status_code=400,
-            detail=f"Survey not in 'ready' status (current: {survey.status})",
+            detail=f"Survey not in 'ready' or 'error' status (current: {survey.status})",
+        )
+
+    if survey.status == "error" and not request.force:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot save error survey without force=True",
         )
 
     normalized = {}
@@ -259,14 +330,10 @@ def save_survey(survey_id: int, request: SaveRequest):
     if validation_errors and request.force:
         survey_data = MedicalSurvey(**normalized)
 
-    csv_path = export_csv_path()
-    save_survey_to_csv(survey_data, csv_path)
-
     worker.state.mark_verified(survey_id, result=normalized)
 
-    logger.info("Survey %d saved to CSV: %s", survey_id, csv_path)
+    logger.info("Survey %d approved (CSV pending finalization)", survey_id)
     return {
         "status": "saved",
         "survey_id": survey_id,
-        "csv_path": csv_path,
     }

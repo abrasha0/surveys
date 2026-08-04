@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useSurveys, useFieldSpecs, useSurveyResult, useSaveSurvey, useProcessingStatus, useSurveyImages } from '../../api/hooks';
+import { useSurveys, useFieldSpecs, useSurveyResult, useSaveSurvey, useProcessingStatus, useSurveyImages, useUnverifySurvey } from '../../api/hooks';
 import { useVerificationStore } from '../../store/verificationStore';
+import { useDraftSync } from '../../hooks/useDraftSync';
 import ImageViewer from '../../components/ImageViewer';
 import PageTabs from '../../components/PageTabs';
 import SurveyHeader from './SurveyHeader';
 import DynamicForm from './DynamicForm';
 
 export default function VerificationPanel() {
-  const navigate = useNavigate();
   const [currentSurveyId, setCurrentSurveyId] = useState<number | null>(null);
-  const formRef = useRef<{ save: () => void }>(null);
+  const formRef = useRef<{ save: () => void; forceSave: () => void }>(null);
   const { data: surveys } = useSurveys();
   const { data: fieldSpecs } = useFieldSpecs();
   const saveSurveyMutation = useSaveSurvey();
+  const unverifyMutation = useUnverifySurvey();
   const initSurvey = useVerificationStore((s) => s.initSurvey);
   const surveyUI = useVerificationStore((s) =>
     currentSurveyId !== null ? s.surveysUI[currentSurveyId] : undefined
@@ -23,9 +23,9 @@ export default function VerificationPanel() {
   const isRunning = processingStatus?.is_running ?? false;
 
   const allSurveys = useMemo(() => surveys ?? [], [surveys]);
-  const allDone = useMemo(
-    () => allSurveys.length > 0 && allSurveys.every((s) => s.status === 'verified' || s.status === 'error'),
-    [allSurveys]
+  const currentSurvey = useMemo(
+    () => allSurveys.find((s) => s.id === currentSurveyId),
+    [allSurveys, currentSurveyId]
   );
 
   const clickableSurveys = useMemo(
@@ -41,6 +41,8 @@ export default function VerificationPanel() {
   const { data: surveyResult } = useSurveyResult(currentSurveyId);
   const { data: imageUrls } = useSurveyImages(currentSurveyId);
 
+  useDraftSync(currentSurveyId);
+
   useEffect(() => {
     if (currentSurveyId === null && clickableSurveys.length > 0) {
       const first = clickableSurveys[0].id;
@@ -48,12 +50,6 @@ export default function VerificationPanel() {
       setCurrentSurveyId(first);
     }
   }, [clickableSurveys, currentSurveyId, initSurvey]);
-
-  useEffect(() => {
-    if (allDone && !isRunning) {
-      navigate('/complete', { replace: true });
-    }
-  }, [allDone, isRunning, navigate]);
 
   useEffect(() => {
     return () => {
@@ -89,6 +85,16 @@ export default function VerificationPanel() {
     });
   };
 
+  const handleUnverify = async () => {
+    if (currentSurveyId === null) return;
+    await unverifyMutation.mutateAsync(currentSurveyId);
+  };
+
+  const handleForceSave = () => {
+    if (currentSurveyId === null) return;
+    formRef.current?.forceSave();
+  };
+
   const currentPage = surveyUI?.selectedPage ?? 0;
 
   const handlePageChange = () => {};
@@ -111,6 +117,8 @@ export default function VerificationPanel() {
         onPrev={handlePrevSurvey}
         onNext={handleNextSurvey}
         onSave={() => formRef.current?.save()}
+        onUnverify={handleUnverify}
+        onForceSave={handleForceSave}
         onSurveyChange={handleSurveyChange}
       />
 
@@ -133,8 +141,10 @@ export default function VerificationPanel() {
             fieldSpecs={fieldSpecs ?? []}
             aiResult={surveyResult?.result ?? null}
             onSave={handleSave}
+            onForceSave={handleForceSave}
             onNextSurvey={handleNextSurvey}
             disabled={saveSurveyMutation.isPending}
+            readOnly={currentSurvey?.status === 'verified'}
           />
         </div>
       </div>
