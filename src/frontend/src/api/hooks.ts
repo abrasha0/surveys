@@ -32,6 +32,11 @@ export interface ProcessingStatus {
   current_stage: string | null;
   eta_seconds: number | null;
   is_running: boolean;
+  batch_size: number;
+  batch_remaining: number | null;
+  batch_processed: number;
+  batch_total_pages: number;
+  batch_processed_pages: number;
 }
 
 export interface SurveyResult {
@@ -150,12 +155,17 @@ export function useLogin() {
 export function useStartProcessing() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      apiFetch<{ status: string; total: number }>('/api/processing/start', {
-        method: 'POST',
-      }),
-onSuccess: () => {
+    mutationFn: (batchSize?: number) =>
+      apiFetch<{ status: string; total: number; batch_size: number }>(
+        '/api/processing/start',
+        {
+          method: 'POST',
+          body: JSON.stringify({ batch_size: batchSize ?? 0 }),
+        }
+      ),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['surveys'] });
+      queryClient.invalidateQueries({ queryKey: ['processing-status'] });
     },
   });
 }

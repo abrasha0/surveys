@@ -6,8 +6,6 @@ import { useSurveys, useFinalizeSession } from "../../api/hooks";
 interface ProcessingProgressBarProps {
   status: ProcessingStatus | undefined;
   isLoading: boolean;
-  onStart?: () => void;
-  isStarting?: boolean;
 }
 
 function formatEta(seconds: number | null): string {
@@ -33,8 +31,6 @@ function stageLabel(
 export default function ProcessingProgressBar({
   status,
   isLoading,
-  onStart,
-  isStarting,
 }: ProcessingProgressBarProps) {
   const [localEtaSeconds, setLocalEtaSeconds] = useState<number | null>(null);
   const [showCompletion, setShowCompletion] = useState(false);
@@ -44,7 +40,7 @@ export default function ProcessingProgressBar({
   const navigate = useNavigate();
 
   const isFinalizeReady = useMemo(
-    () => (surveys ?? []).length > 0 && (surveys ?? []).every((s) => s.status === 'verified' || s.status === 'error'),
+    () => (surveys ?? []).some((s) => s.status === 'verified') ?? false,
     [surveys]
   );
 
@@ -65,6 +61,14 @@ export default function ProcessingProgressBar({
   const current_stage = status?.current_stage ?? null;
   const current_page = status?.current_page ?? null;
   const current_survey_id = status?.current_survey_id ?? null;
+  const batch_size = status?.batch_size ?? 0;
+  const batch_remaining = status?.batch_remaining;
+  const batch_total_pages = status?.batch_total_pages ?? 0;
+  const batch_processed_pages = status?.batch_processed_pages ?? 0;
+
+  const batchActive = batch_size > 0;
+  const batchDone =
+    batchActive && !is_running && batch_remaining !== null && batch_remaining <= 0;
 
   useEffect(() => {
     const newEta = status?.eta_seconds ?? null;
@@ -106,10 +110,23 @@ export default function ProcessingProgressBar({
     );
   }
 
+  const displayTotalPages =
+    batchActive && batch_total_pages > 0 ? batch_total_pages : total_pages;
+  const displayProcessedPages =
+    batchActive && batch_total_pages > 0 ? batch_processed_pages : processed_pages;
   const pagesComplete =
-    total_pages > 0 ? Math.min((processed_pages + errors) / total_pages, 1) : 0;
+    displayTotalPages > 0 ? Math.min(displayProcessedPages / displayTotalPages, 1) : 0;
   const activity = stageLabel(current_stage, current_page, current_survey_id);
-  const unprocessed = total - processed - errors;
+
+  const batchEta = useMemo(() => {
+    if (!batchActive || !localEtaSeconds) return null;
+    const remainingBatch = batch_remaining ?? 0;
+    const remainingGlobal = total - processed - errors;
+    if (remainingGlobal <= 0) return null;
+    return localEtaSeconds * (remainingBatch / remainingGlobal);
+  }, [batchActive, batch_remaining, localEtaSeconds, total, processed, errors]);
+
+  const displayEta = batchActive ? batchEta : localEtaSeconds;
 
   if (total === 0) {
     return (
@@ -136,12 +153,12 @@ export default function ProcessingProgressBar({
         </div>
 
         <span className="text-gray-700 whitespace-nowrap shrink-0 text-sm">
-          przetworzono: {processed_pages} z {total_pages} stron
+          przetworzono: {displayProcessedPages} z {displayTotalPages} stron
           {errors > 0 && <> · Błędy: {errors}</>}
-          {is_running && localEtaSeconds === null
+          {is_running && displayEta === null
             ? " · obliczanie..."
-            : localEtaSeconds !== null && is_running
-              ? ` · ${formatEta(localEtaSeconds)}`
+            : displayEta !== null && is_running
+              ? ` · ${formatEta(displayEta)}`
               : ""}
         </span>
       </div>
@@ -151,19 +168,26 @@ export default function ProcessingProgressBar({
           <span className="text-gray-700 truncate max-w-72 text-sm font-medium">{activity}</span>
         )}
 
-        {is_running ? (
+        {batchDone ? (
+          <>
+            <span className="text-[var(--color-success)] font-semibold text-sm">
+              Wybrana grupa przetworzona ✓
+            </span>
+            {isFinalizeReady && (
+              <button
+                onClick={handleFinalize}
+                disabled={finalizeMutation.isPending}
+                className="px-4 py-1.5 text-sm font-bold text-white bg-[var(--color-info)] rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {finalizeMutation.isPending ? "Finalizowanie..." : "Zakończ sesję"}
+              </button>
+            )}
+          </>
+        ) : is_running ? (
           <span className="flex items-center gap-1.5 text-[var(--color-info)] font-semibold text-sm">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-[var(--color-info)] animate-pulse" />
             przetwarzanie w tle...
           </span>
-        ) : unprocessed > 0 && onStart ? (
-          <button
-            onClick={onStart}
-            disabled={isStarting}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-[var(--color-info)] rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isStarting ? "uruchamianie..." : "rozpocznij analizę"}
-          </button>
         ) : isFinalizeReady ? (
           <button
             onClick={handleFinalize}

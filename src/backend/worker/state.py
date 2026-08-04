@@ -1,8 +1,11 @@
 from dataclasses import dataclass, field
 from pathlib import Path
+import logging
 import time
 
 from config import config
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -28,6 +31,11 @@ class GlobalState:
     eta_seconds: float | None = None
     is_running: bool = False
     started_at: float | None = None
+    batch_size: int = 0
+    batch_remaining: int | None = None
+    batch_processed: int = 0
+    batch_total_pages: int = 0
+    batch_processed_pages: int = 0
 
 
 class ProcessingState:
@@ -122,6 +130,49 @@ class ProcessingState:
             "total_pages": self.global_state.total_pages,
         })
 
+    def init_batch(self, survey_groups: list[list[Path]], batch_size: int = 0):
+        from data_handler import save_processed_data
+        self.surveys = []
+        total_pages = 0
+        for idx, group in enumerate(survey_groups):
+            self.surveys.append(SurveyState(id=idx, files=group))
+            total_pages += len(group)
+
+        queued = len(survey_groups)
+        effective = batch_size if 0 < batch_size < queued else 0
+        logger.info(
+            "init_batch: requested=%d, queued=%d, effective=%d",
+            batch_size, queued, effective,
+        )
+        if effective > 0:
+            batch_total_pages = sum(len(survey_groups[i]) for i in range(effective))
+        else:
+            batch_total_pages = total_pages
+        self.global_state = GlobalState(
+            total=len(survey_groups),
+            total_pages=total_pages,
+            is_running=True,
+            started_at=time.time(),
+            batch_size=effective,
+            batch_remaining=effective if effective > 0 else None,
+            batch_processed=0,
+            batch_total_pages=batch_total_pages,
+            batch_processed_pages=0,
+        )
+        self.page_times.clear()
+        self._counted_pages.clear()
+        save_processed_data({
+            "session_started_at": self.global_state.started_at,
+            "surveys": {},
+            "total_surveys": len(survey_groups),
+            "total_pages": self.global_state.total_pages,
+        })
+
+    def reset_batch(self):
+        self.global_state.batch_size = 0
+        self.global_state.batch_remaining = None
+        self.global_state.batch_processed = 0
+
     def get_survey_state(self, survey_id: int) -> SurveyState | None:
         if 0 <= survey_id < len(self.surveys):
             return self.surveys[survey_id]
@@ -155,6 +206,14 @@ class ProcessingState:
                 self.global_state.processed_pages += uncounted
             if status == "error":
                 self.global_state.errors += 1
+            if self.global_state.batch_size > 0:
+                if (
+                    self.global_state.batch_remaining is not None
+                    and self.global_state.batch_remaining > 0
+                ):
+                    self.global_state.batch_remaining -= 1
+                self.global_state.batch_processed += 1
+                self.global_state.batch_processed_pages += len(survey.files)
         self._persist_survey_to_processed(survey_id)
 
     def mark_verified(self, survey_id: int, result: dict | None = None):
@@ -229,4 +288,9 @@ class ProcessingState:
             "current_stage": self.global_state.current_stage,
             "eta_seconds": self.global_state.eta_seconds,
             "is_running": self.global_state.is_running,
+            "batch_size": self.global_state.batch_size,
+            "batch_remaining": self.global_state.batch_remaining,
+            "batch_processed": self.global_state.batch_processed,
+            "batch_total_pages": self.global_state.batch_total_pages,
+            "batch_processed_pages": self.global_state.batch_processed_pages,
         }

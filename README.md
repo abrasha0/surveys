@@ -40,6 +40,7 @@ Aplikacja dostępna pod `http://localhost:8000` (produkcja) lub `http://localhos
 - Automatyczna analiza zdjęć ankiet przez VLM (Ollama) + Text LLM
 - Dwuetapowe przetwarzanie: VLM → tekst → Text LLM → JSON (70 pól na 5 stronach)
 - Globalny asynchroniczny worker w tle z kolejką, retry (per-request do Ollamy + per-survey w workerze), ETA (rolling average) i możliwością zatrzymania
+- Batch processing — suwak (1..pozostałe) ustawia liczbę ankiet przetwarzanych w sesji, ETA liczone dla batcha, po zakończeniu batcha worker się kończy i można uruchomić następny ("Następny batch")
 - Interleaved verification — weryfikacja gotowych ankiet w trakcie przetwarzania kolejnych
 - Weryfikacja i korekta odczytanych danych w interfejsie side-by-side (podział 40/60)
 - Dwuetapowe zatwierdzanie: walidacja → "Zatwierdź mimo błędów" (force save)

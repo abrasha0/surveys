@@ -150,8 +150,12 @@ def get_survey_result(survey_id: int):
     }
 
 
+class StartRequest(BaseModel):
+    batch_size: int = 0
+
+
 @router.post("/processing/start")
-async def processing_start():
+async def processing_start(request: StartRequest):
     worker = get_worker()
     if worker.state.is_running:
         raise HTTPException(status_code=400, detail="Processing already in progress")
@@ -167,8 +171,13 @@ async def processing_start():
     if not groups:
         raise HTTPException(status_code=404, detail="No surveys found")
 
-    await worker.start(groups)
-    return {"status": "started", "total": len(groups)}
+    batch_size = request.batch_size
+    if batch_size < 0:
+        raise HTTPException(status_code=400, detail="batch_size must be >= 0")
+
+    await worker.start(groups, batch_size=batch_size)
+    effective = batch_size if batch_size > 0 else len(groups)
+    return {"status": "started", "total": len(groups), "batch_size": effective}
 
 
 @router.get("/processing/status")

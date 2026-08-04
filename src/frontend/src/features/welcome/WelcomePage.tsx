@@ -21,6 +21,7 @@ export default function WelcomePage() {
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const [waitingForRunning, setWaitingForRunning] = useState(false);
+  const [batchSize, setBatchSize] = useState<number>(0);
   const waitingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { data: surveys } = useSurveys();
   const { data: processingStatus } = useProcessingStatus();
@@ -57,6 +58,34 @@ export default function WelcomePage() {
     };
   }, [surveys, processingStatus]);
 
+  const remaining = stats.total - stats.processed;
+  const maxBatch = remaining > 0 ? remaining : 1;
+
+  useEffect(() => {
+    if (maxBatch > 0 && batchSize === 0) {
+      setBatchSize(maxBatch);
+    }
+  }, [maxBatch]);
+
+  const isCovered = stats.total > 0 && stats.processed === stats.total;
+  const batchDone = useMemo(() => {
+    const ps = processingStatus;
+    if (!ps) return false;
+    return (
+      ps.batch_size > 0 &&
+      !ps.is_running &&
+      ps.batch_remaining !== null &&
+      ps.batch_remaining <= 0 &&
+      !isCovered
+    );
+  }, [processingStatus, isCovered]);
+
+  useEffect(() => {
+    if (batchDone && remaining > 0) {
+      setBatchSize(remaining);
+    }
+  }, [batchDone, remaining]);
+
   if (processingStatus === undefined || surveys === undefined) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -70,17 +99,21 @@ export default function WelcomePage() {
   }
 
   const readyCount = surveys.filter((s) => s.status === 'ready').length;
-  const isCovered = stats.total > 0 && stats.processed === stats.total;
   const allVerified = isCovered && stats.verified === stats.total;
-  const showEta = stats.total > 0;
+  const showEta = processingStatus?.eta_seconds != null;
   const etaText = formatEta(processingStatus?.eta_seconds);
   const etaLabel = 'Czas przetwarzania';
   const remainingPages = (processingStatus?.total_pages ?? stats.processedPages) - stats.processedPages;
+  const perSurveyEtaSeconds =
+    showEta && remaining > 0 ? (processingStatus?.eta_seconds ?? 0) / remaining : null;
+  const batchEtaSeconds =
+    perSurveyEtaSeconds !== null ? perSurveyEtaSeconds * (batchSize || maxBatch) : null;
+  const batchEtaText = formatEta(batchEtaSeconds);
 
-  const handleStart = () => {
+  const handleStart = (batchSize?: number) => {
     setError('');
     setWaitingForRunning(true);
-    startProcessing.mutate(undefined, {
+    startProcessing.mutate(batchSize, {
       onSuccess: () => {
         waitingIntervalRef.current = setInterval(async () => {
           try {
@@ -108,6 +141,7 @@ export default function WelcomePage() {
   const handleRestart = () => {
     setError('');
     setWaitingForRunning(true);
+    setBatchSize(0);
     clearCache();
     clearSession.mutate(undefined, {
       onSuccess: () => {
@@ -205,25 +239,110 @@ export default function WelcomePage() {
           <p className="text-center text-gray-500">Brak ankiet w katalogu.</p>
         )}
 
-        {!waitingForRunning && stats.total > 0 && stats.processed === 0 && (
+        {!waitingForRunning && !isCovered && !batchDone && remaining > 0 && (
           <>
-            <p className="text-center text-gray-600 mb-6">
-              Znaleziono {stats.total} ankiet. Rozpocznij analizę, aby wygenerować wyniki.
-            </p>
+            {stats.processed === 0 && (
+              <p className="text-center text-gray-600 mb-6">
+                Znaleziono {stats.total} ankiet. Rozpocznij analizę, aby wygenerować wyniki.
+              </p>
+            )}
             {statsBlock}
-            <button onClick={handleStart} disabled={busy} className={primaryButtonClass}>
-              {startProcessing.isPending ? 'Rozpoczynanie...' : 'Rozpocznij analizę'}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Liczba ankiet do przetworzenia
+              </label>
+              <input
+                type="range"
+                min={1}
+                max={maxBatch}
+                value={batchSize}
+                onChange={(e) => setBatchSize(Number(e.target.value))}
+                className="w-full accent-[var(--color-info)]"
+              />
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <span>1</span>
+                <span className="font-semibold text-gray-700">{batchSize}</span>
+                <span>{maxBatch}</span>
+              </div>
+            </div>
+
+            {showEta && (
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-500">Szacowany czas dla wybranej grupy ({batchSize} ankiet)</span>
+                <span className="font-medium">{batchEtaText}</span>
+              </div>
+            )}
+            {!showEta && (
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-500">Szacowany czas</span>
+                <span className="font-medium text-gray-400 italic">pojawi się po pierwszej ankiecie</span>
+              </div>
+            )}
+
+            <button onClick={() => handleStart(batchSize)} disabled={busy} className={primaryButtonClass}>
+              {startProcessing.isPending
+                ? 'Rozpoczynanie...'
+                : stats.processed > 0
+                  ? 'Kontynuuj analizę'
+                  : 'Rozpocznij analizę'}
             </button>
           </>
         )}
 
-        {!waitingForRunning && stats.total > 0 && stats.processed > 0 && !isCovered && (
+        {batchDone && (
           <>
+            <h2 className="text-lg font-semibold text-center mb-2">
+              Wybrana grupa przetworzona
+            </h2>
+            <p className="text-center text-gray-600 mb-4">
+              Przetworzono {processingStatus?.batch_size ?? 0} ankiet.
+              Pozostało {remaining} do przetworzenia.
+            </p>
             {statsBlock}
-            {etaBlock}
-            <button onClick={handleStart} disabled={busy} className={primaryButtonClass}>
-              {startProcessing.isPending ? 'Kontynuowanie...' : 'Kontynuuj analizę'}
-            </button>
+            <div className="flex flex-col gap-3 mt-6">
+              <div className="mb-2">
+                <input
+                  type="range"
+                  min={1}
+                  max={remaining}
+                  value={batchSize}
+                  onChange={(e) => setBatchSize(Number(e.target.value))}
+                  className="w-full accent-[var(--color-info)]"
+                />
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>1</span>
+                  <span className="font-semibold text-gray-700">{batchSize}</span>
+                  <span>{remaining}</span>
+                </div>
+              </div>
+              {showEta && (
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-500">Szacowany czas dla wybranej grupy ({batchSize} ankiet)</span>
+                  <span className="font-medium">{batchEtaText}</span>
+                </div>
+              )}
+              {!showEta && (
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-500">Szacowany czas</span>
+                  <span className="font-medium text-gray-400 italic">pojawi się po pierwszej ankiecie</span>
+                </div>
+              )}
+              <button
+                onClick={() => handleStart(batchSize)}
+                disabled={busy}
+                className="w-full py-3 px-6 text-base bg-[var(--color-info)] text-white
+                           rounded-md hover:opacity-90 disabled:opacity-50 font-medium transition-opacity"
+              >
+                {busy ? 'Uruchamianie...' : 'Następna grupa'}
+              </button>
+              <button
+                onClick={() => navigate('/app')}
+                className="w-full py-2 px-4 text-sm text-gray-700 bg-white border border-gray-300
+                           rounded-md hover:bg-gray-50 font-medium transition-colors"
+              >
+                Przejdź do weryfikacji
+              </button>
+            </div>
           </>
         )}
 

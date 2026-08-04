@@ -16,7 +16,7 @@ class ProcessingWorker:
         self._client: AIClient | None = None
         self._stop_event = asyncio.Event()
 
-    async def start(self, survey_groups: list[list]):
+    async def start(self, survey_groups: list[list], batch_size: int = 0):
         if self.state.is_running:
             raise RuntimeError("Worker already running")
 
@@ -29,8 +29,32 @@ class ProcessingWorker:
             self.state.global_state.total_pages = sum(
                 len(s.files) for s in self.state.surveys
             )
+            queued_count = sum(1 for s in self.state.surveys if s.status == "queued")
+            effective_batch = batch_size if batch_size > 0 else queued_count
+            self.state.global_state.batch_size = min(effective_batch, queued_count)
+            self.state.global_state.batch_remaining = self.state.global_state.batch_size
+            self.state.global_state.batch_processed = 0
+
+            batch_total_pages = 0
+            counted = 0
+            for s in self.state.surveys:
+                if counted >= self.state.global_state.batch_size:
+                    break
+                if s.status == "queued":
+                    batch_total_pages += len(s.files)
+                    counted += 1
+            self.state.global_state.batch_total_pages = batch_total_pages
+            self.state.global_state.batch_processed_pages = 0
+            logger.info(
+                "Starting worker (continue) with batch_size=%d (requested=%d, queued=%d)",
+                self.state.global_state.batch_size, batch_size, queued_count,
+            )
         else:
-            self.state.init_from_surveys(survey_groups)
+            self.state.init_batch(survey_groups, batch_size)
+            logger.info(
+                "Starting worker (fresh) with batch_size=%d (requested=%d, total=%d)",
+                self.state.global_state.batch_size, batch_size, len(survey_groups),
+            )
 
         self._stop_event.clear()
         self._task = asyncio.create_task(self._run())
@@ -41,6 +65,10 @@ class ProcessingWorker:
     async def _run(self):
         self._client = AIClient()
         try:
+            batch_limit = self.state.global_state.batch_size
+            processed_in_batch = 0
+            logger.info("_run started: batch_limit=%d", batch_limit)
+
             for idx, survey in enumerate(self.state.surveys):
                 if self._stop_event.is_set():
                     logger.info("Worker stop requested — finishing current survey")
@@ -49,7 +77,15 @@ class ProcessingWorker:
                 if survey.status in ("ready", "error", "verified"):
                     continue
 
+                if batch_limit > 0 and processed_in_batch >= batch_limit:
+                    logger.info(
+                        "Batch limit reached (%d/%d) — stopping worker",
+                        processed_in_batch, batch_limit,
+                    )
+                    break
+
                 await self._process_survey_with_retry(idx, survey)
+                processed_in_batch += 1
         finally:
             self.state.global_state.is_running = False
             if self._client:
