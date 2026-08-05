@@ -149,13 +149,13 @@ try {
     # --- Krok 4: Uruchomienie aplikacji ---
     if (-not $NoDev) {
         Write-Log "=== Krok 4/5: Uruchamianie uvicorn (API + frontend static) ==="
-        $Uvicorn = Join-Path -Path $VenvPath -ChildPath "Scripts\uvicorn.exe"
+        $PythonExe = Join-Path -Path $VenvPath -ChildPath "Scripts\python.exe"
         $appLog = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\uvicorn_full.log"
         $SrcDir = Join-Path -Path $ProjectRoot -ChildPath "src\backend"
 
-        if (Test-Path -LiteralPath $Uvicorn) {
+        if (Test-Path -LiteralPath $PythonExe) {
             try {
-                $appProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $appLog -RedirectStandardError "${appLog}.err"
+                $appProcess = Start-Process -FilePath $PythonExe -ArgumentList "-m uvicorn main:app --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $appLog -RedirectStandardError "${appLog}.err"
                 Track-Process -Name "Uvicorn" -Process $appProcess
                 Write-Log "OK: Uvicorn uruchomiony (PID: $($appProcess.Id))"
 
@@ -165,7 +165,7 @@ try {
                 for ($i = 0; $i -lt 15; $i++) {
                     Start-Sleep -Seconds 1
                     try {
-                        $r = Invoke-WebRequest -Uri "http://localhost:8000" -UseBasicParsing -TimeoutSec 2
+                        $r = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/auth/health" -UseBasicParsing -TimeoutSec 2
                         $uvicornReady = $true
                         break
                     } catch { }
@@ -179,7 +179,7 @@ try {
                 throw "Nie udalo sie uruchomic uvicorn - $_"
             }
         } else {
-            throw "Nie znaleziono uvicorn.exe w .venv"
+            throw "Nie znaleziono python.exe w .venv"
         }
     } else {
         Write-Log "Krok 4/5: Pominieto (-NoDev)"

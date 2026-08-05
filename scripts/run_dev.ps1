@@ -31,6 +31,36 @@ function Cleanup {
     Write-Log "=== Cleanup zakonczony ==="
 }
 
+function Wait-UvicornReady {
+    param([string]$LogPath)
+    $intervals = @(1, 1, 2, 2, 3, 3, 5, 8)
+    $elapsed = 0
+    foreach ($sec in $intervals) {
+        Start-Sleep -Seconds $sec
+        $elapsed += $sec
+        try {
+            $r = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/auth/health" -UseBasicParsing -TimeoutSec 2
+            if ($r.StatusCode -eq 200) {
+                Write-Log "OK: API gotowe na http://localhost:8000"
+                return $true
+            }
+        } catch {
+            # uvicorn jeszcze nie gotowy - dalej czekamy
+        }
+    }
+    Write-Log "UWAGA: API nie potwierdzone po ${elapsed}s - sprawdz logi: $LogPath oraz ${LogPath}.err"
+    foreach ($f in @($LogPath, "${LogPath}.err")) {
+        if (Test-Path -LiteralPath $f) {
+            $content = Get-Content -LiteralPath $f -Tail 20
+            if ($content) {
+                Write-Log "Ostatnie linie $(Split-Path -Path $f -Leaf):"
+                $content | ForEach-Object { Write-Log "  $_" }
+            }
+        }
+    }
+    return $false
+}
+
 # --- development env cleanup ---
 $WorkingDir = Join-Path -Path $ProjectRoot -ChildPath "working_vault"
 $LogsDir = Join-Path -Path $WorkingDir -ChildPath "logs"
@@ -87,36 +117,21 @@ $ErrorActionPreference = "Continue"
 
 # --- Krok 3: Uruchomienie uvicorn ---
 Write-Log "Krok 3: Uruchamianie uvicorn (API)..."
-$Uvicorn = Join-Path -Path $VenvPath -ChildPath "Scripts\uvicorn.exe"
+$PythonExe = Join-Path -Path $VenvPath -ChildPath "Scripts\python.exe"
 $uvicornLog = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\uvicorn_dev.log"
 
-if (-not (Test-Path -LiteralPath $Uvicorn)) {
-    Write-Log "BLAD: Nie znaleziono uvicorn.exe w .venv"
+if (-not (Test-Path -LiteralPath $PythonExe)) {
+    Write-Log "BLAD: Nie znaleziono python.exe w .venv"
     exit 1
 }
 
 $SrcDir = Join-Path -Path $ProjectRoot -ChildPath "src\backend"
-$uvicornProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --reload --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
+$uvicornProcess = Start-Process -FilePath $PythonExe -ArgumentList "-m uvicorn main:app --reload --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
 Write-Log "OK: Uvicorn uruchomiony (PID: $($uvicornProcess.Id))"
 
 # --- Waitloop na uvicorn ---
 Write-Log "Czekam na gotowosc uvicorn..."
-$uvicornReady = $false
-for ($i = 0; $i -lt 15; $i++) {
-    Start-Sleep -Seconds 1
-    try {
-        $r = Invoke-WebRequest -Uri "http://localhost:8000" -UseBasicParsing -TimeoutSec 2
-        $uvicornReady = $true
-        break
-    } catch {
-        # still starting
-    }
-}
-if ($uvicornReady) {
-    Write-Log "OK: API gotowe na http://localhost:8000"
-} else {
-    Write-Log "OSTROZNE: API nie odpowiada po 15s - sprawdz log: $uvicornLog"
-}
+$null = Wait-UvicornReady -LogPath $uvicornLog
 
 # --- Krok 4: Walidacja node/npm ---
 Write-Log "Krok 4: Sprawdzanie node i npm..."
@@ -194,9 +209,11 @@ try {
                         $uvicornProcess.Kill()
                         $null = $uvicornProcess.WaitForExit(5000)
                     }
-                    $uvicornProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --reload --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
+                    $uvicornProcess = Start-Process -FilePath $PythonExe -ArgumentList "-m uvicorn main:app --reload --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
                     $lastRestartTime = $now
                     Write-Log "OK: Uvicorn zrestartowany (PID: $($uvicornProcess.Id))"
+                    Write-Log "Czekam na gotowosc uvicorn..."
+                    $null = Wait-UvicornReady -LogPath $uvicornLog
                 }
             }
         }
@@ -210,8 +227,10 @@ try {
                     $uvicornProcess.Kill()
                     $null = $uvicornProcess.WaitForExit(5000)
                 }
-                $uvicornProcess = Start-Process -FilePath $Uvicorn -ArgumentList "main:app --reload --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
+                $uvicornProcess = Start-Process -FilePath $PythonExe -ArgumentList "-m uvicorn main:app --reload --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
                 Write-Log "OK: Uvicorn zrestartowany (PID: $($uvicornProcess.Id))"
+                Write-Log "Czekam na gotowosc uvicorn..."
+                $null = Wait-UvicornReady -LogPath $uvicornLog
                 # Odswiez frontend przez Vite
                 Write-Log "INFO: Frontend Vite HMR odswiezy automatycznie po restarcie backendu"
             }
