@@ -5,7 +5,6 @@ param(
 $ProjectRoot = Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..")
 $LogFile = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\run_dev.log"
 $VenvPath = Join-Path -Path $ProjectRoot -ChildPath ".venv"
-$SetupEnvScript = Join-Path -Path $PSScriptRoot -ChildPath "setup_env.ps1"
 
 $uvicornProcess = $null
 $npmProcess = $null
@@ -93,7 +92,7 @@ try {
 } catch {
     Write-Log "BLAD: Ollama nie odpowiada na porcie 11434."
     Write-Log ""
-    Write-Log "Uruchom najpierw: .\scripts\setup_ollama.ps1"
+    Write-Log "Uruchom najpierw: .\scripts\full_setup.ps1"
     Write-Log ""
     Write-Log "=== Run Dev - blad ==="
     exit 1
@@ -102,14 +101,9 @@ try {
 # --- Krok 2: Sprawdzenie .venv ---
 Write-Log "Krok 2: Sprawdzanie wirtualnego srodowiska..."
 if (-not (Test-Path -LiteralPath $VenvPath)) {
-    Write-Log ".venv nie istnieje. Uruchamiam setup_env.ps1..."
-    if (Test-Path -LiteralPath $SetupEnvScript) {
-        & $SetupEnvScript -Force
-        if ($LASTEXITCODE -ne 0) { throw "setup_env.ps1 nie powiodl sie" }
-        Write-Log "OK: .venv utworzony przez setup_env.ps1"
-    } else {
-        throw "Nie znaleziono setup_env.ps1 w $SetupEnvScript"
-    }
+    Write-Log "BLAD: .venv nie istnieje."
+    Write-Log "Uruchom najpierw: .\scripts\full_setup.ps1"
+    exit 1
 } else {
     Write-Log "OK: .venv istnieje"
 }

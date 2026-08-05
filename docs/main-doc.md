@@ -206,36 +206,76 @@ zainstalowany, traces są pomijane (no-op).
 
 ## Deployment
 
-### Scenariusz 1: Ręczny
+### Architektura skryptów
+
+Trzy skrypty w `scripts/`, każdy z jedną odpowiedzialnością:
+
+| Skrypt | Kiedy | Odpowiedzialność |
+|---|---|---|
+| `full_setup.ps1` | Raz przy pierwszym uruchomieniu | Instaluje wszystko: .venv, pakiety Python, npm, Ollama, modele AI. Idempotentny -- bezpiecznie uruchomić wielokrotnie. **NIE uruchamia aplikacji.** |
+| `run_prod.ps1` | Każde uruchomienie produkcyjne | Build frontendu → kopia do `working_vault/dist/` → uvicorn (API+static) → tunel Cloudflare. Domyślnie z tunelem. |
+| `run_dev.ps1` | Programowanie | uvicorn --reload (tylko API na :8000) + Vite HMR (frontend na :5173). File watcher na zdjęcia. |
+
+### Flow użytkownika końcowego
+
 ```powershell
-.\scripts\setup_env.ps1          # Tworzenie venv, pip install, npm install
-.\scripts\setup_ollama.ps1       # Instalacja Ollamy, pull modelu
-.venv\Scripts\Activate.ps1
-cd src/frontend; npm run build; cd ../..
-Copy-Item src/frontend/dist/* working_vault/dist/ -Recurse -Force  # build do working_vault/dist/
-cd src/backend; uvicorn main:app --port 8000            # Start aplikacji
+# Pierwsze uruchomienie (jednorazowo):
+.\scripts\full_setup.ps1
+
+# Kazde kolejne uruchomienie:
+.\scripts\run_prod.ps1               # z tunelem Cloudflare
+.\scripts\run_prod.ps1 -NoTunnel     # tylko lokalnie
 ```
 
-### Scenariusz 2: Automatyczny
+### Flow developera
+
 ```powershell
-.\scripts\full_setup.ps1         # Uruchamia wszystkie skrypty
+# Pierwsze uruchomienie (jednorazowo):
+.\scripts\full_setup.ps1
+
+# Kazde kolejne:
+.\scripts\run_dev.ps1
 ```
 
-### Scenariusz 3: Z tunelem Cloudflare
-```powershell
-.\scripts\full_setup.ps1         # W tym tunelem
-# lub osobno:
-.\scripts\deploy_tunnel.ps1      # Tylko tunel
-```
+### Tryb deweloperski (run_dev.ps1)
 
-Aplikacja dostępna pod `http://localhost:8000`. Hasło ustawiasz w `config.yaml` (szablon w `config.yaml.example` ma pusty placeholder).
+Frontend: `http://localhost:5173` (proxy `/api` → `localhost:8000`). Backend na `:8000` **nie serwuje** frontendu -- służy tylko jako API. Vite HMR natychmiast odświeża zmiany w frontendzie, uvicorn `--reload` restartuje backend po zmianach w Pythonie.
 
-### Uruchomienie deweloperskie (hot-reload)
-```powershell
-.\scripts\run_dev.ps1            # uvicorn --reload (port 8000) + Vite dev (port 5173)
-```
+### Tryb produkcyjny (run_prod.ps1)
 
-Frontend deweloperski: `http://localhost:5173` (proxy `/api` → `localhost:8000`).
+Skrypt automatycznie:
+1. Buduje frontend (`npm run build` w `src/frontend/`)
+2. Kopiuje output do `working_vault/dist/`
+3. Waliduje że `index.html` istnieje
+4. Uruchamia uvicorn na porcie 8000 (bez `--reload`) -- backend serwuje API + zbudowany frontend
+5. Pobiera/uruchamia cloudflared i tworzy publiczny tunel
+6. Wyświetla URL tunelu i zapisuje go do `working_vault/logs/tunnel_url.txt`
+
+Flaga `-NoTunnel` pomija krok z cloudflared -- tylko lokalna produkcja.
+
+### Setup środowiska (full_setup.ps1)
+
+Pojedynczy skrypt, który przygotowuje wszystko co potrzebne do działania aplikacji:
+1. Sprawdza Python >= 3.12
+2. Tworzy/aktualizuje .venv i pakiety Python (pip install -r requirements.txt)
+3. Sprawdza Node.js >= 18 (tylko informuje, nie instaluje)
+4. Instaluje zależności frontendu (npm install)
+5. Instaluje Ollamę (jeśli nie ma)
+6. Uruchamia serwer Ollamy
+7. Pobiera modele AI zdefiniowane w config.yaml
+8. Testuje modele quick API call
+
+Flaga `-Force` wymusza odtworzenie .venv od nowa. Skrypt jest idempotentny -- bezpieczne wielokrotne uruchamianie.
+
+### Mechanizm serwowania frontendu
+
+Backend (`main.py`) próbuje znaleźć zbudowany frontend w dwóch lokalizacjach (w kolejności):
+1. `working_vault/dist/` -- preferowana (kopia po buildzie)
+2. `src/frontend/dist/` -- fallback (bezpośrednio po `npm run build`)
+
+Jeśli żadna nie istnieje, serwowana jest strona informacyjna z instrukcją uruchomienia (zamiast 404 "not found").
+
+W trybie produkcyjnym wszystkie ścieżki niepodpięte pod `/api/*` są obsługiwane przez SPA fallback (`html=True` w StaticFiles) -- React Router przejmuje routing po stronie klienta.
 
 ---
 

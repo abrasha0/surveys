@@ -5,7 +5,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import config, APP_ROOT
@@ -32,6 +33,42 @@ app = FastAPI(title="AnkieterAI", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(api_router)
 
-dist_path = APP_ROOT / "working_vault" / "dist"
-if dist_path.exists():
-    app.mount("/", StaticFiles(directory=str(dist_path), html=True), name="static")
+_dist_paths = [
+    APP_ROOT / "working_vault" / "dist",
+    APP_ROOT / "src" / "frontend" / "dist",
+]
+_dist_path = None
+for _p in _dist_paths:
+    if _p.exists():
+        _dist_path = _p
+        break
+
+if _dist_path:
+    app.mount("/", StaticFiles(directory=str(_dist_path), html=True), name="static")
+
+    @app.middleware("http")
+    async def spa_fallback(request: Request, call_next):
+        response = await call_next(request)
+        if response.status_code == 404 and not request.url.path.startswith("/api/"):
+            index_path = _dist_path / "index.html"
+            if index_path.exists():
+                return FileResponse(str(index_path))
+        return response
+else:
+    @app.get("/", response_class=HTMLResponse)
+    async def no_frontend():
+        return """\
+<!DOCTYPE html>
+<html lang="pl">
+<head><meta charset="UTF-8"><title>AnkieterAI</title></head>
+<body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5">
+<div style="text-align:center;padding:2rem;background:white;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-width:520px">
+<h1>AnkieterAI</h1>
+<p>Frontend nie zostal jeszcze zbudowany.</p>
+<p><strong>Uruchom najpierw:</strong></p>
+<pre style="background:#eee;padding:1rem;border-radius:4px;text-align:left;overflow-x:auto">.\\scripts\\full_setup.ps1</pre>
+<p style="font-size:0.85rem;color:#666">lub dla wersji deweloperskiej:</p>
+<pre style="background:#eee;padding:1rem;border-radius:4px;text-align:left;overflow-x:auto">.\\scripts\\run_dev.ps1</pre>
+<p style="font-size:0.85rem;color:#666">(frontend dostepny na <code>http://localhost:5173</code>)</p>
+</div></body></html>
+"""

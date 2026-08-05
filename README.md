@@ -6,33 +6,36 @@ Automatyczny system wprowadzania ankiet papierowych do formy cyfrowej z wykorzys
 
 ## Quick Start
 
-1. Przygotowanie środowiska (Python + npm):
+Trzy skrypty w `scripts/`:
 
-   ```powershell
-   .\scripts\setup_env.ps1
-   ```
+| Skrypt | Kiedy | Co robi |
+|---|---|---|
+| `full_setup.ps1` | **Raz** (pierwsze uruchomienie) | Tworzy .venv, instaluje pakiety Python i npm, instaluje Ollamę, pobiera modele AI |
+| `run_prod.ps1` | **Każde uruchomienie** | Buduje frontend, startuje backend + API, wystawia przez tunel Cloudflare |
+| `run_dev.ps1` | **Programowanie** | Hot-reload backendu (uvicorn --reload) + Vite HMR frontendu na osobnym porcie |
 
-2. Uruchomienie Ollamy:
+```powershell
+# Pierwsze uruchomienie -- przygotowanie srodowiska (jednorazowo):
+.\scripts\full_setup.ps1
 
-   ```powershell
-   .\scripts\setup_ollama.ps1
-   ```
+# Kazde kolejne uruchomienie produkcyjne:
+.\scripts\run_prod.ps1               # z tunelem Cloudflare
+.\scripts\run_prod.ps1 -NoTunnel     # tylko lokalnie, bez tunelu
 
-3. Pełne uruchomienie produkcyjne:
+# Tryb deweloperski:
+.\scripts\run_dev.ps1
+```
 
-   ```powershell
-   .\scripts\full_setup.ps1
-   ```
+**Po uruchomieniu:**
+- Produkcja: `http://localhost:8000` (backend serwuje API + zbudowany frontend)
+- Dev: frontend `http://localhost:5173` (Vite z proxy /api → :8000), backend `:8000` tylko API
+- Tunel Cloudflare (run_prod): URL wyświetlany w konsoli i zapisywany do `working_vault/logs/tunnel_url.txt`
 
-4. Uruchomienie deweloperskie (z hot-reloadem):
+Hasło ustawiasz w `config.yaml` — skopiuj z `config.yaml.example` i edytuj.
 
-   ```powershell
-   .\scripts\run_dev.ps1
-   ```
+> **Uwaga:** Jeśli wejdziesz na `http://localhost:8000` przed zbudowaniem frontendu, zobaczysz stronę z instrukcją uruchomienia zamiast błędu 404.
 
-Aplikacja dostępna pod `http://localhost:8000` (produkcja) lub `http://localhost:5173` (dev frontend z proxy API). Hasło ustawiasz w `config.yaml` — `config.yaml.example` to szablon z pustym placeholderem, przed startem ustaw własne.
-
-> **Wymagania:** Python ≥ 3.12, Node.js (dla frontendu React).
+> **Wymagania:** Python ≥ 3.12, Node.js ≥ 18 (ręcznie, skrypt tylko sprawdza i informuje).
 
 ## Funkcjonalności
 
