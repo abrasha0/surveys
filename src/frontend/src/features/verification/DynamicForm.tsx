@@ -69,7 +69,6 @@ const DynamicForm = forwardRef<{ save: () => void; forceSave: () => void }, Dyna
   fieldSpecs,
   aiResult,
   onSave,
-  onForceSave,
   onNextSurvey,
   disabled = false,
   readOnly = false,

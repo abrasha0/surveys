@@ -36,6 +36,9 @@ class GlobalState:
     batch_processed: int = 0
     batch_total_pages: int = 0
     batch_processed_pages: int = 0
+    batch_eta_seconds: float | None = None
+    current_survey_pages: int = 0
+    current_survey_batch_idx: int | None = None
 
 
 class ProcessingState:
@@ -241,7 +244,14 @@ class ProcessingState:
         self.global_state.current_survey_id = survey_id
         self.global_state.current_page = page
         self.global_state.current_stage = stage
+        if survey_id is not None and 0 <= survey_id < len(self.surveys):
+            self.global_state.current_survey_pages = len(self.surveys[survey_id].files)
+        if self.global_state.batch_size > 0:
+            self.global_state.current_survey_batch_idx = self.global_state.batch_processed
+        else:
+            self.global_state.current_survey_batch_idx = None
         self._recalculate_eta()
+        self._recalculate_batch_eta()
 
     def record_page_time(self, elapsed: float):
         self.page_times.append(elapsed)
@@ -265,6 +275,35 @@ class ProcessingState:
         else:
             remaining = self.global_state.total_pages - self.global_state.processed_pages
         self.global_state.eta_seconds = avg * remaining if remaining > 0 else 0
+
+    def _recalculate_batch_eta(self):
+        if not self.page_times:
+            self.global_state.batch_eta_seconds = None
+            return
+        if (
+            self.global_state.batch_size <= 0
+            or self.global_state.batch_total_pages <= 0
+        ):
+            self.global_state.batch_eta_seconds = None
+            return
+        avg = sum(self.page_times) / len(self.page_times)
+        remaining_pages = (
+            self.global_state.batch_total_pages
+            - self.global_state.batch_processed_pages
+        )
+        if (
+            self.global_state.current_survey_id is not None
+            and self.global_state.current_page is not None
+            and self.global_state.current_survey_batch_idx is not None
+        ):
+            done_in_current = min(
+                self.global_state.current_page + 1,
+                self.global_state.current_survey_pages,
+            )
+            remaining_pages -= done_in_current
+        self.global_state.batch_eta_seconds = (
+            avg * remaining_pages if remaining_pages > 0 else 0
+        )
 
     def is_finished(self) -> bool:
         return all(s.status in ("ready", "error", "verified") for s in self.surveys)
@@ -293,4 +332,7 @@ class ProcessingState:
             "batch_processed": self.global_state.batch_processed,
             "batch_total_pages": self.global_state.batch_total_pages,
             "batch_processed_pages": self.global_state.batch_processed_pages,
+            "batch_eta_seconds": self.global_state.batch_eta_seconds,
+            "current_survey_pages": self.global_state.current_survey_pages,
+            "current_survey_batch_idx": self.global_state.current_survey_batch_idx,
         }

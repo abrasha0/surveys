@@ -37,6 +37,9 @@ export interface ProcessingStatus {
   batch_processed: number;
   batch_total_pages: number;
   batch_processed_pages: number;
+  batch_eta_seconds: number | null;
+  current_survey_pages: number;
+  current_survey_batch_idx: number | null;
 }
 
 export interface SurveyResult {

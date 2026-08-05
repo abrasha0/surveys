@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSurveys, useFieldSpecs, useSurveyResult, useSaveSurvey, useProcessingStatus, useSurveyImages, useUnverifySurvey } from '../../api/hooks';
+import { useSurveys, useFieldSpecs, useSurveyResult, useSaveSurvey, useSurveyImages, useUnverifySurvey } from '../../api/hooks';
 import { useVerificationStore } from '../../store/verificationStore';
 import { useDraftSync } from '../../hooks/useDraftSync';
 import ImageViewer from '../../components/ImageViewer';
@@ -18,9 +18,6 @@ export default function VerificationPanel() {
   const surveyUI = useVerificationStore((s) =>
     currentSurveyId !== null ? s.surveysUI[currentSurveyId] : undefined
   );
-
-  const { data: processingStatus } = useProcessingStatus();
-  const isRunning = processingStatus?.is_running ?? false;
 
   const allSurveys = useMemo(() => surveys ?? [], [surveys]);
   const currentSurvey = useMemo(
@@ -90,7 +87,7 @@ export default function VerificationPanel() {
     await unverifyMutation.mutateAsync(currentSurveyId);
   };
 
-  const handleForceSave = () => {
+  const handleForceSave = async () => {
     if (currentSurveyId === null) return;
     formRef.current?.forceSave();
   };

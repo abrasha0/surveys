@@ -20,12 +20,20 @@ function stageLabel(
   stage: string | null,
   page: number | null,
   surveyId: number | null,
+  pagesPerSurvey: number,
+  batchIdx: number | null,
+  batchSize: number,
 ): string {
   if (!stage) return "";
-  const stageName = stage === "vlm" ? "VLM" : "Formatowanie";
-  const pageStr = page !== null ? `strona ${page + 1}/5` : "";
-  const surveyStr = surveyId !== null ? `ankieta ${surveyId}` : "";
-  return [stageName, pageStr, surveyStr].filter(Boolean).join(" — ");
+  const stageName = stage === "vlm" ? "Czytanie" : "Formatowanie";
+  const pageStr = page !== null ? `strona ${page + 1}/${pagesPerSurvey}` : "";
+  const surveyStr =
+    batchIdx !== null
+      ? `ankieta ${batchIdx + 1}/${batchSize}`
+      : surveyId !== null
+        ? `ankieta ${surveyId}`
+        : "";
+  return [stageName, surveyStr, pageStr].filter(Boolean).join(" — ");
 }
 
 export default function ProcessingProgressBar({
@@ -34,6 +42,7 @@ export default function ProcessingProgressBar({
 }: ProcessingProgressBarProps) {
   const [localEtaSeconds, setLocalEtaSeconds] = useState<number | null>(null);
   const [showCompletion, setShowCompletion] = useState(false);
+  const [showBatchDone, setShowBatchDone] = useState(false);
   const lastBackendEta = useRef<number | null>(null);
   const { data: surveys } = useSurveys();
   const finalizeMutation = useFinalizeSession();
@@ -63,20 +72,23 @@ export default function ProcessingProgressBar({
   const current_survey_id = status?.current_survey_id ?? null;
   const batch_size = status?.batch_size ?? 0;
   const batch_remaining = status?.batch_remaining;
-  const batch_total_pages = status?.batch_total_pages ?? 0;
   const batch_processed_pages = status?.batch_processed_pages ?? 0;
+  const batch_total_pages = status?.batch_total_pages ?? 0;
+  const batch_eta_seconds = status?.batch_eta_seconds ?? null;
+  const current_survey_pages = status?.current_survey_pages ?? 0;
+  const current_survey_batch_idx = status?.current_survey_batch_idx ?? null;
 
   const batchActive = batch_size > 0;
   const batchDone =
-    batchActive && !is_running && batch_remaining !== null && batch_remaining <= 0;
+    batchActive && !is_running && batch_remaining != null && batch_remaining <= 0;
 
   useEffect(() => {
-    const newEta = status?.eta_seconds ?? null;
+    const newEta = batchActive ? batch_eta_seconds : (status?.eta_seconds ?? null);
     if (newEta !== null && newEta !== lastBackendEta.current) {
       lastBackendEta.current = newEta;
       setLocalEtaSeconds(newEta);
     }
-  }, [status?.eta_seconds]);
+  }, [batchActive, batch_eta_seconds, status?.eta_seconds]);
 
   useEffect(() => {
     if (!is_running) return;
@@ -102,6 +114,18 @@ export default function ProcessingProgressBar({
     }
   }, [is_running, total, processed, errors]);
 
+  useEffect(() => {
+    if (batchDone) {
+      setShowBatchDone(true);
+      const timer = setTimeout(() => {
+        setShowBatchDone(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowBatchDone(false);
+    }
+  }, [batchDone]);
+
   if (isLoading || !status) {
     return (
       <div className="flex items-center h-16 px-4 bg-gray-100 border-b border-gray-200 text-sm text-gray-400">
@@ -110,23 +134,25 @@ export default function ProcessingProgressBar({
     );
   }
 
-  const displayTotalPages =
-    batchActive && batch_total_pages > 0 ? batch_total_pages : total_pages;
-  const displayProcessedPages =
-    batchActive && batch_total_pages > 0 ? batch_processed_pages : processed_pages;
-  const pagesComplete =
-    displayTotalPages > 0 ? Math.min(displayProcessedPages / displayTotalPages, 1) : 0;
-  const activity = stageLabel(current_stage, current_page, current_survey_id);
+  const stageProgress = is_running && current_stage === "format" ? 0.5 : 0;
+  const currentPageProgress = (current_page ?? 0) + stageProgress;
+  const pagesComplete = batchActive
+    ? batch_total_pages > 0
+      ? Math.min((batch_processed_pages + currentPageProgress) / batch_total_pages, 1)
+      : 0
+    : total_pages > 0
+      ? Math.min((processed_pages + stageProgress) / total_pages, 1)
+      : 0;
+  const activity = stageLabel(
+    current_stage,
+    current_page,
+    current_survey_id,
+    current_survey_pages > 0 ? current_survey_pages : 5,
+    batchActive ? current_survey_batch_idx : null,
+    batch_size,
+  );
 
-  const batchEta = useMemo(() => {
-    if (!batchActive || !localEtaSeconds) return null;
-    const remainingBatch = batch_remaining ?? 0;
-    const remainingGlobal = total - processed - errors;
-    if (remainingGlobal <= 0) return null;
-    return localEtaSeconds * (remainingBatch / remainingGlobal);
-  }, [batchActive, batch_remaining, localEtaSeconds, total, processed, errors]);
-
-  const displayEta = batchActive ? batchEta : localEtaSeconds;
+  const displayEta = localEtaSeconds;
 
   if (total === 0) {
     return (
@@ -153,22 +179,18 @@ export default function ProcessingProgressBar({
         </div>
 
         <span className="text-gray-700 whitespace-nowrap shrink-0 text-sm">
-          przetworzono: {displayProcessedPages} z {displayTotalPages} stron
-          {errors > 0 && <> · Błędy: {errors}</>}
+          {activity && <>{activity}<span className="mx-1.5">·</span> </>}
+          {errors > 0 && <>Błędy: {errors} · </>}
           {is_running && displayEta === null
-            ? " · obliczanie..."
+            ? "obliczanie..."
             : displayEta !== null && is_running
-              ? ` · ${formatEta(displayEta)}`
+              ? `${formatEta(displayEta)}`
               : ""}
         </span>
       </div>
 
       <div className="flex items-center gap-3 shrink-0">
-        {activity && (
-          <span className="text-gray-700 truncate max-w-72 text-sm font-medium">{activity}</span>
-        )}
-
-        {batchDone ? (
+        {showBatchDone ? (
           <>
             <span className="text-[var(--color-success)] font-semibold text-sm">
               Wybrana grupa przetworzona ✓
