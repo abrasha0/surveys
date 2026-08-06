@@ -286,6 +286,15 @@ export default function WelcomePage() {
                   ? 'Kontynuuj analizę'
                   : 'Rozpocznij analizę'}
             </button>
+            {stats.processed > 0 && (
+            <button
+              onClick={() => navigate('/app')}
+              className="w-full py-2 px-4 text-sm text-gray-700 bg-white border border-gray-300
+                         rounded-md hover:bg-gray-50 font-medium transition-colors mt-3"
+            >
+              Przejdź do weryfikacji
+            </button>
+            )}
           </>
         )}
 
