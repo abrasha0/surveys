@@ -8,13 +8,11 @@ import {
   useSurveys,
 } from '../../api/hooks';
 import { useVerificationStore } from '../../store/verificationStore';
+import { formatEta as sharedFormatEta } from '../../utils/formatEta';
 
 function formatEta(seconds: number | null | undefined): string {
-  if (seconds === null || seconds === undefined) return '-';
-  if (seconds <= 0) return 'Zakończono';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.round(seconds % 60);
-  return mins > 0 ? `~${mins} min ${secs} s` : `~${secs} s`;
+  if (seconds !== null && seconds !== undefined && seconds <= 0) return 'Zakończono';
+  return sharedFormatEta(seconds);
 }
 
 export default function WelcomePage() {

@@ -2,18 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ProcessingStatus } from "../../api/hooks";
 import { useSurveys, useFinalizeSession } from "../../api/hooks";
+import { formatEta } from "../../utils/formatEta";
 
 interface ProcessingProgressBarProps {
   status: ProcessingStatus | undefined;
   isLoading: boolean;
-}
-
-function formatEta(seconds: number | null): string {
-  if (seconds === null || seconds === undefined) return "-";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  if (m > 0) return `zostało ~${m}min ${s}s`;
-  return `zostało ~${s}s`;
 }
 
 function stageLabel(
@@ -184,7 +177,7 @@ export default function ProcessingProgressBar({
           {is_running && displayEta === null
             ? "obliczanie..."
             : displayEta !== null && is_running
-              ? `${formatEta(displayEta)}`
+              ? `zostało ~${formatEta(displayEta)}`
               : ""}
         </span>
       </div>
