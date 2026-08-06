@@ -7,10 +7,10 @@ interface ImageViewerProps {
 
 const PAGE_DESCRIPTIONS: Record<number, string> = {
   0: 'Dane demograficzne, praca, styl życia',
-  1: 'Skala CES-D (odczucia w minionym tygodniu)',
-  2: 'Ateńska skala bezsenności',
-  3: 'MFIS (część 1, pozycje 1-15)',
-  4: 'MFIS (część 2, pozycje 16-21) oraz pytania o zdrowie',
+  1: 'Ateńska skala bezsenności',
+  2: 'MFIS (część 1, pozycje 1-15)',
+  3: 'MFIS (część 2, pozycje 16-21) oraz pytania o zdrowie',
+  4: 'Skala CES-D (odczucia w minionym tygodniu)',
 };
 
 export default function ImageViewer({ imageUrl, page }: ImageViewerProps) {

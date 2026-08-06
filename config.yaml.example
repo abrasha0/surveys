@@ -120,19 +120,6 @@ prompts:
     }
 
   page_2_json_schema: |
-    ZASADY DLA PÓL:
-    Skala depresji (pytania 1-20). Dozwolone wartości dla WSZYSTKICH kluczy (od depr_1 do depr_20) to WYŁĄCZNIE:
-    ["Rzadko lub wcale (mniej niż 1 dzień)", "Przez niedługi czas (1-2 dni)", "Czasem lub przez umiarkowany okres (3-4 dni)", "Przeważnie lub cały czas (5-7 dni)"]
-
-    OCZEKIWANY FORMAT WYJŚCIOWY:
-    {
-      "depr_1": "", "depr_2": "", "depr_3": "", "depr_4": "", "depr_5": "",
-      "depr_6": "", "depr_7": "", "depr_8": "", "depr_9": "", "depr_10": "",
-      "depr_11": "", "depr_12": "", "depr_13": "", "depr_14": "", "depr_15": "",
-      "depr_16": "", "depr_17": "", "depr_18": "", "depr_19": "", "depr_20": ""
-    }
-
-  page_3_json_schema: |
     ZASADY DLA PÓL (Dozwolone wartości):
     * sen_1 - Zasypianie: ["szybkie", "nieznacznie opóźnione", "opóźnione", "bardzo opóźnione lub bezsenność przez całą noc"]
     * sen_2 - Budzenie w nocy: ["nie występuje", "sporadycznie", "często", "bardzo często lub bezsenność przez całą noc"]
@@ -149,7 +136,7 @@ prompts:
       "sen_5": "", "sen_6": "", "sen_7": "", "sen_8": ""
     }
 
-  page_4_json_schema: |
+  page_3_json_schema: |
     ZASADY DLA PÓL:
     Dla wszystkich pytań ze skali zmęczenia (od mfis_1 do mfis_15) dozwolone wartości to WYŁĄCZNIE:
     ["0", "1", "2", "3", "4"]
@@ -161,7 +148,7 @@ prompts:
       "mfis_11": "", "mfis_12": "", "mfis_13": "", "mfis_14": "", "mfis_15": ""
     }
 
-  page_5_json_schema: |
+  page_4_json_schema: |
     ZASADY DLA PÓL:
     * Dla pytań skali zmęczenia (od mfis_16 do mfis_21) dozwolone wartości to WYŁĄCZNIE: ["0", "1", "2", "3", "4"]
     * choroba_anemia oraz choroba_tarczyca - Czy stwierdzono: ["TAK", "NIE"]
@@ -171,4 +158,17 @@ prompts:
     {
       "mfis_16": "", "mfis_17": "", "mfis_18": "", "mfis_19": "", "mfis_20": "", "mfis_21": "",
       "choroba_anemia": "", "choroba_tarczyca": "", "tarczyca_jakie": "", "choroba_inne": ""
+    }
+
+  page_5_json_schema: |
+    ZASADY DLA PÓL:
+    Skala depresji (pytania 1-20). Dozwolone wartości dla WSZYSTKICH kluczy (od depr_1 do depr_20) to WYŁĄCZNIE:
+    ["Rzadko lub wcale (mniej niż 1 dzień)", "Przez niedługi czas (1-2 dni)", "Czasem lub przez umiarkowany okres (3-4 dni)", "Przeważnie lub cały czas (5-7 dni)"]
+
+    OCZEKIWANY FORMAT WYJŚCIOWY:
+    {
+      "depr_1": "", "depr_2": "", "depr_3": "", "depr_4": "", "depr_5": "",
+      "depr_6": "", "depr_7": "", "depr_8": "", "depr_9": "", "depr_10": "",
+      "depr_11": "", "depr_12": "", "depr_13": "", "depr_14": "", "depr_15": "",
+      "depr_16": "", "depr_17": "", "depr_18": "", "depr_19": "", "depr_20": ""
     }

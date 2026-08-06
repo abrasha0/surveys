@@ -9,10 +9,10 @@ type LayoutType = 'columns-3' | 'table' | 'grid-2' | 'table+health';
 
 const PAGE_LAYOUT: Record<number, LayoutType> = {
   0: 'columns-3',
-  1: 'table',
-  2: 'grid-2',
-  3: 'table',
-  4: 'table+health',
+  1: 'grid-2',
+  2: 'table',
+  3: 'table+health',
+  4: 'table',
 };
 
 interface DynamicFormProps {
@@ -90,7 +90,7 @@ const DynamicForm = forwardRef<{ save: () => void; forceSave: () => void }, Dyna
   );
 
   const { mfisFields, healthFields } = useMemo(() => {
-    if (selectedPage !== 4) return { mfisFields: [], healthFields: [] };
+    if (selectedPage !== 3) return { mfisFields: [], healthFields: [] };
     const mfis = pageFields.filter((f) => f.name.startsWith('mfis_'));
     const health = pageFields.filter((f) => !f.name.startsWith('mfis_'));
     return { mfisFields: mfis, healthFields: health };
