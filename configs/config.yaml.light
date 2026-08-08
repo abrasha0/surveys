@@ -1,0 +1,161 @@
+app:
+  page_title: "surveysApp"
+  password: ""
+  processing_dir: "working_vault"
+  csv_results: "working_vault/wyniki.csv"
+  cache_file: "working_vault/cache_results.json"
+  surveys_dir: "working_vault/surveys_data"
+  accepted_file_types:
+    - jpg
+    - png
+    - webp
+
+ai:
+  vlm_model: "moondream"
+  text_model: "llama3.2:3b"
+  ollama_url: "http://localhost:11434"
+  max_retries: 3
+  timeout_sec: 120
+  num_ctx: 8192
+  temperature: 0.0
+  keep_alive: "5m"
+
+image:
+  max_dimension: 2000
+  contrast_factor: 1.5
+  jpeg_quality: 80
+
+ingestion:
+  survey_group_size: 5
+  upload_dir_prefix: "ankieter_uploads_"
+
+logging:
+  file: "working_vault/logs/ankieter.log"
+  level: "DEBUG"
+  ai_log_max_bytes: 10485760
+  ai_log_backup_count: 3
+  shorten_models_io: false
+  max_models_io_size: 500
+
+langsmith:
+  tracing_v2: false
+  endpoint: ""
+  api_key: ""
+  project: "surveysApp"
+
+processing:
+  progress_vlm_weight: 0.3
+  progress_text_weight: 0.6
+  history_display_limit: 8
+  worker_max_retries: 3
+  eta_rolling_window: 10
+  survey_cache_dir: "working_vault/logs/survey_cache"
+  re_ocr_threshold: 0.0
+  re_ocr_max_attempts: 0
+
+prompts:
+  vlm: |
+    Jesteś zaawansowanym i wysoce precyzyjnym systemem OCR do dygitalizacji formularzy medycznych i ankiet. Twoim jedynym zadaniem jest konwersja obrazu na tekst, z zachowaniem sensu strukturalnego.
+    RYGOROSTYCZNE ZASADY:
+    1. Brak jakichkolwiek wstępów, powitań i komentarzy. Zwróć sam wyekstrahowany tekst.
+    2. USUWANIE SZUMU: Bezwzględnie ignoruj ciągi kropek (np. "........") oraz ciągi podkreśleń (np. "________"), które służą w formularzach jako linie do wpisywania odręcznego tekstu. Jeśli odczytasz odręczny tekst "COŚ" na linii kropek, zwróć po prostu słowo "COŚ", bez żadnych znaków interpunkcyjnych wokół niego.
+    3. SKALE I TABELE (np. MFIS): Jeśli dokument zawiera tabelę lub skalę z punktacją (np. kolumny z nagłówkami 0, 1, 2, 3, 4), analizuj ją rygorystycznie wiersz po wierszu. Zamiast przepisywać całą siatkę, dla każdego wiersza przepisz treść pytania/stwierdzenia, a następnie podaj TYLKO tę wartość z nagłówka kolumny, która została zaznaczona (np. "Pytanie 1: 3").
+    4. ZAZNACZENIA: Jeśli widzisz pojedyncze pola wyboru (checkboxy), oznacz puste jako [ ], a zaznaczone jako [X]. Jeśli liczba lub odpowiedź tekstowa jest zakreślona kółkiem, zapisz ją w nawiasach okrągłych, np. (4).
+    5. Kopiuj zwykły tekst linia po linii.
+    6. Jeśli obraz nie zawiera żadnego czytelnego tekstu, zwróć tylko tag: [PUSTA_STRONA].
+
+  text_format: |
+    Jesteś bezwzględnym parserem danych. Otrzymasz surowy tekst z systemu OCR oraz ZASADY I DOCELOWY SCHEMAT JSON definiujący strukturę odpowiedzi. 
+    Twoim zadaniem jest wyciągnięcie danych z tekstu OCR i zwrócenie ich w zwięzłym, płaskim formacie JSON (tylko klucz: wartość).
+    RYGOROSTYCZNE ZASADY:
+    1. FORMAT: Zwróć WYŁĄCZNIE czysty obiekt JSON bez zagnieżdżeń. Nie używaj znaczników markdown (jak ```json). Brak jakiegokolwiek tekstu przed/po JSON.
+    2. WALIDACJA: Zwracana wartość MUSI DOKŁADNIE pasować do podanych w zasadach [Dozwolonych wartości].
+    3. BRAK WYNIKU: Jeśli odpowiedź z OCR jest niejasna, brak jej, lub nie pasuje do listy, zwróć pusty string: "".
+    4. ODPORNOŚĆ NA ŚMIECI: Ignoruj zdania konwersacyjne i halucynacje z OCR.
+    5. CZYSZCZENIE OUTPUTU: Podczas ekstrakcji wartości tekstowych do formatu JSON, działaj jako korektor. Usuń wszelkie wiodące i kończące ciągi kropek, nadmiarowe spacje oraz przypadkowe podkreślenia, które są wynikiem błędów OCR (np. z ciągów takich jak '...Jan...Kowalski....' utwórz 'Jan Kowalski').
+    SUROWY TEKST OCR:
+    {vlm_output}
+    ZASADY I OCZEKIWANY SCHEMAT:
+    {page_json_schema}
+
+  page_1_json_schema: |
+    ZASADY DLA PÓL (Dozwolone wartości):
+    * p1_plec - Płeć: ["Kobieta", "Mężczyzna", "Nie chcę podawać"]
+    * p2_wiek - Wiek: [DOWOLNY_TEKST]
+    * p3_miejsce - Wielkość miejscowości: ["Wieś", "Miasto do 50 tys. mieszkańców", "Miasto 50-100 tys. mieszkańców", "Miasto powyżej 100 tys. mieszkańców"]
+    * p4_stan - Stan cywilny: ["Panna/kawaler", "W związku nieformalnym", "Mężatka/żonaty", "Rozwiedziona/rozwiedziony", "Wdowa/wdowiec"]
+    * p5_forma - Zamieszkanie: ["Z rodziną", "W akademiku", "W wynajmowanym mieszkaniu/pokoju", "Inne"]
+    * p5_inne - Jeśli 'Inne' w p5: [DOWOLNY_TEKST]
+    * p6_stopien - Stopień studiów: ["Studia I stopnia", "Studia II stopnia"]
+    * p7_uczelnia - Nazwa uczelni: [DOWOLNY_TEKST]
+    * p8_praca - Praca zawodowa: ["Tak, w zawodzie medycznym", "Tak, poza zawodem", "Nie (Jeśli zaznaczyłaś/eś tą odpowiedź, przejdź do pytania nr 12)"]
+    * p9_system - System pracy: ["Zmianowym, 12-godzinnym", "Jednozmianowym, 8-godzinnym", "Innym"]
+    * p9_inne - Jeśli 'Innym' w p9: [DOWOLNY_TEKST]
+    * p10_oddzial - Oddział: ["Zachowawczym", "Zabiegowym", "Inne"]
+    * p10_inne - Jeśli 'Inne' w p10: [DOWOLNY_TEKST]
+    * p11_staz - Staż: [DOWOLNY_TEKST]
+    * p12_sen - Godziny snu: ["poniżej 5 godzin", "5-6 godzin", "7-8 godzin", "Powyżej 8 godzin"]
+    * p13_ekran - Czas przed ekranem: ["Mniej niż 1 godzinę", "1-3 godziny", "Powyżej 3 godzin"]
+    * p14_kofeina - Kofeina: ["Nie", "Tak, 1-2 porcje dziennie", "Tak, 3 lub więcej porcji dziennie"]
+
+    OCZEKIWANY FORMAT WYJŚCIOWY:
+    {
+      "p1_plec": "", "p2_wiek": "", "p3_miejsce": "", "p4_stan": "", 
+      "p5_forma": "", "p5_inne": "", "p6_stopien": "", "p7_uczelnia": "", 
+      "p8_praca": "", "p9_system": "", "p9_inne": "", "p10_oddzial": "", 
+      "p10_inne": "", "p11_staz": "", "p12_sen": "", "p13_ekran": "", "p14_kofeina": ""
+    }
+
+  page_2_json_schema: |
+    ZASADY DLA PÓL (Dozwolone wartości):
+    * sen_1 - Zasypianie: ["szybkie", "nieznacznie opóźnione", "opóźnione", "bardzo opóźnione lub bezsenność przez całą noc"]
+    * sen_2 - Budzenie w nocy: ["nie występuje", "sporadycznie", "często", "bardzo często lub bezsenność przez całą noc"]
+    * sen_3 - Budzenie rano: ["o zamierzonej godzinie", "nieznacznie wcześniej", "znacznie wcześniej", "dużo wcześniej lub bezsenność przez całą noc"]
+    * sen_4 - Czas snu: ["wystarczający", "nieznacznie niewystarczający", "wyraźnie niewystarczający", "całkowicie niewystarczający lub bezsenność przez całą noc"]
+    * sen_5 - Jakość snu: ["satysfakcjonująca", "nieznacznie niesatysfakcjonująca", "wyraźnie niesatysfakcjonująca", "całkowicie niesatysfakcjonująca"]
+    * sen_6 - Samopoczucie w dzień: ["dobre", "nieznacznie gorsze", "wyraźnie gorsze", "wybitnie gorsze"]
+    * sen_7 - Sprawność: ["niezaburzona", "nieznacznie zaburzona", "wyraźnie zaburzona", "wybitnie zaburzona"]
+    * sen_8 - Senność: ["nie zdarza się", "nieznaczna", "wyraźna", "bardzo nasilona"]
+
+    OCZEKIWANY FORMAT WYJŚCIOWY:
+    {
+      "sen_1": "", "sen_2": "", "sen_3": "", "sen_4": "",
+      "sen_5": "", "sen_6": "", "sen_7": "", "sen_8": ""
+    }
+
+  page_3_json_schema: |
+    ZASADY DLA PÓL:
+    Dla wszystkich pytań ze skali zmęczenia (od mfis_1 do mfis_15) dozwolone wartości to WYŁĄCZNIE:
+    ["0", "1", "2", "3", "4"]
+
+    OCZEKIWANY FORMAT WYJŚCIOWY:
+    {
+      "mfis_1": "", "mfis_2": "", "mfis_3": "", "mfis_4": "", "mfis_5": "",
+      "mfis_6": "", "mfis_7": "", "mfis_8": "", "mfis_9": "", "mfis_10": "",
+      "mfis_11": "", "mfis_12": "", "mfis_13": "", "mfis_14": "", "mfis_15": ""
+    }
+
+  page_4_json_schema: |
+    ZASADY DLA PÓL:
+    * Dla pytań skali zmęczenia (od mfis_16 do mfis_21) dozwolone wartości to WYŁĄCZNIE: ["0", "1", "2", "3", "4"]
+    * choroba_anemia oraz choroba_tarczyca - Czy stwierdzono: ["TAK", "NIE"]
+    * tarczyca_jakie oraz choroba_inne - Opis chorób: [DOWOLNY_TEKST]
+
+    OCZEKIWANY FORMAT WYJŚCIOWY:
+    {
+      "mfis_16": "", "mfis_17": "", "mfis_18": "", "mfis_19": "", "mfis_20": "", "mfis_21": "",
+      "choroba_anemia": "", "choroba_tarczyca": "", "tarczyca_jakie": "", "choroba_inne": ""
+    }
+
+  page_5_json_schema: |
+    ZASADY DLA PÓL:
+    Skala depresji (pytania 1-20). Dozwolone wartości dla WSZYSTKICH kluczy (od depr_1 do depr_20) to WYŁĄCZNIE: 
+    ["Rzadko lub wcale (mniej niż 1 dzień)", "Przez niedługi czas (1-2 dni)", "Czasem lub przez umiarkowany okres (3-4 dni)", "Przeważnie lub cały czas (5-7 dni)"]
+
+    OCZEKIWANY FORMAT WYJŚCIOWY:
+    {
+      "depr_1": "", "depr_2": "", "depr_3": "", "depr_4": "", "depr_5": "",
+      "depr_6": "", "depr_7": "", "depr_8": "", "depr_9": "", "depr_10": "",
+      "depr_11": "", "depr_12": "", "depr_13": "", "depr_14": "", "depr_15": "",
+      "depr_16": "", "depr_17": "", "depr_18": "", "depr_19": "", "depr_20": ""
+    }
