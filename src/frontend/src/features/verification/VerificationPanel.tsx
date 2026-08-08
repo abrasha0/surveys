@@ -4,6 +4,7 @@ import { useVerificationStore } from '../../store/verificationStore';
 import { useDraftSync } from '../../hooks/useDraftSync';
 import ImageViewer from '../../components/ImageViewer';
 import PageTabs from '../../components/PageTabs';
+import Spinner from '../../components/ui/Spinner';
 import SurveyHeader from './SurveyHeader';
 import DynamicForm from './DynamicForm';
 
@@ -35,10 +36,12 @@ export default function VerificationPanel() {
     [allSurveys, currentSurveyId]
   );
 
-  const { data: surveyResult } = useSurveyResult(currentSurveyId);
-  const { data: imageUrls } = useSurveyImages(currentSurveyId);
+  const { data: surveyResult, isLoading: resultLoading } = useSurveyResult(currentSurveyId);
+  const { data: imageUrls, isLoading: imagesLoading, isRefetching: imagesRefetching } = useSurveyImages(currentSurveyId);
 
   useDraftSync(currentSurveyId);
+
+  const formLoading = imagesLoading || imagesRefetching || resultLoading;
 
   useEffect(() => {
     if (currentSurveyId === null && clickableSurveys.length > 0) {
@@ -127,11 +130,19 @@ export default function VerificationPanel() {
             onChange={handlePageChange}
           />
           <div className="flex-1 min-h-0">
-            <ImageViewer imageUrl={imageUrls?.[currentPage] ?? null} page={currentPage} />
+            <ImageViewer imageUrl={imageUrls?.[currentPage] ?? null} page={currentPage} isLoading={imagesLoading || imagesRefetching} />
           </div>
         </div>
 
-<div className="flex-1 min-w-0 flex flex-col overflow-y-auto">
+<div className="flex-1 min-w-0 flex flex-col overflow-y-auto relative">
+          {formLoading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70">
+              <div className="flex flex-col items-center gap-3">
+                <Spinner className="w-8 h-8" />
+                <span className="text-sm text-gray-500">Ładowanie ankiety...</span>
+              </div>
+            </div>
+          )}
           <DynamicForm
             ref={formRef}
             surveyId={currentSurveyId}

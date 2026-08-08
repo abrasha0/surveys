@@ -3,6 +3,7 @@ import Spinner from './ui/Spinner';
 interface ImageViewerProps {
   imageUrl: string | null | undefined;
   page: number;
+  isLoading?: boolean;
 }
 
 const PAGE_DESCRIPTIONS: Record<number, string> = {
@@ -13,13 +14,13 @@ const PAGE_DESCRIPTIONS: Record<number, string> = {
   4: 'Skala CES-D (odczucia w minionym tygodniu)',
 };
 
-export default function ImageViewer({ imageUrl, page }: ImageViewerProps) {
-  const isLoading = imageUrl === undefined;
-  const hasError = imageUrl === null;
+export default function ImageViewer({ imageUrl, page, isLoading: loading }: ImageViewerProps) {
+  const showLoading = loading || imageUrl === undefined;
+  const hasError = !loading && imageUrl === null;
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-gray-100">
-      {isLoading && <Spinner className="absolute inset-0" />}
+      {showLoading && <Spinner className="absolute inset-0" />}
       {hasError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 p-4 text-center">
           <p className="font-medium">Brak obrazu dla tej strony</p>

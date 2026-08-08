@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiFetch } from './client';
 
 export interface FieldSpec {
@@ -84,16 +84,30 @@ export function useProcessingStatus() {
 export function useSurveyImages(surveyId: number | null) {
   const [data, setData] = useState<Record<number, string | null> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefetching, setIsRefetching] = useState(false);
   const cacheBustRef = useRef(Date.now());
+  const imageCache = useRef<Map<number, Record<number, string | null>>>(new Map());
+  const prevSurveyId = useRef<number | null>(null);
+  const MAX_CACHE_SIZE = 5;
 
   useEffect(() => {
     if (surveyId === null) {
-      setData(null);
+      prevSurveyId.current = null;
       return;
     }
 
-    cacheBustRef.current = Date.now();
+    if (imageCache.current.has(surveyId)) {
+      const cached = imageCache.current.get(surveyId)!;
+      setData(cached);
+      setIsLoading(false);
+      setIsRefetching(false);
+      prevSurveyId.current = surveyId;
+      return;
+    }
+
+    setIsRefetching(data !== null);
     setIsLoading(true);
+    setData(null);
     let cancelled = false;
 
     const load = async () => {
@@ -119,18 +133,34 @@ export function useSurveyImages(surveyId: number | null) {
 
       const map: Record<number, string | null> = {};
       entries.forEach((e) => { map[e.page] = e.url; });
+
+      imageCache.current.set(surveyId, map);
+      if (imageCache.current.size > MAX_CACHE_SIZE) {
+        const oldestKey = imageCache.current.keys().next().value;
+        if (oldestKey !== undefined) {
+          const evicted = imageCache.current.get(oldestKey);
+          if (evicted) {
+            Object.values(evicted).forEach((url) => { if (url) URL.revokeObjectURL(url); });
+          }
+          imageCache.current.delete(oldestKey);
+        }
+      }
+
       setData(map);
       setIsLoading(false);
+      setIsRefetching(false);
     };
 
     load();
+
+    prevSurveyId.current = surveyId;
 
     return () => {
       cancelled = true;
     };
   }, [surveyId]);
 
-  return { data, isLoading };
+  return { data, isLoading, isRefetching };
 }
 
 export function useSurveyResult(surveyId: number | null) {
@@ -138,6 +168,7 @@ export function useSurveyResult(surveyId: number | null) {
     queryKey: ['survey-result', surveyId],
     queryFn: () => apiFetch<SurveyResult>(`/api/surveys/${surveyId}/result`),
     enabled: surveyId !== null,
+    placeholderData: keepPreviousData,
   });
 }
 
