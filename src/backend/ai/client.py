@@ -189,9 +189,11 @@ class AIClient:
                             ],
                             "stream": False,
                             "keep_alive": _OLLAMA_KEEP_ALIVE,
+                            "think": False,
                             "options": {
                                 "num_ctx": _OLLAMA_NUM_CTX,
                                 "temperature": _OLLAMA_TEMPERATURE,
+                                "num_predict": config.ai["num_predict_vlm"],
                             },
                         },
                     )
@@ -298,6 +300,7 @@ class AIClient:
                             "options": {
                                 "num_ctx": _OLLAMA_NUM_CTX,
                                 "temperature": _OLLAMA_TEMPERATURE,
+                                "num_predict": config.ai["num_predict_text"],
                             },
                         },
                     )
@@ -394,6 +397,24 @@ class AIClient:
                 page_results.append({})
                 continue
 
+            stripped_text = raw_text.strip()
+            if stripped_text == "" or stripped_text == "[PUSTA_STRONA]" or len(stripped_text) < 10:
+                page_elapsed = time.perf_counter() - page_start
+                logger.info(
+                    "Empty VLM output for page %d of survey %d — skipping text formatting (length=%d)",
+                    page_idx + 1, survey_idx + 1, len(stripped_text),
+                )
+                if progress_callback:
+                    progress_callback(ProcessingStatus(
+                        survey_idx=survey_idx, total_surveys=total_surveys,
+                        page_idx=page_idx, total_pages=total_pages,
+                        status="page_done",
+                        message="",
+                        extra={"elapsed_s": f"{page_elapsed:.1f}", "empty_page": True},
+                    ))
+                page_results.append({})
+                continue
+
             logger.info(
                 "Processing page %d/%d for survey %d — step 2/2: Text LLM formatting (raw_text=%d chars)",
                 page_idx + 1, total_pages, survey_idx + 1, len(raw_text),
@@ -436,6 +457,14 @@ class AIClient:
                             raw_text = await self._extract_text_vlm(
                                 file_path, page_idx, progress_callback, survey_idx, total_surveys, total_pages
                             )
+                            stripped_text = raw_text.strip()
+                            if stripped_text == "" or stripped_text == "[PUSTA_STRONA]" or len(stripped_text) < 10:
+                                logger.info(
+                                    "Empty VLM output on re-OCR for page %d of survey %d — skipping (length=%d)",
+                                    page_idx + 1, survey_idx + 1, len(stripped_text),
+                                )
+                                page_results.append({})
+                                break
                             continue
 
                     if progress_callback:
