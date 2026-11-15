@@ -17,8 +17,9 @@ from data_handler import (
     clear_cache_file,
     clear_survey_cache_dir,
     export_csv_path,
+    load_processed_data,
 )
-from domain.csv_export import save_survey_to_csv
+from domain.csv_export import rebuild_csv_from_processed, save_survey_to_csv
 from domain.field_specs import ALL_FIELDS, FIELD_SPEC_BY_NAME
 from domain.schemas import MedicalSurvey
 from ingestion.file_grouping import scan_survey_directory
@@ -81,8 +82,10 @@ def list_surveys() -> list[dict]:
 @router.get("/surveys/export/csv")
 def export_csv():
     csv_path = export_csv_path()
-    if not Path(csv_path).exists():
-        raise HTTPException(status_code=404, detail="CSV not yet created")
+    processed = load_processed_data()
+    written = rebuild_csv_from_processed(processed, csv_path)
+    if written == 0:
+        raise HTTPException(status_code=404, detail="No verified surveys to export")
     return FileResponse(
         path=csv_path,
         media_type="text/csv",

@@ -139,7 +139,9 @@ class MedicalSurvey(BaseModel):
         row = [ts]
         for f in CSV_FIELDS:
             val = getattr(self, f.name, "")
-            row.append(str(val) if val is not None else "")
+            cell = str(val) if val is not None else ""
+            cell = cell.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+            row.append(cell)
         return row
 
     @classmethod
