@@ -57,7 +57,7 @@ export default function ScaleTableGrid({ fields, values, onChange, rowHeight = 4
                     <td key={choice} className="p-0 border-b border-gray-100 text-center" style={{ height: rowHeight }}>
                       <button
                         type="button"
-                        onClick={() => onChange(field.name, choice)}
+                        onClick={() => onChange(field.name, selected ? '' : choice)}
                         className={`w-full h-full flex items-center justify-center transition-colors cursor-pointer
                           ${selected
                             ? 'bg-[var(--color-info)] text-white font-medium'

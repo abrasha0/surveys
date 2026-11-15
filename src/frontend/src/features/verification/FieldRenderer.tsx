@@ -34,7 +34,7 @@ function RadioCardGroup({
           <button
             key={choice}
             type="button"
-            onClick={() => onChange(choice)}
+            onClick={() => onChange(selected ? '' : choice)}
             className={`flex items-center gap-2 px-3 py-2.5 rounded border text-xs text-left transition-all cursor-pointer
               ${selected
                 ? 'border-[var(--color-info)] bg-[var(--color-info)]/10'
