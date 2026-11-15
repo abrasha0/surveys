@@ -16,6 +16,7 @@ class SurveyState:
     result: dict | None = None
     error_message: str | None = None
     draft_values: dict | None = None
+    csv_written: bool = False
 
 
 @dataclass
@@ -74,12 +75,18 @@ class ProcessingState:
                 status = s.get("status", "queued")
                 result = s.get("result")
                 error = s.get("error_message")
+                csv_written = bool(s.get("csv_written", False))
+                if status == "ready" and not result:
+                    status = "queued"
+                    result = None
+                    error = None
                 fresh_surveys[key] = s
             else:
                 status = "queued"
                 result = None
                 error = None
-            self.surveys.append(SurveyState(id=idx, files=group, status=status, result=result, error_message=error))
+                csv_written = False
+            self.surveys.append(SurveyState(id=idx, files=group, status=status, result=result, error_message=error, csv_written=csv_written))
             total_pages += len(group)
 
         # Load drafts from disk
@@ -190,6 +197,7 @@ class ProcessingState:
             "error_message": survey.error_message,
             "files": [str(p.name) for p in survey.files],
             "survey_id": survey_id,
+            "csv_written": survey.csv_written,
         }, page_times=self.page_times)
 
     def set_survey_status(self, survey_id: int, status: str,
@@ -225,6 +233,12 @@ class ProcessingState:
             raise ValueError(f"Cannot verify survey in status '{survey.status}'")
         survey.status = "verified"
         survey.result = result
+        survey.csv_written = False
+        self._persist_survey_to_processed(survey_id)
+
+    def mark_csv_written(self, survey_id: int):
+        survey = self.surveys[survey_id]
+        survey.csv_written = True
         self._persist_survey_to_processed(survey_id)
 
     def unverify(self, survey_id: int):

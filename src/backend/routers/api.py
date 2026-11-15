@@ -260,11 +260,18 @@ def finalize_session():
         raise HTTPException(status_code=400, detail="No verified surveys to finalize")
 
     csv_path = export_csv_path()
+    written = 0
+    skipped = 0
     for survey in verified:
+        if survey.csv_written:
+            skipped += 1
+            continue
         if survey.result:
             try:
                 survey_data = MedicalSurvey(**survey.result)
                 save_survey_to_csv(survey_data, csv_path)
+                worker.state.mark_csv_written(survey.id)
+                written += 1
             except Exception as e:
                 logger.error("Failed to save survey %d to CSV: %s", survey.id, e)
 
@@ -273,6 +280,8 @@ def finalize_session():
         "status": "finalized",
         "csv_path": csv_path,
         "total_verified": len(verified),
+        "written": written,
+        "skipped": skipped,
         "total_errors": total_errors,
     }
 

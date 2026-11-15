@@ -22,8 +22,16 @@ async def lifespan(app: FastAPI):
         log_file=config.logging["file"],
         level=getattr(logging, config.logging["level"].upper(), logging.DEBUG),
     )
-    yield
     worker = get_worker()
+    surveys_dir = config.app.get("surveys_dir")
+    if surveys_dir:
+        dir_path = Path(surveys_dir)
+        if dir_path.is_dir():
+            from ingestion.file_grouping import scan_survey_directory
+            groups = scan_survey_directory(dir_path)
+            if groups:
+                worker.state.ensure_from_cache(groups)
+    yield
     if worker.state.is_running:
         await worker.stop()
 
