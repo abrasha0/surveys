@@ -9,7 +9,6 @@ interface SurveyHeaderProps {
   onNext: () => void;
   onSave: () => void;
   onUnverify: () => void;
-  onForceSave: () => void;
   onSurveyChange: (surveyId: number) => void;
 }
 
@@ -39,13 +38,14 @@ function statusTooltip(status: SurveyListItem['status']): string | undefined {
 }
 
 function isClickable(status: SurveyListItem['status']): boolean {
-  return status === 'ready' || status === 'verified';
+  return status === 'ready' || status === 'verified' || status === 'error';
 }
 
 function tabStyle(status: SurveyListItem['status'], isActive: boolean): string {
   if (isActive) {
     switch (status) {
       case 'ready':
+        return 'bg-amber-500 text-white';
       case 'verified':
         return 'bg-[var(--color-success)] text-white';
       case 'processing':
@@ -60,6 +60,7 @@ function tabStyle(status: SurveyListItem['status'], isActive: boolean): string {
   const base = 'transition-colors';
   switch (status) {
     case 'ready':
+      return `${base} bg-amber-100 text-amber-800 hover:bg-amber-200`;
     case 'verified':
       return `${base} bg-green-100 text-green-800 hover:bg-green-200`;
     case 'processing':
@@ -82,12 +83,12 @@ export default function SurveyHeader({
   onNext,
   onSave,
   onUnverify,
-  onForceSave,
   onSurveyChange,
 }: SurveyHeaderProps) {
   const queuedCount = surveys.filter((s) => s.status === 'queued').length;
   const processingCount = surveys.filter((s) => s.status === 'processing').length;
-  const readyCount = surveys.filter((s) => s.status === 'ready' || s.status === 'verified').length;
+  const readyCount = surveys.filter((s) => s.status === 'ready').length;
+  const verifiedCount = surveys.filter((s) => s.status === 'verified').length;
 
   return (
     <div className="flex items-center justify-between px-2 py-2 border-b border-gray-200 bg-white">
@@ -95,7 +96,7 @@ export default function SurveyHeader({
         <span className="font-medium text-sm">
           Ankieta {currentIndex + 1} z {totalSurveys}
         </span>
-        {(queuedCount > 0 || processingCount > 0) && (
+        {(queuedCount > 0 || processingCount > 0 || readyCount > 0 || verifiedCount > 0) && (
           <div className="flex items-center gap-1.5 text-xs">
             {queuedCount > 0 && (
               <span className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 font-medium">
@@ -108,8 +109,13 @@ export default function SurveyHeader({
               </span>
             )}
             {readyCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">
+                do weryfikacji: {readyCount}
+              </span>
+            )}
+            {verifiedCount > 0 && (
               <span className="px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium">
-                gotowe: {readyCount}
+                zatwierdzone: {verifiedCount}
               </span>
             )}
           </div>
@@ -150,6 +156,7 @@ export default function SurveyHeader({
           const currentSurvey = surveys.find(s => s.id === currentSurveyId);
           switch (currentSurvey?.status) {
             case 'ready':
+            case 'error':
               return (
                 <button onClick={onSave}
                   className="px-3 py-1.5 text-sm font-medium text-white bg-[var(--color-success)] rounded hover:opacity-90">
@@ -161,13 +168,6 @@ export default function SurveyHeader({
                 <button onClick={onUnverify}
                   className="px-3 py-1.5 text-sm font-medium text-white bg-[var(--color-warning)] rounded hover:opacity-90">
                   Cofnij zatwierdzenie
-                </button>
-              );
-            case 'error':
-              return (
-                <button onClick={onForceSave}
-                  className="px-3 py-1.5 text-sm font-medium text-white bg-[var(--color-error)] rounded hover:opacity-90">
-                  Zatwierdź mimo błędów
                 </button>
               );
             default:

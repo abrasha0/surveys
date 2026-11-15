@@ -27,7 +27,7 @@ export default function VerificationPanel() {
   );
 
   const clickableSurveys = useMemo(
-    () => allSurveys.filter((s) => s.status === 'ready' || s.status === 'verified'),
+    () => allSurveys.filter((s) => s.status === 'ready' || s.status === 'verified' || s.status === 'error'),
     [allSurveys]
   );
 
@@ -76,14 +76,17 @@ export default function VerificationPanel() {
     });
   };
 
+  const handleForceSave = async (values: Record<string, unknown>) => {
+    await saveSurveyMutation.mutateAsync({
+      surveyId: currentSurveyId!,
+      values,
+      force: true,
+    });
+  };
+
   const handleUnverify = async () => {
     if (currentSurveyId === null) return;
     await unverifyMutation.mutateAsync(currentSurveyId);
-  };
-
-  const handleForceSave = async () => {
-    if (currentSurveyId === null) return;
-    formRef.current?.forceSave();
   };
 
   const currentPage = surveyUI?.selectedPage ?? 0;
@@ -109,7 +112,6 @@ export default function VerificationPanel() {
         onNext={handleNextSurvey}
         onSave={() => formRef.current?.save()}
         onUnverify={handleUnverify}
-        onForceSave={handleForceSave}
         onSurveyChange={handleSurveyChange}
       />
 

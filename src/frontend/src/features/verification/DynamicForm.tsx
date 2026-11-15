@@ -20,7 +20,7 @@ interface DynamicFormProps {
   fieldSpecs: FieldSpec[];
   aiResult: Record<string, unknown> | null;
   onSave: (values: Record<string, unknown>) => Promise<void>;
-  onForceSave: () => Promise<void>;
+  onForceSave: (values: Record<string, unknown>) => Promise<void>;
   onNextSurvey: () => void;
   disabled?: boolean;
   readOnly?: boolean;
@@ -69,6 +69,7 @@ const DynamicForm = forwardRef<{ save: () => void; forceSave: () => void }, Dyna
   fieldSpecs,
   aiResult,
   onSave,
+  onForceSave,
   onNextSurvey,
   disabled = false,
   readOnly = false,
@@ -78,7 +79,6 @@ const DynamicForm = forwardRef<{ save: () => void; forceSave: () => void }, Dyna
   const draftValues = useVerificationStore((s) => s.getSurveyUI(surveyId).draftValues);
   const updateDraft = useVerificationStore((s) => s.updateDraft);
   const saveDraft = useVerificationStore((s) => s.saveDraft);
-  const clearDraft = useVerificationStore((s) => s.clearDraft);
   const setShowErrors = useVerificationStore((s) => s.setShowErrors);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -148,28 +148,26 @@ const DynamicForm = forwardRef<{ save: () => void; forceSave: () => void }, Dyna
     setSaving(true);
     try {
       await onSave({ ...allValues });
-      clearDraft(surveyId);
       setErrors({});
       setShowErrors(surveyId, false);
       onNextSurvey();
     } finally {
       setSaving(false);
     }
-  }, [fieldSpecs, allValues, onSave, clearDraft, surveyId, setShowErrors, onNextSurvey]);
+  }, [fieldSpecs, allValues, onSave, surveyId, setShowErrors, onNextSurvey]);
 
   const handleForceSave = useCallback(async () => {
     setSaving(true);
     setShowErrors(surveyId, false);
     try {
-      await onSave({ ...allValues, ...draftValues });
-      clearDraft(surveyId);
+      await onForceSave({ ...allValues, ...draftValues });
       setErrors({});
       setShowErrors(surveyId, false);
       onNextSurvey();
     } finally {
       setSaving(false);
     }
-  }, [allValues, draftValues, onSave, clearDraft, surveyId, setShowErrors, onNextSurvey]);
+  }, [allValues, draftValues, onForceSave, surveyId, setShowErrors, onNextSurvey]);
 
   useImperativeHandle(ref, () => ({ save: handleSave, forceSave: handleForceSave }), [handleSave, handleForceSave]);
 
