@@ -229,7 +229,7 @@ class ProcessingState:
 
     def mark_verified(self, survey_id: int, result: dict | None = None):
         survey = self.surveys[survey_id]
-        if survey.status != "ready":
+        if survey.status not in ("ready", "error"):
             raise ValueError(f"Cannot verify survey in status '{survey.status}'")
         survey.status = "verified"
         survey.result = result

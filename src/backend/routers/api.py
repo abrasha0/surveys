@@ -143,7 +143,7 @@ def get_survey_result(survey_id: int):
     survey = worker.state.get_survey_state(survey_id)
     if not survey:
         raise HTTPException(status_code=404, detail="Survey not found")
-    if survey.status not in ("ready", "error"):
+    if survey.status not in ("ready", "verified", "error"):
         raise HTTPException(status_code=400, detail="Survey not yet processed")
     return {
         "id": survey_id,
@@ -297,12 +297,6 @@ def save_survey(survey_id: int, request: SaveRequest):
         raise HTTPException(
             status_code=400,
             detail=f"Survey not in 'ready' or 'error' status (current: {survey.status})",
-        )
-
-    if survey.status == "error" and not request.force:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot save error survey without force=True",
         )
 
     normalized = {}
