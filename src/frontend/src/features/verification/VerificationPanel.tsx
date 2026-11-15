@@ -36,12 +36,13 @@ export default function VerificationPanel() {
     [allSurveys, currentSurveyId]
   );
 
-  const { data: surveyResult, isLoading: resultLoading } = useSurveyResult(currentSurveyId);
-  const { data: imageUrls, isLoading: imagesLoading, isRefetching: imagesRefetching } = useSurveyImages(currentSurveyId);
+  const { data: surveyResult, isLoading: resultLoading, isFetching: resultFetching } = useSurveyResult(currentSurveyId);
+  const { data: imageUrls, isLoading: imagesLoading, isRefetching: imagesRefetching } = useSurveyImages(currentSurveyId, allSurveys);
 
   useDraftSync(currentSurveyId);
 
-  const formLoading = imagesLoading || imagesRefetching || resultLoading;
+  const formLoading = !surveyResult && (resultLoading || resultFetching);
+  const aiResult = surveyResult?.id === currentSurveyId ? surveyResult?.result ?? null : null;
 
   useEffect(() => {
     if (currentSurveyId === null && clickableSurveys.length > 0) {
@@ -50,16 +51,6 @@ export default function VerificationPanel() {
       setCurrentSurveyId(first);
     }
   }, [clickableSurveys, currentSurveyId, initSurvey]);
-
-  useEffect(() => {
-    return () => {
-      if (imageUrls) {
-        Object.values(imageUrls).forEach((url) => {
-          if (url) URL.revokeObjectURL(url);
-        });
-      }
-    };
-  }, [imageUrls]);
 
   const handleSurveyChange = (surveyId: number) => {
     initSurvey(surveyId);
@@ -147,7 +138,7 @@ export default function VerificationPanel() {
             ref={formRef}
             surveyId={currentSurveyId}
             fieldSpecs={fieldSpecs ?? []}
-            aiResult={surveyResult?.result ?? null}
+            aiResult={aiResult}
             onSave={handleSave}
             onForceSave={handleForceSave}
             onNextSurvey={handleNextSurvey}

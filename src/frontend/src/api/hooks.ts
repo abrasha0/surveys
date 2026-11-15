@@ -81,14 +81,34 @@ export function useProcessingStatus() {
   });
 }
 
-export function useSurveyImages(surveyId: number | null) {
+export function useSurveyImages(surveyId: number | null, surveys?: SurveyListItem[]) {
   const [data, setData] = useState<Record<number, string | null> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefetching, setIsRefetching] = useState(false);
+  const dataRef = useRef<Record<number, string | null> | null>(null);
   const cacheBustRef = useRef(Date.now());
   const imageCache = useRef<Map<number, Record<number, string | null>>>(new Map());
   const prevSurveyId = useRef<number | null>(null);
+  const lastStatuses = useRef<Map<number, string>>(new Map());
   const MAX_CACHE_SIZE = 5;
+
+  dataRef.current = data;
+
+  useEffect(() => {
+    return () => {
+      imageCache.current.forEach((map) => {
+        Object.values(map).forEach((url) => {
+          if (url) URL.revokeObjectURL(url);
+        });
+      });
+      imageCache.current.clear();
+      if (dataRef.current) {
+        Object.values(dataRef.current).forEach((url) => {
+          if (url) URL.revokeObjectURL(url);
+        });
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (surveyId === null) {
@@ -105,12 +125,13 @@ export function useSurveyImages(surveyId: number | null) {
       return;
     }
 
-    setIsRefetching(data !== null);
-    setIsLoading(true);
-    setData(null);
+    const wasEmpty = data === null;
+    if (wasEmpty) setIsLoading(true);
+    else setIsRefetching(true);
     let cancelled = false;
 
     const load = async () => {
+      cacheBustRef.current = Date.now();
       const pages = [0, 1, 2, 3, 4];
       const entries = await Promise.all(
         pages.map(async (page) => {
@@ -134,21 +155,24 @@ export function useSurveyImages(surveyId: number | null) {
       const map: Record<number, string | null> = {};
       entries.forEach((e) => { map[e.page] = e.url; });
 
-      imageCache.current.set(surveyId, map);
-      if (imageCache.current.size > MAX_CACHE_SIZE) {
-        const oldestKey = imageCache.current.keys().next().value;
-        if (oldestKey !== undefined) {
-          const evicted = imageCache.current.get(oldestKey);
-          if (evicted) {
-            Object.values(evicted).forEach((url) => { if (url) URL.revokeObjectURL(url); });
+      const isComplete = Object.values(map).every((v) => v !== null);
+      if (isComplete) {
+        if (imageCache.current.size >= MAX_CACHE_SIZE) {
+          const oldestKey = imageCache.current.keys().next().value;
+          if (oldestKey !== undefined) {
+            const evicted = imageCache.current.get(oldestKey);
+            if (evicted) {
+              Object.values(evicted).forEach((url) => { if (url) URL.revokeObjectURL(url); });
+            }
+            imageCache.current.delete(oldestKey);
           }
-          imageCache.current.delete(oldestKey);
         }
+        imageCache.current.set(surveyId, map);
       }
 
-      setData(map);
-      setIsLoading(false);
+      if (wasEmpty) setIsLoading(false);
       setIsRefetching(false);
+      setData(map);
     };
 
     load();
@@ -159,6 +183,23 @@ export function useSurveyImages(surveyId: number | null) {
       cancelled = true;
     };
   }, [surveyId]);
+
+  useEffect(() => {
+    if (!surveys) return;
+    for (const survey of surveys) {
+      const prevStatus = lastStatuses.current.get(survey.id);
+      if (prevStatus !== undefined && prevStatus !== survey.status) {
+        if (survey.id !== surveyId) {
+          const cached = imageCache.current.get(survey.id);
+          if (cached) {
+            Object.values(cached).forEach((url) => { if (url) URL.revokeObjectURL(url); });
+            imageCache.current.delete(survey.id);
+          }
+        }
+      }
+      lastStatuses.current.set(survey.id, survey.status);
+    }
+  }, [surveys, surveyId]);
 
   return { data, isLoading, isRefetching };
 }
