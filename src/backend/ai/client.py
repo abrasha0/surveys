@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import httpx
-from PIL import Image, ImageEnhance
+from PIL import Image
 
 from config import config
 from domain.schemas import MedicalSurvey
@@ -30,7 +30,6 @@ _OLLAMA_NUM_CTX = config.ai["num_ctx"]
 _OLLAMA_TEMPERATURE = config.ai["temperature"]
 _OLLAMA_KEEP_ALIVE = config.ai["keep_alive"]
 _MAX_IMAGE_DIMENSION = config.image["max_dimension"]
-_CONTRAST_FACTOR = config.image["contrast_factor"]
 _SHORTEN_IO = config.logging["shorten_models_io"]
 _MAX_IO_SIZE = config.logging["max_models_io_size"]
 
@@ -93,11 +92,8 @@ def preprocess_image(path: Path) -> bytes:
             new_h = int(h * scale)
             img = img.resize((new_w, new_h), Image.LANCZOS)
 
-        img = img.convert("L")
-        img = ImageEnhance.Contrast(img).enhance(_CONTRAST_FACTOR)
-
         buf = BytesIO()
-        img.save(buf, format="JPEG", quality=config.image["jpeg_quality"])
+        img.save(buf, format="PNG")
         return buf.getvalue()
 
 

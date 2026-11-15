@@ -35,8 +35,6 @@ ai:
 
 image:
   max_dimension: 2000             # Maksymalny rozmiar dłuższego boku obrazu (px)
-  contrast_factor: 1.5            # Współczynnik podbicia kontrastu (1.0 = brak)
-  jpeg_quality: 85                # Jakość kompresji JPEG (1-100)
 
 ingestion:
   survey_group_size: 5            # Liczba stron na ankietę (5 = standard)
