@@ -18,7 +18,7 @@ class FieldSpec:
 
 
 # ============================================================
-# Strona 1 – Demografia + styl życia
+# Page 1 – demographics and lifestyle
 # ============================================================
 PAGE0_FIELDS = [
     FieldSpec("p1_plec", "1. Płeć", 0, "radio",
@@ -73,7 +73,7 @@ PAGE0_FIELDS = [
 
 
 # ============================================================
-# Strona 2 – CES-D (3 opcje – zgodnie z papierową ankietą)
+# Page 5 – CES-D (4 options, as on the paper survey)
 # ============================================================
 _CESD_CHOICES = [
     "Rzadko lub wcale (mniej niż 1 dzień)",
@@ -127,7 +127,7 @@ PAGE1_FIELDS = [
 
 
 # ============================================================
-# Strona 3 – Ateńska skala bezsenności
+# Page 2 – Athens Insomnia Scale
 # ============================================================
 PAGE2_FIELDS = [
     FieldSpec("sen_1", "Zasypianie", 1, "radio",
@@ -163,7 +163,7 @@ PAGE2_FIELDS = [
 
 
 # ============================================================
-# Strona 4 – MFIS (1-15)
+# Page 3 – MFIS (1-15)
 # ============================================================
 _MFIS_CHOICES = ["0", "1", "2", "3", "4"]
 
@@ -202,7 +202,7 @@ PAGE3_FIELDS = [
 
 
 # ============================================================
-# Strona 5 – MFIS (16-21) + zdrowie
+# Page 4 – MFIS (16-21) and health
 # ============================================================
 PAGE4_FIELDS = [
     FieldSpec("mfis_16", "Trudności w uporządkowaniu myśli", 3, "radio", _MFIS_CHOICES,
@@ -230,19 +230,19 @@ PAGE4_FIELDS = [
 
 
 # ============================================================
-# Kolejność kolumn dla exportu CSV: Demografia → MFIS → Health → Sen → CES-D
+# CSV column order: demographics → MFIS → health → sleep → CES-D
 # ============================================================
 CSV_FIELDS = (
-    PAGE0_FIELDS +                                           # Demografia (17)
+    PAGE0_FIELDS +                                           # Demographics (17)
     PAGE3_FIELDS +                                           # MFIS 1-15
     [f for f in PAGE4_FIELDS if f.name.startswith("mfis_")] +  # MFIS 16-21
     [f for f in PAGE4_FIELDS if not f.name.startswith("mfis_")] +  # Health (4)
-    PAGE2_FIELDS +                                           # Sen (8)
+    PAGE2_FIELDS +                                           # Sleep (8)
     PAGE1_FIELDS                                             # CES-D (20)
 )
 
 # ============================================================
-# Zbiór wszystkich pól (do UI / promptów / walidacji)
+# All fields (UI, prompts, validation)
 # ============================================================
 ALL_FIELDS = (
     PAGE0_FIELDS +
@@ -252,10 +252,10 @@ ALL_FIELDS = (
     PAGE4_FIELDS
 )
 
-# Słownik do szybkiego dostępu po nazwie
+# Lookup by field name
 FIELD_SPEC_BY_NAME = {f.name: f for f in ALL_FIELDS}
 
-# Mapowanie strony -> lista pól (do użycia w promptach i UI)
+# Page index -> fields on that page (prompts and UI)
 PAGE_MAP = {
     0: PAGE0_FIELDS,
     1: PAGE2_FIELDS,

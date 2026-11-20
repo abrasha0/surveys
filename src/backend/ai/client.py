@@ -124,8 +124,8 @@ class AIClient:
                             page_idx=page_index,
                             total_pages=total_pages,
                             status="vlm_extracting" if attempt == 0 else "vlm_retrying",
-                            message=f"Ankieta {survey_idx+1}, Strona {page_index+1}/{total_pages}: VLM ekstrakcja tekstu..." if attempt == 0
-                                    else f"Ankieta {survey_idx+1}, Strona {page_index+1}: VLM ponawianie ({attempt+1}/{self.max_retries})...",
+                            message=f"Survey {survey_idx+1}, page {page_index+1}/{total_pages}: VLM text extraction..." if attempt == 0
+                                    else f"Survey {survey_idx+1}, page {page_index+1}: VLM retry ({attempt+1}/{self.max_retries})...",
                         ))
 
                     if _HAS_TRACING:
@@ -240,8 +240,8 @@ class AIClient:
                             page_idx=page_index,
                             total_pages=total_pages,
                             status="text_formatting" if attempt == 0 else "text_retrying",
-                            message=f"Ankieta {survey_idx+1}, Strona {page_index+1}/{total_pages}: Text LLM formatowanie JSON..." if attempt == 0
-                                    else f"Ankieta {survey_idx+1}, Strona {page_index+1}: Text LLM ponawianie ({attempt+1}/{self.max_retries})...",
+                            message=f"Survey {survey_idx+1}, page {page_index+1}/{total_pages}: text LLM JSON formatting..." if attempt == 0
+                                    else f"Survey {survey_idx+1}, page {page_index+1}: text LLM retry ({attempt+1}/{self.max_retries})...",
                         ))
 
                     if _logger_mod.ai_req_logger:
@@ -331,8 +331,10 @@ class AIClient:
         progress_callback: Callable[[ProcessingStatus], None] | None = None,
         page_done_callback: Callable[[int, int], None] | None = None,
     ) -> list[dict]:
-        """Przetwarza strony sekwencyjnie: dla każdej strony VLM → Text LLM → result.
-        page_done_callback(survey_id, page_idx) wywoływane przy przejściu do kolejnej strony."""
+        """Process pages one by one: VLM extraction, then text LLM formatting.
+
+        page_done_callback(survey_idx, page_idx) is called when a page is finished.
+        """
         total_pages = len(survey_files)
         page_results: list[dict] = []
 
@@ -360,7 +362,7 @@ class AIClient:
                         survey_idx=survey_idx, total_surveys=total_surveys,
                         page_idx=page_idx, total_pages=total_pages,
                         status="page_error",
-                        message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}: VLM błąd — pominięto",
+                        message=f"Survey {survey_idx+1}, page {page_idx+1}: VLM error, page skipped",
                         extra={"elapsed_s": f"{page_elapsed:.1f}"},
                     ))
                 page_results.append({})
@@ -399,7 +401,7 @@ class AIClient:
                         survey_idx=survey_idx, total_surveys=total_surveys,
                         page_idx=page_idx, total_pages=total_pages,
                         status="text_formatting",
-                        message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}/{total_pages}: Text LLM formatowanie JSON...",
+                        message=f"Survey {survey_idx+1}, page {page_idx+1}/{total_pages}: text LLM JSON formatting...",
                     ))
                 try:
                     result = await self._format_json_llm(
@@ -421,7 +423,7 @@ class AIClient:
                                     survey_idx=survey_idx, total_surveys=total_surveys,
                                     page_idx=page_idx, total_pages=total_pages,
                                     status="vlm_reocr",
-                                    message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}: ponowna analiza VLM ({re_ocr_attempt}/{re_ocr_max_attempts})",
+                                    message=f"Survey {survey_idx+1}, page {page_idx+1}: VLM re-OCR ({re_ocr_attempt}/{re_ocr_max_attempts})",
                                 ))
                             raw_text = await self._extract_text_vlm(
                                 file_path, page_idx, progress_callback, survey_idx, total_surveys, total_pages
@@ -459,7 +461,7 @@ class AIClient:
                             survey_idx=survey_idx, total_surveys=total_surveys,
                             page_idx=page_idx, total_pages=total_pages,
                             status="page_error",
-                            message=f"Ankieta {survey_idx+1}, Strona {page_idx+1}: Text LLM błąd — pominięto",
+                            message=f"Survey {survey_idx+1}, page {page_idx+1}: text LLM error, page skipped",
                             extra={"elapsed_s": f"{page_elapsed:.1f}"},
                         ))
                     page_results.append({})
@@ -489,7 +491,7 @@ class AIClient:
         progress_callback: Callable[[ProcessingStatus], None] | None = None,
         page_done_callback: Callable[[int, int], None] | None = None,
     ) -> dict:
-        """Zwraca słownik ze scalonymi danymi ankiety."""
+        """Process all pages of one survey and return the merged, validated answers."""
         total_pages = len(survey_files)
 
         if progress_callback:
@@ -497,7 +499,7 @@ class AIClient:
                 survey_idx=survey_idx, total_surveys=total_surveys,
                 page_idx=0, total_pages=total_pages,
                 status="survey_start",
-                message=f"Ankieta {survey_idx+1}/{total_surveys}: rozpoczęcie przetwarzania ({total_pages} stron)...",
+                message=f"Survey {survey_idx+1}/{total_surveys}: processing started ({total_pages} pages)...",
             ))
 
         t0 = time.perf_counter()
@@ -513,7 +515,7 @@ class AIClient:
                 survey_idx=survey_idx, total_surveys=total_surveys,
                 page_idx=total_pages, total_pages=total_pages,
                 status="survey_done",
-                message=f"Ankieta {survey_idx+1}/{total_surveys}: przetworzona",
+                message=f"Survey {survey_idx+1}/{total_surveys}: processed",
                 extra={"elapsed_s": f"{elapsed_total:.1f}", "pages": total_pages},
             ))
 

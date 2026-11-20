@@ -12,7 +12,7 @@ from config import config
 logger = logging.getLogger(__name__)
 
 _SECRET_KEY = secrets.token_hex(32)
-_TOKEN_TTL = 60 * 60 * 8  # 8h — wystarczające dla single-user session
+_TOKEN_TTL = 60 * 60 * 8  # 8 h is enough for a single-user session
 
 
 def is_password_configured() -> bool:

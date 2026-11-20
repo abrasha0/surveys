@@ -21,10 +21,10 @@ function Read-Config {
     if (-not (Test-Path -LiteralPath $ConfigPath)) {
         $ConfigExample = Join-Path -Path $ProjectRoot -ChildPath "configs\config.yaml.example"
         if (-not (Test-Path -LiteralPath $ConfigExample)) {
-            Write-Log "OSTROZNIE: brak config.yaml i configs\config.yaml.example"
+            Write-Log "WARNING: neither config.yaml nor configs\config.yaml.example exists"
             return $null
         }
-        Write-Log "config.yaml nie istnieje -- uzywam configs\config.yaml.example"
+        Write-Log "config.yaml does not exist -- using configs\config.yaml.example"
         $ConfigPath = $ConfigExample
     }
     $PythonExe = Join-Path -Path $VenvPath -ChildPath "Scripts\python.exe"
@@ -46,72 +46,72 @@ print(json.dumps(cfg))
 New-Item -Path $LogFile -ItemType File -Force | Out-Null
 Write-Log "=== Full Setup - Environment ==="
 Write-Log "Project root: $ProjectRoot"
-if ($Force) { Write-Log "Tryb Force: wymuszanie reinstalacji .venv" }
+if ($Force) { Write-Log "Force mode: recreating .venv" }
 
 # ============================================================
-# Krok 1: Python >= 3.12
+# Step 1: Python >= 3.12
 # ============================================================
-Write-Log "=== Krok 1/9: Python >= 3.12 ==="
+Write-Log "=== Step 1/9: Python >= 3.12 ==="
 try {
     $pyVersion = & python --version 2>&1
-    Write-Log "Znaleziono: $pyVersion"
+    Write-Log "Found: $pyVersion"
     if ($pyVersion -match 'Python (\d+)\.(\d+)') {
         $major = [int]$Matches[1]
         $minor = [int]$Matches[2]
         if ($major -gt 3 -or ($major -eq 3 -and $minor -ge 12)) {
             Write-Log "OK: Python $major.$minor"
         } else {
-            throw "Wymagany Python >= 3.12, znaleziono $major.$minor"
+            throw "Python >= 3.12 is required, found $major.$minor"
         }
     } else {
-        throw "Nie rozpoznano wersji: $pyVersion"
+        throw "Unrecognized version: $pyVersion"
     }
 } catch {
-    Write-Log "BLAD: $_"
+    Write-Log "ERROR: $_"
     exit 1
 }
 
 # ============================================================
-# Krok 2: .venv
+# Step 2: .venv
 # ============================================================
-Write-Log "=== Krok 2/9: Wirtualne srodowisko ==="
+Write-Log "=== Step 2/9: virtual environment ==="
 if (Test-Path -LiteralPath $VenvPath) {
     if ($Force) {
-        Write-Log "Force: usuwanie istniejacego .venv..."
+        Write-Log "Force: removing the existing .venv..."
         Remove-Item -Path $VenvPath -Recurse -Force
         & python -m venv $VenvPath
-        if ($LASTEXITCODE -ne 0) { throw "Blad tworzenia venv" }
-        Write-Log "OK: .venv utworzony od nowa"
+        if ($LASTEXITCODE -ne 0) { throw "Failed to create .venv" }
+        Write-Log "OK: .venv recreated"
     } else {
-        Write-Log "OK: .venv juz istnieje"
+        Write-Log "OK: .venv already exists"
     }
 } else {
     & python -m venv $VenvPath
-    if ($LASTEXITCODE -ne 0) { throw "Blad tworzenia venv" }
-    Write-Log "OK: .venv utworzony"
+    if ($LASTEXITCODE -ne 0) { throw "Failed to create .venv" }
+    Write-Log "OK: .venv created"
 }
 
 $PythonExe = Join-Path -Path $VenvPath -ChildPath "Scripts\python.exe"
 if (-not (Test-Path -LiteralPath $PythonExe)) {
-    throw "Nie znaleziono python.exe w .venv: $PythonExe"
+    throw "python.exe not found in .venv: $PythonExe"
 }
 
-Write-Log "Upgrade pip..."
+Write-Log "Upgrading pip..."
 & $PythonExe -m pip install --upgrade pip setuptools wheel 2>&1 | ForEach-Object { Write-Log "  $_" }
-if ($LASTEXITCODE -ne 0) { Write-Log "OSTROZNIE: upgrade pip nieudany (kontynuuje)" }
+if ($LASTEXITCODE -ne 0) { Write-Log "WARNING: pip upgrade failed (continuing)" }
 
 # ============================================================
-# Krok 3: pip install requirements.txt
+# Step 3: pip install -r requirements.txt
 # ============================================================
-Write-Log "=== Krok 3/9: Instalacja pakietow Python ==="
+Write-Log "=== Step 3/9: installing Python packages ==="
 if (-not (Test-Path -LiteralPath $RequirementsPath)) {
-    throw "Nie znaleziono requirements.txt: $RequirementsPath"
+    throw "requirements.txt not found: $RequirementsPath"
 }
 & $PythonExe -m pip install -r $RequirementsPath 2>&1 | ForEach-Object { Write-Log "  $_" }
-if ($LASTEXITCODE -ne 0) { throw "pip install nie powiodl sie" }
-Write-Log "OK: pakiety Python zainstalowane"
+if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
+Write-Log "OK: Python packages installed"
 
-# Odczytaj konfiguracje (PyYAML dopiero teraz dostepne w .venv)
+# Read the config now that PyYAML is installed in .venv
 $config = Read-Config -ConfigPath (Join-Path -Path $ProjectRoot -ChildPath "config.yaml")
 $vlmModel = "moondream"
 $textModel = "llama3.2:3b"
@@ -119,22 +119,22 @@ if ($config -and $config.ai) {
     if ($config.ai.vlm_model) { $vlmModel = $config.ai.vlm_model }
     if ($config.ai.text_model) { $textModel = $config.ai.text_model }
 }
-Write-Log "Modele z config.yaml: VLM=$vlmModel  Text=$textModel"
+Write-Log "Models from config: VLM=$vlmModel  Text=$textModel"
 
 # ============================================================
-# Krok 4: Node.js >= 18 + npm
+# Step 4: Node.js and npm
 # ============================================================
-Write-Log "=== Krok 4/9: Node.js i npm ==="
+Write-Log "=== Step 4/9: Node.js and npm ==="
 $nodePath = (Get-Command "node" -ErrorAction SilentlyContinue).Source
 $npmPath = (Get-Command "npm" -ErrorAction SilentlyContinue).Source
 if (-not $nodePath) {
-    Write-Log "BLAD: Node.js nie znaleziony w PATH."
-    Write-Log "       Zainstaluj Node.js >=18 recznie: https://nodejs.org/"
-    Write-Log "       Po instalacji uruchom ten skrypt ponownie."
+    Write-Log "ERROR: Node.js not found in PATH."
+    Write-Log "       Install Node.js >= 18 manually: https://nodejs.org/"
+    Write-Log "       Then run this script again."
     exit 1
 }
 if (-not $npmPath) {
-    Write-Log "BLAD: npm nie znaleziony w PATH."
+    Write-Log "ERROR: npm not found in PATH."
     exit 1
 }
 try {
@@ -142,36 +142,36 @@ try {
     if ($nodeVersion -match 'v(\d+)\.') {
         $nodeMajor = [int]$Matches[1]
         if ($nodeMajor -lt 18) {
-            Write-Log "BLAD: Node.js $nodeMajor < 18. Zainstaluj Node.js >=18: https://nodejs.org/"
+            Write-Log "ERROR: Node.js $nodeMajor < 18. Install Node.js >= 18: https://nodejs.org/"
             exit 1
         }
     }
     Write-Log "OK: Node $nodeVersion, npm $(& npm --version 2>&1)"
 } catch {
-    Write-Log "BLAD: nie udalo sie sprawdzic wersji Node.js"
+    Write-Log "ERROR: failed to check the Node.js version"
     exit 1
 }
 
 # ============================================================
-# Krok 5: npm install (frontend)
+# Step 5: npm install (frontend)
 # ============================================================
-Write-Log "=== Krok 5/9: Instalacja zaleznosci frontendu ==="
+Write-Log "=== Step 5/9: installing frontend dependencies ==="
 $FrontendDir = Join-Path -Path $ProjectRoot -ChildPath "src\frontend"
 if (-not (Test-Path -LiteralPath $FrontendDir)) {
-    throw "Nie znaleziono src/frontend"
+    throw "src/frontend directory not found"
 }
 $nodeModules = Join-Path -Path $FrontendDir -ChildPath "node_modules"
 if (Test-Path -LiteralPath $nodeModules) {
-    Write-Log "node_modules juz istnieje -- uruchamiam npm install (sprawdzi aktualizacje)"
+    Write-Log "node_modules already exists -- running npm install to sync it"
 }
 & npm install --prefix $FrontendDir 2>&1 | ForEach-Object { Write-Log "  $_" }
-if ($LASTEXITCODE -ne 0) { throw "npm install nie powiodl sie" }
-Write-Log "OK: zaleznosci frontendu zainstalowane"
+if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+Write-Log "OK: frontend dependencies installed"
 
 # ============================================================
-# Krok 6: Ollama -- lokalizacja
+# Step 6: locate or install Ollama
 # ============================================================
-Write-Log "=== Krok 6/9: Ollama ==="
+Write-Log "=== Step 6/9: Ollama ==="
 $ollamaSearchPaths = @(
     "C:\Program Files\Ollama\ollama.exe",
     "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe"
@@ -183,35 +183,35 @@ if (-not $ollamaPath) {
     }
 }
 if (-not $ollamaPath) {
-    Write-Log "Ollama nie znaleziona. Pobieram instalator..."
+    Write-Log "Ollama not found. Downloading the installer..."
     $url = "https://ollama.com/download/OllamaSetup.exe"
     $dst = "$env:TEMP\OllamaSetup.exe"
     (New-Object System.Net.WebClient).DownloadFile($url, $dst)
-    Write-Log "Instalacja cicha..."
+    Write-Log "Silent install..."
     Start-Process $dst -ArgumentList "/S" -Wait -PassThru | Out-Null
     $ollamaPath = "C:\Program Files\Ollama\ollama.exe"
     if (-not (Test-Path -LiteralPath $ollamaPath)) {
-        throw "Instalacja Ollamy nieudana -- zainstaluj recznie: https://ollama.com/download"
+        throw "Ollama installation failed -- install it manually: https://ollama.com/download"
     }
-    Write-Log "OK: Ollama zainstalowana"
+    Write-Log "OK: Ollama installed"
 }
 Write-Log "Ollama: $ollamaPath"
 
 # ============================================================
-# Krok 7: Ollama -- serwer
+# Step 7: Ollama server
 # ============================================================
-Write-Log "=== Krok 7/9: Serwer Ollamy ==="
+Write-Log "=== Step 7/9: Ollama server ==="
 $ollamaReady = $false
 try {
     $r = Invoke-WebRequest -Uri "http://localhost:11434" -UseBasicParsing -TimeoutSec 3
     if ($r.StatusCode -eq 200) {
-        Write-Log "OK: serwer Ollamy juz dziala"
+        Write-Log "OK: Ollama server is already running"
         $ollamaReady = $true
     }
 } catch {}
 
 if (-not $ollamaReady) {
-    Write-Log "Serwer nie dziala. Uruchamiam ollama serve..."
+    Write-Log "Server is not running. Starting ollama serve..."
     Start-Process -FilePath $ollamaPath -ArgumentList "serve" -NoNewWindow -PassThru | Out-Null
     Start-Sleep -Seconds 4
     for ($i = 0; $i -lt 10; $i++) {
@@ -220,33 +220,33 @@ if (-not $ollamaReady) {
             $r = Invoke-WebRequest -Uri "http://localhost:11434" -UseBasicParsing -TimeoutSec 3
             if ($r.StatusCode -eq 200) { $ollamaReady = $true; break }
         } catch {}
-        Write-Log "Czekam na serwer... ($($i+1)/10)"
+        Write-Log "Waiting for the server... ($($i+1)/10)"
     }
     if (-not $ollamaReady) {
-        throw "Serwer Ollamy nie wystartowal po 30s"
+        throw "Ollama server did not start within 30 s"
     }
-    Write-Log "OK: serwer Ollamy odpowiada"
+    Write-Log "OK: Ollama server responds"
 }
 
 # ============================================================
-# Krok 8: Pull modeli
+# Step 8: pull models
 # ============================================================
-Write-Log "=== Krok 8/9: Modele AI ==="
+Write-Log "=== Step 8/9: AI models ==="
 
 function Pull-ModelIfMissing {
     param([string]$Name)
     $list = & $ollamaPath list 2>&1 | Out-String
     if ($list -match [regex]::Escape($Name)) {
-        Write-Log "OK: $Name juz pobrany"
+        Write-Log "OK: $Name already pulled"
         return $true
     }
-    Write-Log "Pobieranie $Name (to moze chwile zajac)..."
+    Write-Log "Pulling $Name (this may take a while)..."
     $oldErrPref = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     & $ollamaPath pull $Name 2>&1 | ForEach-Object { Write-Log "  $_" }
     $ErrorActionPreference = $oldErrPref
     if ($LASTEXITCODE -ne 0) { return $false }
-    Write-Log "OK: $Name pobrany"
+    Write-Log "OK: $Name pulled"
     return $true
 }
 
@@ -259,36 +259,36 @@ function Test-Model {
         Write-Log "OK: $Name -- $($json.response)"
         return $true
     } catch {
-        Write-Log "OSTROZNIE: test API nieudany dla $Name -- $_"
+        Write-Log "WARNING: API test failed for $Name -- $_"
         return $false
     }
 }
 
 $vlmOk = Pull-ModelIfMissing -Name $vlmModel
 $textOk = Pull-ModelIfMissing -Name $textModel
-if (-not $vlmOk) { throw "Pull VLM $vlmModel nieudany" }
-if (-not $textOk) { throw "Pull Text $textModel nieudany" }
+if (-not $vlmOk) { throw "Failed to pull VLM $vlmModel" }
+if (-not $textOk) { throw "Failed to pull text model $textModel" }
 
 # ============================================================
-# Krok 9: Test modeli
+# Step 9: test models
 # ============================================================
-Write-Log "=== Krok 9/9: Test modeli ==="
-Write-Log "Test VLM ($vlmModel)..."
+Write-Log "=== Step 9/9: testing models ==="
+Write-Log "Testing VLM ($vlmModel)..."
 $vlmTest = Test-Model -Name $vlmModel
-Write-Log "Test Text ($textModel)..."
+Write-Log "Testing text model ($textModel)..."
 $textTest = Test-Model -Name $textModel
 
 if (-not $vlmTest -or -not $textTest) {
-    Write-Log "OSTROZNIE: Niektore modele nie przeszly testu API."
-    Write-Log "Moga byc jeszcze ladowane. Sprobuj recznie: ollama run $vlmModel"
+    Write-Log "WARNING: some models failed the API test."
+    Write-Log "They may still be loading. Try manually: ollama run $vlmModel"
 }
 
 # ============================================================
-# Podsumowanie
+# Summary
 # ============================================================
 Write-Log ""
 Write-Log "========================================"
-Write-Log "  AnkieterAI -- Srodowisko gotowe"
+Write-Log "  AnkieterAI -- environment ready"
 Write-Log "========================================"
 Write-Log "  Python:  $pyVersion"
 Write-Log "  .venv:   $VenvPath"
@@ -299,10 +299,10 @@ Write-Log "  VLM:     $vlmModel"
 Write-Log "  Text:    $textModel"
 Write-Log "========================================"
 Write-Log ""
-Write-Log "Aby uruchomic aplikacje:"
-Write-Log "  .\scripts\run_prod.ps1    (produkcja + tunel Cloudflare)"
-Write-Log "  .\scripts\run_dev.ps1     (deweloperski, hot-reload)"
+Write-Log "To start the app:"
+Write-Log "  .\scripts\run_prod.ps1    (production build + Cloudflare tunnel)"
+Write-Log "  .\scripts\run_dev.ps1     (development, hot reload)"
 Write-Log ""
 
-Write-Log "=== Full Setup -- zakonczony pomyslnie ==="
+Write-Log "=== Full Setup -- finished successfully ==="
 exit 0

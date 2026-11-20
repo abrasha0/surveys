@@ -7,12 +7,12 @@ from domain.field_specs import CSV_FIELDS
 
 logger = logging.getLogger(__name__)
 
-# Nagłówek CSV na podstawie field_specs
+# CSV header built from field_specs
 CSV_HEADER = ["Sygnatura czasowa"] + [f.get_csv_header() for f in CSV_FIELDS]
 
 
 def rebuild_csv_from_processed(processed_data: dict, csv_path: str) -> int:
-    """Odbudowuje wyniki.csv w całości z processed.json (ankiety ze statusem 'verified')."""
+    """Rewrite the results CSV from processed.json, using only verified surveys."""
     filepath = Path(csv_path)
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
@@ -37,7 +37,7 @@ def rebuild_csv_from_processed(processed_data: dict, csv_path: str) -> int:
         try:
             survey = MedicalSurvey(**result)
         except Exception as e:
-            logger.warning("Pominięto ankietę %s podczas odbudowy CSV: %s", key, e)
+            logger.warning("Skipped survey %s while rebuilding CSV: %s", key, e)
             continue
         rows.append(survey.to_csv_row())
 
@@ -47,5 +47,5 @@ def rebuild_csv_from_processed(processed_data: dict, csv_path: str) -> int:
         for row in rows:
             writer.writerow(row)
 
-    logger.info("Odbudowano CSV %s: %d zweryfikowanych wierszy", csv_path, len(rows))
+    logger.info("Rebuilt CSV %s: %d verified rows", csv_path, len(rows))
     return len(rows)

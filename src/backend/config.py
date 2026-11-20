@@ -12,7 +12,7 @@ APP_ROOT = _ROOT
 
 
 class Section(dict):
-    """Dict z dostępem atrybutowym: section.key == section["key"]."""
+    """Dict with attribute access: section.key == section["key"]."""
 
     def __getattr__(self, name):
         try:
@@ -32,7 +32,7 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 
 def _apply_env_override(data: dict, prefix: str = _ENV_PREFIX) -> dict:
-    """Nadpisuje wartości z YAML danymi z env vars (ANKIETER_*)."""
+    """Override YAML values with ANKIETER_* environment variables."""
     for key, val in data.items():
         env_key = prefix + key.upper()
         if isinstance(val, dict):
@@ -45,7 +45,7 @@ def _apply_env_override(data: dict, prefix: str = _ENV_PREFIX) -> dict:
 
 
 def _coerce(env_val: str, reference):
-    """Konwertuje string z env na typ zgodny z defaultową wartością."""
+    """Convert an environment string to the type of the YAML value it overrides."""
     if isinstance(reference, bool):
         return env_val.lower() in ("true", "1", "yes")
     if isinstance(reference, int):

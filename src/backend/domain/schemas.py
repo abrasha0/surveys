@@ -6,7 +6,7 @@ from domain.field_specs import FIELD_SPEC_BY_NAME, ALL_FIELDS, CSV_FIELDS
 
 
 class MedicalSurvey(BaseModel):
-    # A. Demografia
+    # A. Demographics
     p1_plec: Optional[str] = None
     p2_wiek: Optional[int] = None
     p3_miejsce: Optional[str] = None
@@ -16,7 +16,7 @@ class MedicalSurvey(BaseModel):
     p6_stopien: Optional[str] = None
     p7_uczelnia: str = ""
 
-    # B. Aktywność zawodowa
+    # B. Employment
     p8_praca: Optional[str] = None
     p9_system: Optional[str] = None
     p9_inne: str = ""
@@ -24,7 +24,7 @@ class MedicalSurvey(BaseModel):
     p10_inne: str = ""
     p11_staz: str = ""
 
-    # C. Styl życia
+    # C. Lifestyle
     p12_sen: Optional[str] = None
     p13_ekran: Optional[str] = None
     p14_kofeina: Optional[str] = None
@@ -52,13 +52,13 @@ class MedicalSurvey(BaseModel):
     mfis_20: Optional[str] = None
     mfis_21: Optional[str] = None
 
-    # E. Stan zdrowia
+    # E. Health
     choroba_anemia: Optional[str] = None
     choroba_tarczyca: Optional[str] = None
     tarczyca_jakie: str = ""
     choroba_inne: str = ""
 
-    # F. Jakość snu
+    # F. Sleep quality (Athens Insomnia Scale)
     sen_1: Optional[str] = None
     sen_2: Optional[str] = None
     sen_3: Optional[str] = None
@@ -90,7 +90,7 @@ class MedicalSurvey(BaseModel):
     depr_19: Optional[str] = None
     depr_20: Optional[str] = None
 
-    # --- Walidacja i normalizacja ---
+    # --- Validation and normalization ---
     @field_validator("*", mode="before")
     @classmethod
     def normalize_field(cls, v, info):
@@ -98,21 +98,20 @@ class MedicalSurvey(BaseModel):
         spec = FIELD_SPEC_BY_NAME.get(field_name)
         if not spec:
             return v
-        # Jeśli to select, sprawdź czy wartość jest w dozwolonych
+        # Radio fields accept only one of the allowed choices
         if spec.kind == "radio":
             if v is None:
                 return None
             if isinstance(v, str):
-                # Dopasowanie przybliżone – można rozszerzyć
                 if v in spec.choices:
                     return v
-                # Próba przybliżonego dopasowania (np. małe litery)
+                # Fall back to a case- and whitespace-insensitive match
                 for choice in spec.choices:
                     if v.lower().strip() == choice.lower().strip():
                         return choice
                 return None
             return None
-        # Dla liczby
+        # Numbers
         if spec.kind == "number":
             if v is None:
                 return None
@@ -120,7 +119,7 @@ class MedicalSurvey(BaseModel):
                 return int(v)
             except (ValueError, TypeError):
                 return None
-        # Dla tekstu
+        # Free text
         if spec.kind == "text":
             if v is None:
                 return ""

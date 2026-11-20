@@ -7,7 +7,10 @@ logger = logging.getLogger(__name__)
 
 
 def scan_survey_directory(dir_path: Path) -> list[list[Path]]:
-    """Skanuje katalog ze zdjęciami, sortuje po nazwie, grupuje po 5."""
+    """Scan the image directory, sort files by name and split them into surveys.
+
+    Group size comes from ingestion.survey_group_size (one image per page).
+    """
     extensions = {".jpg", ".jpeg", ".png", ".webp"}
     files = [
         p for p in dir_path.iterdir()

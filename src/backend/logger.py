@@ -43,7 +43,7 @@ def setup_logging(
     for noisy in ("httpx", "httpcore", "PIL", "asyncio"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
-    # Dedykowany logger dla AI requests z rotacją
+    # Dedicated rotating logger for AI requests
     global ai_req_logger
     ai_req_logger = logging.getLogger("ai.requests")
     ai_req_logger.setLevel(logging.DEBUG)
