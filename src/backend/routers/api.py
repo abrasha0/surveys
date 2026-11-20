@@ -321,16 +321,22 @@ def save_survey(survey_id: int, request: SaveRequest):
                 normalized[f.name] = None
         elif spec and spec.kind == "number":
             try:
-                normalized[f.name] = int(raw) if raw is not None else None
+                value = int(raw) if raw is not None else None
             except (ValueError, TypeError):
                 normalized[f.name] = None
                 validation_errors[f.name] = f"Invalid number: '{raw}'"
+            else:
+                normalized[f.name] = value
+                too_low = value is not None and spec.min is not None and value < spec.min
+                too_high = value is not None and spec.max is not None and value > spec.max
+                if too_low or too_high:
+                    validation_errors[f.name] = f"Value {value} outside range {spec.min}-{spec.max}"
         elif spec and spec.kind == "text":
             normalized[f.name] = str(raw).strip() if raw is not None else ""
         else:
             normalized[f.name] = raw
     try:
-        survey_data = MedicalSurvey(**normalized)
+        MedicalSurvey(**normalized)
     except ValidationError as e:
         for error in e.errors():
             field = ".".join(str(loc) for loc in error["loc"]) if error["loc"] else "unknown"
@@ -341,9 +347,6 @@ def save_survey(survey_id: int, request: SaveRequest):
             "message": "Validation errors",
             "errors": validation_errors,
         })
-
-    if validation_errors and request.force:
-        survey_data = MedicalSurvey(**normalized)
 
     worker.state.mark_verified(survey_id, result=normalized)
 

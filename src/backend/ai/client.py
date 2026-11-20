@@ -243,7 +243,9 @@ class AIClient:
                     if attempt < self.max_retries - 1:
                         await asyncio.sleep(2 ** attempt)
 
-            raise RuntimeError(f"VLM page {page_index} failed after {self.max_retries} retries")
+            raise RuntimeError(
+                f"VLM page {page_index} failed after {self.max_retries} retries"
+            ) from last_error
 
     async def _format_json_llm(
         self,
@@ -268,6 +270,7 @@ class AIClient:
         async with (llm_trace(ctx) if ctx else nullcontext()):
             for attempt in range(self.max_retries):
                 t0 = time.perf_counter()
+                content = ""
                 try:
                     if progress_callback:
                         progress_callback(ProcessingStatus(
@@ -306,9 +309,12 @@ class AIClient:
                     )
                     elapsed = time.perf_counter() - t0
                     resp.raise_for_status()
+                    content = resp.text
                     body = resp.json()
                     content = body.get("message", {}).get("content", "")
                     parsed = json.loads(content)
+                    if not isinstance(parsed, dict):
+                        raise ValueError(f"expected a JSON object, got {type(parsed).__name__}")
                     if _logger_mod.ai_req_logger:
                         _logger_mod.ai_req_logger.info(
                             "text_format_ok | model=%s | page=%d | keys=%s | latency=%.2fs | output_preview=%s",
@@ -323,7 +329,7 @@ class AIClient:
                     last_error = jde
                     logger.error(
                         "JSONDecodeError page=%d attempt=%d/%d after %.2fs: %s | "
-                        "Raw content (first 500 chars): %s",
+                        "Raw content: %s",
                         page_index, attempt+1, self.max_retries, elapsed,
                         str(jde), _truncate(content),
                     )
@@ -352,7 +358,9 @@ class AIClient:
                     if attempt < self.max_retries - 1:
                         await asyncio.sleep(2 ** attempt)
 
-            raise RuntimeError(f"Text LLM page {page_index} failed after {self.max_retries} retries")
+            raise RuntimeError(
+                f"Text LLM page {page_index} failed after {self.max_retries} retries"
+            ) from last_error
 
     async def _process_pages_sequential(
         self,

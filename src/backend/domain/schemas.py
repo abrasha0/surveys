@@ -1,6 +1,7 @@
+import re
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
 from domain.field_specs import FIELD_SPEC_BY_NAME, ALL_FIELDS, CSV_FIELDS
 
 from dataclasses import dataclass
@@ -14,7 +15,7 @@ class SurveyGroup:
 class MedicalSurvey(BaseModel):
     # A. Demografia
     p1_plec: Optional[str] = None
-    p2_wiek: Optional[int] = Field(default=None, ge=18, le=80)
+    p2_wiek: Optional[int] = None
     p3_miejsce: Optional[str] = None
     p4_stan: Optional[str] = None
     p5_forma: Optional[str] = None
@@ -149,9 +150,27 @@ class MedicalSurvey(BaseModel):
         kwargs = {}
         for f in ALL_FIELDS:
             raw = data.get(f.name)
-            if f.name == "p2_wiek" and isinstance(raw, str):
-                import re
-                m = re.search(r"\d+", raw)
-                raw = int(m.group()) if m else None
+            if f.kind == "number":
+                raw = _parse_number_in_range(raw, f.min, f.max)
             kwargs[f.name] = raw
         return cls(**kwargs)
+
+
+def _parse_number_in_range(raw, min_value: int | None, max_value: int | None) -> int | None:
+    """Read a number from OCR output; drop it when it falls outside the allowed range.
+
+    The reviewer fills in a dropped value by hand, so one misread number does not
+    fail the whole survey.
+    """
+    if isinstance(raw, str):
+        m = re.search(r"\d+", raw)
+        raw = m.group() if m else None
+    try:
+        value = int(raw) if raw is not None else None
+    except (ValueError, TypeError):
+        return None
+    if value is None:
+        return None
+    if (min_value is not None and value < min_value) or (max_value is not None and value > max_value):
+        return None
+    return value

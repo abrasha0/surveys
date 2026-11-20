@@ -1,7 +1,9 @@
-import time
 import logging
+import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from uuid import uuid4
 
 from config import config
 
@@ -10,14 +12,14 @@ logger = logging.getLogger(__name__)
 _SHORTEN_IO = config.logging["shorten_models_io"]
 _MAX_IO_SIZE = config.logging["max_models_io_size"]
 
+_client = None
+_client_attempted = False
+
 
 def _truncate(text: str, limit: int | None = None) -> str:
     if not _SHORTEN_IO:
         return text
     return text[: limit or _MAX_IO_SIZE]
-
-_client = None
-_client_attempted = False
 
 
 @dataclass
@@ -35,7 +37,6 @@ def _get_client():
         return _client
     _client_attempted = True
 
-    from config import config
     if not config.langsmith["tracing_v2"] or not config.langsmith["endpoint"]:
         logger.debug("LangSmith tracing disabled")
         return None
@@ -60,150 +61,79 @@ def get_langsmith_client():
 
 
 @asynccontextmanager
-async def vlm_trace(ctx: TraceContext):
+async def _trace_run(name: str, run_type: str, tags: list[str], metadata: dict):
+    """Record the wrapped block as one LangSmith run.
+
+    Tracing failures are logged and never interrupt the traced operation.
+    """
     client = _get_client()
     if client is None:
         yield None
         return
 
-    from config import config
-    tags = ["vlm"]
+    run_id = uuid4()
+    try:
+        client.create_run(
+            name=name,
+            inputs={},
+            run_type=run_type,
+            id=run_id,
+            project_name=config.langsmith["project"],
+            start_time=datetime.now(timezone.utc),
+            tags=tags,
+            extra={"metadata": metadata},
+        )
+    except Exception as e:
+        logger.warning("LangSmith create_run failed for %s: %s", name, e)
+        yield None
+        return
+
+    t0 = time.perf_counter()
+    error = None
+    try:
+        yield run_id
+    except Exception as e:
+        error = e
+        raise
+    finally:
+        try:
+            client.update_run(
+                run_id,
+                end_time=datetime.now(timezone.utc),
+                outputs={"latency_s": round(time.perf_counter() - t0, 3)},
+                error=_truncate(str(error)) if error else None,
+            )
+        except Exception as e:
+            logger.warning("LangSmith update_run failed for %s: %s", name, e)
+
+
+def _model_tags(kind: str, ctx: TraceContext) -> list[str]:
+    tags = [kind]
     if ctx.model:
         tags.append(ctx.model)
     if ctx.page_idx >= 0:
         tags.append(f"page_{ctx.page_idx}")
     if ctx.survey_idx >= 0:
         tags.append(f"survey_{ctx.survey_idx}")
-
-    run = client.create_run(
-        name=f"vlm_{ctx.operation}",
-        project_name=config.langsmith["project"],
-        run_type="chain",
-        tags=tags,
-        extra={
-            "model": ctx.model,
-            "page_idx": ctx.page_idx,
-            "survey_idx": ctx.survey_idx,
-            **ctx.extra,
-        },
-    )
-
-    t0 = time.perf_counter()
-    error = None
-    result = None
-    try:
-        result = yield run
-    except Exception as e:
-        error = e
-        raise
-    finally:
-        elapsed = time.perf_counter() - t0
-        try:
-            client.update_run(
-                run.id,
-                end_time=time.time(),
-                extra={
-                    "latency_s": round(elapsed, 3),
-                    "error": _truncate(str(error)) if error else None,
-                },
-            )
-            if error:
-                client.update_run(run.id, error=_truncate(str(error)))
-        except Exception as e:
-            logger.warning("LangSmith vlm_trace update_run failed: %s", e)
+    return tags
 
 
-@asynccontextmanager
-async def llm_trace(ctx: TraceContext):
-    client = _get_client()
-    if client is None:
-        yield None
-        return
-
-    from config import config
-    tags = ["text_llm"]
-    if ctx.model:
-        tags.append(ctx.model)
-    if ctx.page_idx >= 0:
-        tags.append(f"page_{ctx.page_idx}")
-    if ctx.survey_idx >= 0:
-        tags.append(f"survey_{ctx.survey_idx}")
-
-    run = client.create_run(
-        name=f"llm_{ctx.operation}",
-        project_name=config.langsmith["project"],
-        run_type="chain",
-        tags=tags,
-        extra={
-            "model": ctx.model,
-            "page_idx": ctx.page_idx,
-            "survey_idx": ctx.survey_idx,
-            **ctx.extra,
-        },
-    )
-
-    t0 = time.perf_counter()
-    error = None
-    result = None
-    try:
-        result = yield run
-    except Exception as e:
-        error = e
-        raise
-    finally:
-        elapsed = time.perf_counter() - t0
-        try:
-            client.update_run(
-                run.id,
-                end_time=time.time(),
-                extra={
-                    "latency_s": round(elapsed, 3),
-                    "error": _truncate(str(error)) if error else None,
-                },
-            )
-            if error:
-                client.update_run(run.id, error=_truncate(str(error)))
-        except Exception as e:
-            logger.warning("LangSmith llm_trace update_run failed: %s", e)
+def _model_metadata(ctx: TraceContext) -> dict:
+    return {
+        "model": ctx.model,
+        "page_idx": ctx.page_idx,
+        "survey_idx": ctx.survey_idx,
+        **ctx.extra,
+    }
 
 
-@asynccontextmanager
-async def io_trace(op_name: str, metadata: dict | None = None):
-    client = _get_client()
-    if client is None:
-        yield None
-        return
+def vlm_trace(ctx: TraceContext):
+    return _trace_run(f"vlm_{ctx.operation}", "chain", _model_tags("vlm", ctx), _model_metadata(ctx))
 
-    from config import config
-    tags = ["io"]
 
-    run = client.create_run(
-        name=f"io_{op_name}",
-        project_name=config.langsmith["project"],
-        run_type="tool",
-        tags=tags,
-        extra=metadata or {},
-    )
+def llm_trace(ctx: TraceContext):
+    return _trace_run(f"llm_{ctx.operation}", "chain", _model_tags("text_llm", ctx), _model_metadata(ctx))
 
-    t0 = time.perf_counter()
-    error = None
-    try:
-        yield run
-    except Exception as e:
-        error = e
-        raise
-    finally:
-        elapsed = time.perf_counter() - t0
-        try:
-            client.update_run(
-                run.id,
-                end_time=time.time(),
-                extra={
-                    "latency_s": round(elapsed, 3),
-                    "error": _truncate(str(error)) if error else None,
-                },
-            )
-            if error:
-                client.update_run(run.id, error=_truncate(str(error)))
-        except Exception as e:
-            logger.warning("LangSmith io_trace update_run failed: %s", e)
+
+def io_trace(op_name: str, metadata: dict | None = None):
+    return _trace_run(f"io_{op_name}", "tool", ["io"], metadata or {})

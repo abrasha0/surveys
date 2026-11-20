@@ -117,7 +117,7 @@ class ProcessingWorker:
                     idx, attempt + 1, max_retries, e,
                 )
                 if attempt < max_retries - 1:
-                    pass
+                    await asyncio.sleep(2 ** attempt)
 
         error_msg = str(last_error)[:200] if last_error else "Unknown error"
         self.state.set_survey_status(idx, "error", error=error_msg)
