@@ -18,6 +18,7 @@ interface VerificationStore {
   setSelectedPage: (surveyId: number, page: number) => void;
   setShowErrors: (surveyId: number, show: boolean) => void;
   updateDraft: (surveyId: number, values: Record<string, unknown>) => void;
+  mergeServerDraft: (surveyId: number, values: Record<string, unknown>) => void;
   saveDraft: (surveyId: number) => void;
   clearDraft: (surveyId: number) => void;
   initSurvey: (surveyId: number) => void;
@@ -99,6 +100,24 @@ export const useVerificationStore = create<VerificationStore>((set, get) => ({
         },
       };
     });
+  },
+
+  // Fills in fields saved on the server (e.g. from another browser) that are
+  // missing locally. Local edits win because they are never older than the
+  // last server sync from this browser.
+  mergeServerDraft: (surveyId: number, values: Record<string, unknown>) => {
+    const current = get().surveysUI[surveyId] ?? defaultUIState();
+    const missing = Object.keys(values).filter((key) => !(key in current.draftValues));
+    if (missing.length === 0) return;
+    set((s) => ({
+      surveysUI: {
+        ...s.surveysUI,
+        [surveyId]: {
+          ...current,
+          draftValues: { ...values, ...current.draftValues },
+        },
+      },
+    }));
   },
 
   saveDraft: (surveyId: number) => {

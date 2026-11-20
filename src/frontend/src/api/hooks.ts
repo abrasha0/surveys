@@ -46,6 +46,7 @@ export interface SurveyResult {
   id: number;
   status: string;
   result: Record<string, unknown> | null;
+  draft: Record<string, unknown> | null;
   error: string | null;
 }
 

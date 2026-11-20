@@ -16,6 +16,7 @@ export default function VerificationPanel() {
   const saveSurveyMutation = useSaveSurvey();
   const unverifyMutation = useUnverifySurvey();
   const initSurvey = useVerificationStore((s) => s.initSurvey);
+  const mergeServerDraft = useVerificationStore((s) => s.mergeServerDraft);
   const surveyUI = useVerificationStore((s) =>
     currentSurveyId !== null ? s.surveysUI[currentSurveyId] : undefined
   );
@@ -43,6 +44,13 @@ export default function VerificationPanel() {
 
   const formLoading = !surveyResult && (resultLoading || resultFetching);
   const aiResult = surveyResult?.id === currentSurveyId ? surveyResult?.result ?? null : null;
+  const serverDraft = surveyResult?.id === currentSurveyId ? surveyResult?.draft ?? null : null;
+
+  useEffect(() => {
+    if (currentSurveyId !== null && serverDraft) {
+      mergeServerDraft(currentSurveyId, serverDraft);
+    }
+  }, [currentSurveyId, serverDraft, mergeServerDraft]);
 
   useEffect(() => {
     if (currentSurveyId === null && clickableSurveys.length > 0) {

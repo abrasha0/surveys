@@ -13,9 +13,10 @@ interface ScaleTableGridProps {
   values: Record<string, unknown>;
   onChange: (name: string, value: unknown) => void;
   rowHeight?: number;
+  disabled?: boolean;
 }
 
-export default function ScaleTableGrid({ fields, values, onChange, rowHeight = 40 }: ScaleTableGridProps) {
+export default function ScaleTableGrid({ fields, values, onChange, rowHeight = 40, disabled = false }: ScaleTableGridProps) {
   if (fields.length === 0) return null;
 
   const choices = fields[0].choices ?? [];
@@ -26,7 +27,7 @@ export default function ScaleTableGrid({ fields, values, onChange, rowHeight = 4
     : choices;
 
   return (
-    <div>
+    <div className={disabled ? 'opacity-70' : undefined}>
       <table className="w-full border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
         <thead>
           <tr>
@@ -57,11 +58,13 @@ export default function ScaleTableGrid({ fields, values, onChange, rowHeight = 4
                     <td key={choice} className="p-0 border-b border-gray-100 text-center" style={{ height: rowHeight }}>
                       <button
                         type="button"
+                        disabled={disabled}
                         onClick={() => onChange(field.name, selected ? '' : choice)}
-                        className={`w-full h-full flex items-center justify-center transition-colors cursor-pointer
+                        className={`w-full h-full flex items-center justify-center transition-colors
+                          ${disabled ? 'cursor-default' : 'cursor-pointer'}
                           ${selected
                             ? 'bg-[var(--color-info)] text-white font-medium'
-                            : 'hover:bg-blue-100/70 text-gray-500'
+                            : `text-gray-500 ${disabled ? '' : 'hover:bg-blue-100/70'}`
                           }`}
                       >
                         {selected ? '●' : '○'}

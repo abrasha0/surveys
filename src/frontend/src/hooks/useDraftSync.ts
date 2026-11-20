@@ -2,40 +2,56 @@ import { useEffect, useRef } from 'react';
 import { useSaveDraft } from '../api/hooks';
 import { useVerificationStore } from '../store/verificationStore';
 
-const SYNC_INTERVAL = 30000;
+const SYNC_DELAY_MS = 2000;
 
+interface PendingDraft {
+  surveyId: number;
+  values: Record<string, unknown>;
+  key: string;
+}
+
+/**
+ * Mirrors the local draft of the current survey to the backend.
+ *
+ * Changes are debounced: a request is sent once the values stop changing for
+ * SYNC_DELAY_MS. A pending draft is flushed when the user switches to another
+ * survey or leaves the verification view.
+ */
 export function useDraftSync(surveyId: number | null) {
-  const saveDraftMutation = useSaveDraft();
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastValuesRef = useRef<string>('');
+  const { mutate: saveDraft } = useSaveDraft();
+  const pendingRef = useRef<PendingDraft | null>(null);
+  const lastSyncedRef = useRef<string>('');
 
   const draftValues = useVerificationStore((s) =>
     surveyId !== null ? s.surveysUI[surveyId]?.draftValues : undefined
   );
 
   useEffect(() => {
-    if (surveyId === null || !draftValues) return;
+    if (surveyId === null || !draftValues || Object.keys(draftValues).length === 0) return;
 
-    const valuesJson = JSON.stringify(draftValues);
-    if (valuesJson === lastValuesRef.current) return;
-    lastValuesRef.current = valuesJson;
+    const key = `${surveyId}:${JSON.stringify(draftValues)}`;
+    if (key === lastSyncedRef.current) return;
 
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
+    pendingRef.current = { surveyId, values: draftValues, key };
+    const timer = setTimeout(() => {
+      pendingRef.current = null;
+      lastSyncedRef.current = key;
+      saveDraft({ surveyId, values: draftValues });
+    }, SYNC_DELAY_MS);
 
-    timerRef.current = setInterval(() => {
-      saveDraftMutation.mutate({ surveyId, values: draftValues });
-    }, SYNC_INTERVAL);
+    return () => clearTimeout(timer);
+  }, [surveyId, draftValues, saveDraft]);
 
+  useEffect(() => {
+    const pending = pendingRef;
+    const lastSynced = lastSyncedRef;
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      if (Object.keys(draftValues).length > 0) {
-        saveDraftMutation.mutate({ surveyId, values: draftValues });
+      const draft = pending.current;
+      if (draft && draft.surveyId === surveyId) {
+        pending.current = null;
+        lastSynced.current = draft.key;
+        saveDraft({ surveyId: draft.surveyId, values: draft.values });
       }
     };
-  }, [surveyId, draftValues, saveDraftMutation]);
+  }, [surveyId, saveDraft]);
 }

@@ -201,6 +201,7 @@ const DynamicForm = forwardRef<{ save: () => void; forceSave: () => void }, Dyna
                   onChange={handleChange}
                   error={errors[field.name]}
                   showErrors={showErrors}
+                  disabled={readOnly}
                 />
               </div>
             ))}
@@ -212,6 +213,7 @@ const DynamicForm = forwardRef<{ save: () => void; forceSave: () => void }, Dyna
             fields={pageFields}
             values={allValues}
             onChange={handleChange}
+            disabled={readOnly}
           />
         )}
 
@@ -232,6 +234,7 @@ const DynamicForm = forwardRef<{ save: () => void; forceSave: () => void }, Dyna
               fields={mfisFields}
               values={allValues}
               onChange={handleChange}
+              disabled={readOnly}
             />
             <hr className="border-gray-200 mb-6" />
             {(() => {
