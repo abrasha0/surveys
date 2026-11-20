@@ -1,189 +1,167 @@
-# Survey Structure — AnkieterAI
+# Survey structure
 
-## Przegląd
+The survey has **5 pages** and **70 fields**. The field definitions in
+`src/backend/domain/field_specs.py` are the single source of truth: they drive the
+verification form, server-side validation, the CSV columns and (together with the
+`page_N_json_schema` prompts in the config) AI extraction.
 
-- **70 pól** na 5 stronach ankiety (63 oryginalne + 7 rozszerzonych)
-- **71 nagłówków CSV** (1 Sygnatura czasowa + 70 pól)
-- Źródło prawdy: `src/domain/field_specs.py`
-- Modele danych: `src/domain/schemas.py` (MedicalSurvey)
-- CSV export: `src/domain/csv_export.py` (CSV_HEADER generowany dynamicznie z ALL_FIELDS)
+Field names are stable identifiers. Labels, choices and CSV headers are the Polish
+texts used in the UI and in the exported CSV, and must match the paper survey and the
+prompts exactly.
 
----
+Field types:
 
-## Strona 1 — Demografia + styl życia (17 pól)
+- **choice**: exactly one of the listed answers (a radio group in the form)
+- **number**: an integer, optionally limited to a range
+- **text**: free text
 
-Pierwsza strona ankiety zawiera pytania demograficzne, informacje o pracy
-oraz stylu życia respondenta.
+Some text fields are marked as conditional: they are meant to be filled in only when
+another field has a given answer (for example `p5_inne` when `p5_forma` is `Inne`).
+The condition is informational; the form always shows these fields.
 
-| #  | Nazwa pola     | Etykieta                              | Typ    | Dozwolone wartości                                                                                         | Nagłówek CSV                                          |
-|----|----------------|---------------------------------------|--------|------------------------------------------------------------------------------------------------------------|-------------------------------------------------------|
-| 1  | `p1_plec`      | 1. Płeć                               | radio | Kobieta, Mężczyzna, Nie chcę podawać                                                                      | Płeć                                                  |
-| 2  | `p2_wiek`      | 2. Wiek                               | number | 18-80 (dowolny tekst z regex `\d+`)                                                                        | Wiek                                                  |
-| 3  | `p3_miejsce`   | 3. Miejsce zamieszkania               | radio | Wieś, Miasto do 50 tys. mieszkańców, Miasto 50-100 tys. mieszkańców, Miasto powyżej 100 tys. mieszkańców    | Miejsce zamieszkania                                  |
-| 4  | `p4_stan`      | 4. Stan cywilny                       | radio | Panna/kawaler, W związku nieformalnym, Mężatka/żonaty, Rozwiedziona/rozwiedziony, Wdowa/wdowiec            | Stan cywilny                                          |
-| 5  | `p5_forma`     | 5. Forma zamieszkania                 | radio | Z rodziną, W akademiku, W wynajmowanym mieszkaniu/pokoju, Inne                                           | Forma zamieszkania w trakcie studiów                 |
-| 6  | `p5_inne`      | 5a. Inne (zamieszkanie)               | text   | (dowolny tekst)                                                                                            | Inne (forma zamieszkania)                             |
-| 7  | `p6_stopien`   | 6. Stopień studiów                    | radio | Studia I stopnia, Studia II stopnia                                                                        | Stopień studiów                                       |
-| 8  | `p7_uczelnia`  | 7. Uczelnia                           | text   | (dowolny tekst)                                                                                            | Na jakiej uczelni studiujesz?                          |
-| 9  | `p8_praca`     | 8. Praca w trakcie studiów?            | radio | Tak, w zawodzie medycznym, Tak, poza zawodem, Nie (Jeśli zaznaczyłaś/eś tą odpowiedź, przejdź do pytania nr 12) | Czy pracujesz zawodowo w trakcie studiów?    |
-| 10 | `p9_system`    | 9. System pracy                       | radio | Zmianowym, 12-godzinnym, Jednozmianowym, 8-godzinnym, Innym                                               | Jeśli pracujesz w zawodzie, to w jakim systemie       |
-| 11 | `p9_inne`      | 9a. Inne (system pracy)               | text   | (dowolny tekst)                                                                                            | Inne (system pracy)                                   |
-| 12 | `p10_oddzial`  | 10. Rodzaj oddziału                   | radio | Zachowawczym, Zabiegowym, Inne                                                                             | Na jakim rodzaju oddziału pracujesz?                  |
-| 13 | `p10_inne`     | 10a. Inne (oddział)                   | text   | (dowolny tekst)                                                                                            | Inne (oddział)                                        |
-| 14 | `p11_staz`     | 11. Staż pracy                        | text   | (dowolny tekst)                                                                                            | Jaki jest Twój staż pracy                             |
-| 15 | `p12_sen`      | 12. Średnia liczba godzin snu         | radio | poniżej 5 godzin, 5-6 godzin, 7-8 godzin, Powyżej 8 godzin                                                | Jaka jest Twoja średnia liczba godzin snu w ciągu doby? |
-| 16 | `p13_ekran`    | 13. Godziny przed ekranem             | radio | Mniej niż 1 godzinę, 1-3 godziny, Powyżej 3 godzin                                                        | Ile godzin dziennie spędzasz przed ekranem             |
-| 17 | `p14_kofeina`  | 14. Spożycie kofeiny                  | radio | Nie, Tak, 1-2 porcje dziennie, Tak, 3 lub więcej porcji dziennie                                          | Czy pijesz napoje zawierające kofeinę (kawa, napoje energetyczne)? |
+## Summary
 
----
+| Page | Content | Fields | Field names |
+|---|---|---|---|
+| 1 | Demographics, employment, lifestyle | 17 | `p1_plec` … `p14_kofeina`, including `p5_inne`, `p9_inne`, `p10_inne` |
+| 2 | Athens Insomnia Scale | 8 | `sen_1` … `sen_8` |
+| 3 | MFIS (Modified Fatigue Impact Scale), items 1-15 | 15 | `mfis_1` … `mfis_15` |
+| 4 | MFIS items 16-21 and health | 10 | `mfis_16` … `mfis_21`, `choroba_anemia`, `choroba_tarczyca`, `tarczyca_jakie`, `choroba_inne` |
+| 5 | CES-D (Center for Epidemiologic Studies Depression Scale) | 20 | `depr_1` … `depr_20` |
+| **Total** | | **70** | |
 
-## Strona 2 — Ateńska skala bezsenności (8 pól)
+## Page 1: demographics, employment and lifestyle
 
-**Athens Insomnia Scale** — skala bezsenności. Pytania dotyczą **ostatnich
-dwóch tygodni**.
+| Field | Label | Type | Allowed values | CSV header |
+|---|---|---|---|---|
+| `p1_plec` | 1. Płeć | choice | Kobieta; Mężczyzna; Nie chcę podawać | Płeć |
+| `p2_wiek` | 2. Wiek | number | 18-80 | Wiek |
+| `p3_miejsce` | 3. Miejsce zamieszkania | choice | Wieś; Miasto do 50 tys. mieszkańców; Miasto 50-100 tys. mieszkańców; Miasto powyżej 100 tys. mieszkańców | Miejsce zamieszkania |
+| `p4_stan` | 4. Stan cywilny | choice | Panna/kawaler; W związku nieformalnym; Mężatka/żonaty; Rozwiedziona/rozwiedziony; Wdowa/wdowiec | Stan cywilny |
+| `p5_forma` | 5. Forma zamieszkania | choice | Z rodziną; W akademiku; W wynajmowanym mieszkaniu/pokoju; Inne | Forma zamieszkania w trakcie studiów |
+| `p5_inne` | 5a. Inne (zamieszkanie) | text | free text (if `p5_forma` = Inne) | Inne (forma zamieszkania) |
+| `p6_stopien` | 6. Stopień studiów | choice | Studia I stopnia; Studia II stopnia | Stopień studiów |
+| `p7_uczelnia` | 7. Uczelnia | text | free text | Na jakiej uczelni studiujesz? |
+| `p8_praca` | 8. Praca w trakcie studiów? | choice | Tak, w zawodzie medycznym; Tak, poza zawodem; Nie (Jeśli zaznaczyłaś/eś tą odpowiedź, przejdź do pytania nr 12) | Czy pracujesz zawodowo w trakcie studiów? |
+| `p9_system` | 9. System pracy | choice | Zmianowym, 12-godzinnym; Jednozmianowym, 8-godzinnym; Innym | Jeśli pracujesz w zawodzie, to w jakim systemie |
+| `p9_inne` | 9a. Inne (system pracy) | text | free text (if `p9_system` = Innym) | Inne (system pracy) |
+| `p10_oddzial` | 10. Rodzaj oddziału | choice | Zachowawczym; Zabiegowym; Inne | Na jakim rodzaju oddziału pracujesz? |
+| `p10_inne` | 10a. Inne (oddział) | text | free text (if `p10_oddzial` = Inne) | Inne (oddział) |
+| `p11_staz` | 11. Staż pracy | text | free text | Jaki jest Twój staż pracy |
+| `p12_sen` | 12. Średnia liczba godzin snu | choice | poniżej 5 godzin; 5-6 godzin; 7-8 godzin; Powyżej 8 godzin | Jaka jest Twoja średnia liczba godzin snu w ciągu doby? |
+| `p13_ekran` | 13. Godziny przed ekranem | choice | Mniej niż 1 godzinę; 1-3 godziny; Powyżej 3 godzin | Ile godzin dziennie spędzasz przed ekranem |
+| `p14_kofeina` | 14. Spożycie kofeiny | choice | Nie; Tak, 1-2 porcje dziennie; Tak, 3 lub więcej porcji dziennie | Czy pijesz napoje zawierające kofeinę (kawa, napoje energetyczne)? |
 
-| #  | Nazwa pola | Etykieta                    | Dozwolone wartości (4 opcje)                                                                                |
-|----|------------|-----------------------------|-------------------------------------------------------------------------------------------------------------|
-| 1  | `sen_1`    | Zasypianie                  | szybkie, nieznacznie opóźnione, opóźnione, bardzo opóźnione lub bezsenność przez całą noc                  |
-| 2  | `sen_2`    | Budzenie się w nocy         | nie występuje, sporadycznie, często, bardzo często lub bezsenność przez całą noc                           |
-| 3  | `sen_3`    | Wcześniejsze budzenie       | o zamierzonej godzinie, nieznacznie wcześniej, znacznie wcześniej, dużo wcześniej lub bezsenność przez całą noc |
-| 4  | `sen_4`    | Całkowity czas snu          | wystarczający, nieznacznie niewystarczający, wyraźnie niewystarczający, całkowicie niewystarczający lub bezsenność przez całą noc |
-| 5  | `sen_5`    | Jakość snu                  | satysfakcjonująca, nieznacznie niesatysfakcjonująca, wyraźnie niesatysfakcjonująca, całkowicie niesatysfakcjonująca |
-| 6  | `sen_6`    | Samopoczucie nast. dnia     | dobre, nieznacznie gorsze, wyraźnie gorsze, **wybitnie gorsze**                                            |
-| 7  | `sen_7`    | Sprawność nast. dnia        | niezaburzona, nieznacznie zaburzona, wyraźnie zaburzona, **wybitnie zaburzona**                             |
-| 8  | `sen_8`    | Senność w ciągu dnia        | nie zdarza się, nieznaczna, wyraźna, bardzo nasilona                                                        |
+## Page 2: Athens Insomnia Scale
 
-> Uwaga: `sen_6` i `sen_7` mają 4 opcje (w tym "wybitnie gorsze" / "wybitnie zaburzona").
+All items have four answers, from best to worst sleep.
 
----
+| Field | Label | Allowed values | CSV header |
+|---|---|---|---|
+| `sen_1` | Zasypianie | szybkie; nieznacznie opóźnione; opóźnione; bardzo opóźnione lub bezsenność przez całą noc | Zasypianie po położeniu się do łóżka i zgaszeniu światła |
+| `sen_2` | Budzenie się w nocy | nie występuje; sporadycznie; często; bardzo często lub bezsenność przez całą noc | Budzenie się podczas nocy |
+| `sen_3` | Wcześniejsze budzenie | o zamierzonej godzinie; nieznacznie wcześniej; znacznie wcześniej; dużo wcześniej lub bezsenność przez całą noc | Budzenie się rano wcześniej niż planowano |
+| `sen_4` | Całkowity czas snu | wystarczający; nieznacznie niewystarczający; wyraźnie niewystarczający; całkowicie niewystarczający lub bezsenność przez całą noc | Całkowity czas snu |
+| `sen_5` | Jakość snu | satysfakcjonująca; nieznacznie niesatysfakcjonująca; wyraźnie niesatysfakcjonująca; całkowicie niesatysfakcjonująca | Jakość snu, niezależnie od czasu jego trwania |
+| `sen_6` | Samopoczucie nast. dnia | dobre; nieznacznie gorsze; wyraźnie gorsze; wybitnie gorsze | Samopoczucie następnego dnia |
+| `sen_7` | Sprawność nast. dnia | niezaburzona; nieznacznie zaburzona; wyraźnie zaburzona; wybitnie zaburzona | Sprawność psychiczna i fizyczna następnego dnia |
+| `sen_8` | Senność w ciągu dnia | nie zdarza się; nieznaczna; wyraźna; bardzo nasilona | Senność w ciągu dnia |
 
-## Strona 3 — MFIS pozycje 1-15 (15 pól)
+## Page 3: MFIS, items 1-15
 
-**MFIS** (Modified Fatigue Impact Scale) — skala wpływu zmęczenia.
-Pytania dotyczą **ostatnich 4 tygodni**.
+Every MFIS item uses the scale `0`-`4`, shown in the form as 0 Nigdy (never),
+1 Rzadko (rarely), 2 Czasami (sometimes), 3 Często (often), 4 Prawie zawsze (almost
+always). The items refer to the last 4 weeks.
 
-**Skala odpowiedzi (5 opcji, 0-4):**
-- 0 — Nigdy
-- 1 — Rzadko
-- 2 — Czasami
-- 3 — Często
-- 4 — Prawie zawsze
+| Field | Label | Type | CSV header |
+|---|---|---|---|
+| `mfis_1` | Czułam/em się mniej uważna/y | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Czułam/em się mniej uważna/y] |
+| `mfis_2` | Trudno było mi się skupić | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Trudno było mi się skupić przez dłuższą chwilę] |
+| `mfis_3` | Trudno było mi myśleć logicznie | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Trudno było mi myśleć logicznie] |
+| `mfis_4` | Byłam/em niezdarna/y | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Byłam/em niezdarna/y] |
+| `mfis_5` | Byłam/em zapominalska/ski | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Byłam/em zapominalska/ski] |
+| `mfis_6` | Musiałam/em wyznaczać tempo | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Musiałam/em sama/sam wyznaczać sobie indywidualne tempo mojej pracy i aktywności fizycznej (bo nie mogłam/em nadążyć)] |
+| `mfis_7` | Trudno zmotywować się do aktywności fizycznej | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Trudno było mi się zmotywować do czegoś co wymagało aktywności fizycznej] |
+| `mfis_8` | Trudno zmotywować się do wyjścia | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Trudno było mi się zmotywować do aktywnego uczestnictwa w zajęciach poza domem (spotkania itp.)] |
+| `mfis_9` | Nie czułam/em się zdolna/y do niczego poza domem | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Nie czułam/em się zdolna/y do robienia czegokolwiek poza domem] |
+| `mfis_10` | Problem z utrzymaniem wysiłku fizycznego | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em problem z utrzymaniem wysiłku fizycznego przez dłuższy czas] |
+| `mfis_11` | Trudności w podejmowaniu decyzji | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em trudności w podejmowaniu decyzji] |
+| `mfis_12` | Trudno zmusić się do myślenia | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Trudno było mi się zmusić do zrobienia czegokolwiek co wymagało myślenia] |
+| `mfis_13` | Mięśnie jak z waty | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em poczucie, że moje mięśnie są jakby "zrobione z waty"] |
+| `mfis_14` | Dyskomfort fizyczny | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Odczuwałam/em dyskomfort fizyczny] |
+| `mfis_15` | Problem z ukończeniem zadania (myślenie) | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em problem z ukończeniem określonego zadania bo wymagało to myślenia] |
 
-| #  | Nazwa pola  | Etykieta                                                    | Nagłówek CSV                                                                                                  |
-|----|-------------|-------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
-| 1  | `mfis_1`    | Czułam/em się mniej uważna/y                                | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Czułam/em się mniej uważna/y] |
-| 2  | `mfis_2`    | Trudno było mi się skupić                                   | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Trudno było mi się skupić przez dłuższą chwilę] |
-| 3  | `mfis_3`    | Trudno było mi myśleć logicznie                             | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Trudno było mi myśleć logicznie] |
-| 4  | `mfis_4`    | Byłam/em niezdarna/y                                        | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Byłam/em niezdarna/y] |
-| 5  | `mfis_5`    | Byłam/em zapominalska/ski                                   | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Byłam/em zapominalska/ski] |
-| 6  | `mfis_6`    | Musiałam/em wyznaczać tempo                                 | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Musiałam/em sama/sam wyznaczać sobie indywidualne tempo mojej pracy i aktywności fizycznej (bo nie mogłam/em nadążyć)] |
-| 7  | `mfis_7`    | Trudno zmotywować się do aktywności fizycznej               | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Trudno było mi się zmotywować do czegoś co wymagało aktywności fizycznej] |
-| 8  | `mfis_8`    | Trudno zmotywować się do wyjścia                             | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Trudno było mi się zmotywować do aktywnego uczestnictwa w zajęciach poza domem (spotkania itp.)] |
-| 9  | `mfis_9`    | Nie czułam/em się zdolna/y do niczego poza domem            | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Nie czułam/em się zdolna/y do robienia czegokolwiek poza domem] |
-| 10 | `mfis_10`   | Problem z utrzymaniem wysiłku fizycznego                     | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em problem z utrzymaniem wysiłku fizycznego przez dłuższy czas] |
-| 11 | `mfis_11`   | Trudności w podejmowaniu decyzji                            | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em trudności w podejmowaniu decyzji] |
-| 12 | `mfis_12`   | Trudno zmusić się do myślenia                               | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Trudno było mi się zmusić do zrobienia czegokolwiek co wymagało myślenia] |
-| 13 | `mfis_13`   | Mięśnie jak z waty                                          | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em poczucie, że moje mięśnie są jakby "zrobione z waty"] |
-| 14 | `mfis_14`   | Dyskomfort fizyczny                                         | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Odczuwałam/em dyskomfort fizyczny] |
-| 15 | `mfis_15`   | Problem z ukończeniem zadania (myślenie)                    | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em problem z ukończeniem określonego zadania bo wymagało to myślenia] |
+## Page 4: MFIS items 16-21 and health
 
----
+The MFIS items use the same `0`-`4` scale as page 3.
 
-## Strona 4 — MFIS pozycje 16-21 + zdrowie (10 pól)
+| Field | Label | Type | CSV header |
+|---|---|---|---|
+| `mfis_16` | Trudności w uporządkowaniu myśli | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em trudności w uporządkowaniu myśli podczas pracy (w domu i poza domem)] |
+| `mfis_17` | Problem z ukończeniem zadania (wysiłek fiz.) | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em problem z ukończeniem określonego zadania bo wymagało to wysiłku fizycznego] |
+| `mfis_18` | Myślenie spowolnione | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em wrażenie, że moje myślenie uległo spowolnieniu ] |
+| `mfis_19` | Problemy z koncentracją | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em problemy z koncentracją] |
+| `mfis_20` | Musiałam/em ograniczyć aktywność | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Musiałam/em ograniczyć moją aktywność fizyczną] |
+| `mfis_21` | Musiałam/em odpoczywać częściej | choice | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Musiałam/em odpoczywać częściej i przez dłuższy okres czasu] |
+| `choroba_anemia` | Czy stwierdzono anemię? | choice: NIE; TAK | Czy w ostatnim czasie stwierdzono u Ciebie anemię? |
+| `choroba_tarczyca` | Problemy z tarczycą? | choice: NIE; TAK | Czy w ostatnim czasie stwierdzono u Ciebie problemy z tarczycą? |
+| `tarczyca_jakie` | Jakie problemy z tarczycą? | text (if `choroba_tarczyca` = TAK) | Jeśli odpowiedź na poprzednie pytanie brzmiało "tak", to jakie problemy stwierdzono: |
+| `choroba_inne` | Inne choroby | text | Czy w ostatnim czasie stwierdzono u Ciebie inne choroby? Jeśli tak, to jakie: |
 
-Kontynuacja skali MFIS (6 pól) oraz pytania o stan zdrowia (4 pola).
+## Page 5: CES-D
 
-### MFIS 16-21 (skala 0-4)
+The items refer to the past week. Every item uses the same four answers:
 
-| #  | Nazwa pola    | Etykieta                                                    | Nagłówek CSV                                                                                                  |
-|----|---------------|-------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
-| 1  | `mfis_16`     | Trudności w uporządkowaniu myśli                            | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em trudności w uporządkowaniu myśli podczas pracy (w domu i poza domem)] |
-| 2  | `mfis_17`     | Problem z ukończeniem zadania (wysiłek fiz.)                | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em problem z ukończeniem określonego zadania bo wymagało to wysiłku fizycznego] |
-| 3  | `mfis_18`     | Myślenie spowolnione                                        | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em wrażenie, że moje myślenie uległo spowolnieniu ] |
-| 4  | `mfis_19`     | Problemy z koncentracją                                     | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Miałam/em problemy z koncentracją] |
-| 5  | `mfis_20`     | Musiałam/em ograniczyć aktywność                            | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Musiałam/em ograniczyć moją aktywność fizyczną] |
-| 6  | `mfis_21`     | Musiałam/em odpoczywać częściej                             | Czy w ciągu ostatnich 4 tygodni doświadczyłaś/eś którykolwiek z objawów? Jeśli tak, zaznacz odpowiednią rubrykę [Musiałam/em odpoczywać częściej i przez dłuższy okres czasu] |
-
-### Stan zdrowia
-
-| #  | Nazwa pola          | Etykieta                      | Typ    | Dozwolone wartości | Nagłówek CSV                                               |
-|----|---------------------|-------------------------------|--------|--------------------|-------------------------------------------------------------|
-| 7  | `choroba_anemia`    | Czy stwierdzono anemię?       | radio | TAK, NIE           | Czy w ostatnim czasie stwierdzono u Ciebie anemię?          |
-| 8  | `choroba_tarczyca`  | Problemy z tarczycą?          | radio | TAK, NIE           | Czy w ostatnim czasie stwierdzono u Ciebie problemy z tarczycą? |
-| 9  | `tarczyca_jakie`    | Jakie problemy z tarczycą?    | text   | (dowolny tekst)    | Jeśli odpowiedź na poprzednie pytanie brzmiało "tak", to jakie problemy stwierdzono: |
-| 10 | `choroba_inne`      | Inne choroby                  | text   | (dowolny tekst)    | Czy w ostatnim czasie stwierdzono u Ciebie inne choroby? Jeśli tak, to jakie: |
-
----
-
-## Strona 5 — CES-D (20 pól)
-
-**CES-D** (Center for Epidemiologic Studies Depression Scale) — skala depresji.
-Odpowiedzi dotyczą odczuć i zachowań w **minionym tygodniu**.
-
-**Skala odpowiedzi (4 opcje):**
 - Rzadko lub wcale (mniej niż 1 dzień)
 - Przez niedługi czas (1-2 dni)
 - Czasem lub przez umiarkowany okres (3-4 dni)
 - Przeważnie lub cały czas (5-7 dni)
 
-| #  | Nazwa pola | Etykieta                                    | Nagłówek CSV                                                          |
-|----|------------|---------------------------------------------|-----------------------------------------------------------------------|
-| 1  | `depr_1`   | Przeszkadzały mi rzeczy…                    | Podczas minionego tygodnia   [Przeszkadzały mi rzeczy, które zazwyczaj mi nie przeszkadzają] |
-| 2  | `depr_2`   | Nie miałem ochoty jeść…                     | Podczas minionego tygodnia   [Nie miałem ochoty jeść; mój apetyt był słaby] |
-| 3  | `depr_3`   | Nie mogłem otrząsnąć się z chandry…         | Podczas minionego tygodnia   [Czułem, że nie mogę otrząsnąć się z chandry, nawet z pomocą rodziny lub przyjaciół] |
-| 4  | `depr_4`   | Czułem, że jestem tak samo dobry…           | Podczas minionego tygodnia   [Czułem, że jestem tak samo dobry jak inni ludzie] |
-| 5  | `depr_5`   | Ciężko mi się skoncentrować…               | Podczas minionego tygodnia   [Było mi ciężko skoncentrować się na tym co robię] |
-| 6  | `depr_6`   | Czułem się przygnębiony                     | Podczas minionego tygodnia   [Czułem się przygnębiony]                  |
-| 7  | `depr_7`   | Cokolwiek robię, wymaga wysiłku            | Podczas minionego tygodnia   [Czułem, że cokolwiek robię, wymaga wysiłku] |
-| 8  | `depr_8`   | Optymistycznie patrzyłem w przyszłość       | Podczas minionego tygodnia   [Optymistycznie patrzyłem w przyszłość]    |
-| 9  | `depr_9`   | Moje życie to porażka                       | Podczas minionego tygodnia   [Miałem poczucie, że moje życie to porażka] |
-| 10 | `depr_10`  | Czułem strach                               | Podczas minionego tygodnia   [Czułem strach]                           |
-| 11 | `depr_11`  | Mój sen był niespokojny                     | Podczas minionego tygodnia   [Mój sen był niespokojny]                 |
-| 12 | `depr_12`  | Byłem szczęśliwy                            | Podczas minionego tygodnia   [Byłem szczęśliwy]                        |
-| 13 | `depr_13`  | Mówiłem mniej niż zwykle                   | Podczas minionego tygodnia   [Mówiłem mniej niż zwykle]               |
-| 14 | `depr_14`  | Czułem się samotny                          | Podczas minionego tygodnia   [Czułem się samotny]                      |
-| 15 | `depr_15`  | Ludzie byli nieprzyjaźni                    | Podczas minionego tygodnia   [Ludzie byli nastawieni nieprzyjaźnie]    |
-| 16 | `depr_16`  | Czerpałem radość z życia                    | Podczas minionego tygodnia   [Czerpałem radość z życia]                |
-| 17 | `depr_17`  | Miałem napady płaczu                        | Podczas minionego tygodnia   [Miałem napady płaczu]                    |
-| 18 | `depr_18`  | Było mi smutno                              | Podczas minionego tygodnia   [Było mi smutno]                          |
-| 19 | `depr_19`  | Ludzie mnie nie lubią                       | Podczas minionego tygodnia   [Czułem, że ludzie mnie nie lubią]        |
-| 20 | `depr_20`  | Nie mogłem się za nic zabrać                | Podczas minionego tygodnia   [Nie byłem w stanie się za nic zabrać]    |
+| Field | Label | Type | CSV header |
+|---|---|---|---|
+| `depr_1` | Przeszkadzały mi rzeczy… | choice | Podczas minionego tygodnia   [Przeszkadzały mi rzeczy, które zazwyczaj mi nie przeszkadzają] |
+| `depr_2` | Nie miałem ochoty jeść… | choice | Podczas minionego tygodnia   [Nie miałem ochoty jeść; mój apetyt był słaby] |
+| `depr_3` | Nie mogłem otrząsnąć się z chandry… | choice | Podczas minionego tygodnia   [Czułem, że nie mogę otrząsnąć się z chandry, nawet z pomocą rodziny lub przyjaciół] |
+| `depr_4` | Czułem, że jestem tak samo dobry… | choice | Podczas minionego tygodnia   [Czułem, że jestem tak samo dobry jak inni ludzie] |
+| `depr_5` | Ciężko mi się skoncentrować… | choice | Podczas minionego tygodnia   [Było mi ciężko skoncentrować się na tym co robię] |
+| `depr_6` | Czułem się przygnębiony | choice | Podczas minionego tygodnia   [Czułem się przygnębiony] |
+| `depr_7` | Cokolwiek robię, wymaga wysiłku | choice | Podczas minionego tygodnia   [Czułem, że cokolwiek robię, wymaga wysiłku] |
+| `depr_8` | Optymistycznie patrzyłem w przyszłość | choice | Podczas minionego tygodnia   [Optymistycznie patrzyłem w przyszłość] |
+| `depr_9` | Moje życie to porażka | choice | Podczas minionego tygodnia   [Miałem poczucie, że moje życie to porażka] |
+| `depr_10` | Czułem strach | choice | Podczas minionego tygodnia   [Czułem strach] |
+| `depr_11` | Mój sen był niespokojny | choice | Podczas minionego tygodnia   [Mój sen był niespokojny] |
+| `depr_12` | Byłem szczęśliwy | choice | Podczas minionego tygodnia   [Byłem szczęśliwy] |
+| `depr_13` | Mówiłem mniej niż zwykle | choice | Podczas minionego tygodnia   [Mówiłem mniej niż zwykle] |
+| `depr_14` | Czułem się samotny | choice | Podczas minionego tygodnia   [Czułem się samotny] |
+| `depr_15` | Ludzie byli nieprzyjaźni | choice | Podczas minionego tygodnia   [Ludzie byli nastawieni nieprzyjaźnie] |
+| `depr_16` | Czerpałem radość z życia | choice | Podczas minionego tygodnia   [Czerpałem radość z życia] |
+| `depr_17` | Miałem napady płaczu | choice | Podczas minionego tygodnia   [Miałem napady płaczu] |
+| `depr_18` | Było mi smutno | choice | Podczas minionego tygodnia   [Było mi smutno] |
+| `depr_19` | Ludzie mnie nie lubią | choice | Podczas minionego tygodnia   [Czułem, że ludzie mnie nie lubią] |
+| `depr_20` | Nie mogłem się za nic zabrać | choice | Podczas minionego tygodnia   [Nie byłem w stanie się za nic zabrać] |
 
----
+## Validation
 
-## Mapowanie CSV
+The same rules apply when AI results are loaded and when a reviewer saves a survey:
 
-Kolejność kolumn w pliku CSV:
+| Type | Rule | Empty value |
+|---|---|---|
+| choice | Must match an allowed answer, ignoring case and surrounding whitespace. Other AI output is dropped; on save it is a validation error | `null` |
+| number | Integer within the range (AI output: the first number in the text). Values outside the range are dropped from AI output; on save they are a validation error | `null` |
+| text | Trimmed | `""` |
 
-| Pozycja | Zawartość |
-|---------|-----------|
-| 1 | Sygnatura czasowa (format: `YYYY-MM-DD HH:MM:SS`) |
-| 2-71 | 70 pól zgodnie z kolejnością w `ALL_FIELDS` (strona 1 → strona 5) |
+Empty fields are allowed. On save the server returns `422` with the invalid fields
+unless the request is forced.
 
-Encoding: **UTF-8 BOM** (`utf-8-sig`) dla poprawnego otwierania w Excelu.
+## CSV columns
 
----
+The CSV has 71 columns: a timestamp (`Sygnatura czasowa`, format `M/D/YYYY HH:MM:SS`)
+followed by the 70 fields. The column order differs from the page order:
 
-## Walidacja (z `schemas.py` i `api.py`)
+1. Page 1 fields (17)
+2. MFIS items 1-21 (21)
+3. Health fields (4)
+4. Athens Insomnia Scale (8)
+5. CES-D (20)
 
-| Typ pola | Reguła walidacji backend | Wartość przy braku |
-|----------|--------------------------|--------------------|
-| `radio` | Dokładne dopasowanie case-insensitive do dozwolonych wartości | `None` |
-| `number` | Konwersja na `int`, zakres 18-80 (dla wieku) | `None` |
-| `text` | `strip()`, zwraca string | `""` (pusty string) |
-
-Frontend (React) dodatkowo waliduje przed wysłaniem — czerwone kropki przy błędach,
-dwuetapowe zatwierdzanie (walidacja → jeśli błędy, pokaż kropki → "Zatwierdź mimo błędów").
-
----
-
-## Podsumowanie: 70 pól
-
-| Strona | Zakres | Liczba pól | Nazwy pól |
-|--------|--------|-----------|-----------|
-| 1 | Demografia + styl życia | 17 | `p1_plec` .. `p14_kofeina` (+ `p5_inne`, `p9_inne`, `p10_inne`) |
-| 2 | Athens (bezsenność) | 8 | `sen_1` .. `sen_8` |
-| 3 | MFIS (zmęczenie 1-15) | 15 | `mfis_1` .. `mfis_15` |
-| 4 | MFIS (16-21) + zdrowie | 10 | `mfis_16` .. `mfis_21` + `choroba_anemia` .. `choroba_inne` |
-| 5 | CES-D (depresja) | 20 | `depr_1` .. `depr_20` |
-| **Razem** | | **70** | |
+The file is UTF-8 with BOM and uses `;` as the separator.
