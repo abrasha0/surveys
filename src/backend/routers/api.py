@@ -12,8 +12,7 @@ from pydantic import BaseModel, ValidationError
 from auth import get_current_user
 from config import config
 from data_handler import (
-    archive_csv,
-    archive_processed,
+    archive_session,
     drafts_dir,
     export_csv_path,
     load_processed_data,
@@ -203,8 +202,7 @@ def clear_session():
     if worker.state.is_running:
         raise HTTPException(status_code=400, detail="Cannot clear session while processing")
 
-    archive_processed()
-    archive_csv()
+    archive_dir = archive_session()
 
     draft_dir = drafts_dir()
     if draft_dir.exists():
@@ -212,8 +210,8 @@ def clear_session():
 
     worker.state.reset()
 
-    logger.info("Session cleared and archived")
-    return {"status": "cleared"}
+    logger.info("Session cleared")
+    return {"status": "cleared", "archive": archive_dir.name if archive_dir else None}
 
 
 @router.post("/surveys/{survey_id}/unverify")

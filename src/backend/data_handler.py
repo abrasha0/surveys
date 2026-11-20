@@ -46,20 +46,39 @@ def update_survey_in_processed(survey_id: int, update: dict, page_times: list[fl
     save_processed_data(data)
 
 
-def archive_processed():
-    path = _processed_path()
-    if path.exists():
-        archived = path.with_suffix(".json.old")
-        shutil.move(str(path), str(archived))
-        logger.info("Archived %s -> %s", path.name, archived.name)
+ARCHIVE_DIR = "archive"
 
 
-def archive_csv():
-    csv_path = Path(config.app["csv_results"])
-    if csv_path.exists():
-        archived = csv_path.with_suffix(".csv.old")
-        shutil.move(str(csv_path), str(archived))
-        logger.info("Archived %s -> %s", csv_path.name, archived.name)
+def _new_archive_dir() -> Path:
+    """Create a unique, sortable archive directory: <processing_dir>/archive/YYYYMMDD-HHMMSS[-N]."""
+    root = Path(config.app["processing_dir"]) / ARCHIVE_DIR
+    root.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    candidate = root / stamp
+    n = 2
+    while True:
+        try:
+            candidate.mkdir()
+            return candidate
+        except FileExistsError:
+            candidate = root / f"{stamp}-{n}"
+            n += 1
+
+
+def archive_session() -> Path | None:
+    """Move processed.json and the results CSV into a new timestamped archive directory.
+
+    Previous archives are never overwritten or deleted. Returns the archive directory,
+    or None when there was nothing to archive.
+    """
+    files = [p for p in (_processed_path(), Path(config.app["csv_results"])) if p.exists()]
+    if not files:
+        return None
+    target = _new_archive_dir()
+    for path in files:
+        shutil.move(str(path), str(target / path.name))
+    logger.info("Archived %s -> %s", ", ".join(p.name for p in files), target)
+    return target
 
 
 def survey_cache_dir() -> Path:

@@ -115,13 +115,15 @@ All runtime data lives under `working_vault/` (paths are configurable):
 | `processed.json` | Session state: status, AI result (replaced by the verified values on save) and error of each survey, plus recent page times |
 | `logs/survey_cache/drafts/survey_<id>.json` | Server copy of the form draft of each survey |
 | `wyniki.csv` | Results CSV, rebuilt on finalize and on export |
+| `archive/<YYYYMMDD-HHMMSS>/` | `processed.json` and the CSV of each cleared session |
 | `logs/` | `ankieter.log`, `ai_requests.log`, script and uvicorn logs |
 | `dist/` | Frontend build copied by `run_prod.ps1` / `run_prod.sh` |
 
 On startup (or on the first `GET /api/surveys`) the state is loaded from
 `processed.json`. A cached survey is reused only if its file names are unchanged; otherwise it goes back to
-`queued`. `POST /api/session/clear` renames `processed.json` and the CSV to `*.old`,
-deletes the drafts and resets the state.
+`queued`. `POST /api/session/clear` moves `processed.json` and the CSV to a new
+`archive/<YYYYMMDD-HHMMSS>/` directory (a `-2`, `-3`, … suffix is added if the name is taken),
+deletes the drafts and resets the state. Older archives are never overwritten or deleted.
 
 ### CSV export
 
@@ -193,4 +195,4 @@ React 19, TypeScript, Vite 8, React Router, TanStack Query, Zustand and Tailwind
 - "Rozpocznij od nowa" (start over) on `/welcome` and "Nowa sesja" (new session) on
   `/complete` ask for confirmation, then call `/api/session/clear` and clear the local
   drafts. "Rozpocznij od nowa" also starts processing again; "Nowa sesja" opens
-  `/welcome`. The clear overwrites the previous `*.old` archive.
+  `/welcome`. Each clear creates a new timestamped archive; older ones are kept.
