@@ -56,10 +56,6 @@ def _get_client():
     return _client
 
 
-def get_langsmith_client():
-    return _get_client()
-
-
 @asynccontextmanager
 async def _trace_run(name: str, run_type: str, tags: list[str], metadata: dict):
     """Record the wrapped block as one LangSmith run.

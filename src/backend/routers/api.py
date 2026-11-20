@@ -14,7 +14,6 @@ from config import config
 from data_handler import (
     archive_csv,
     archive_processed,
-    clear_cache_file,
     clear_survey_cache_dir,
     export_csv_path,
     load_processed_data,
@@ -207,7 +206,6 @@ def clear_session():
     archive_processed()
     archive_csv()
     clear_survey_cache_dir()
-    clear_cache_file()
 
     draft_dir = Path(config.processing.get("survey_cache_dir", "working_vault/logs/survey_cache")) / "drafts"
     if draft_dir.exists():

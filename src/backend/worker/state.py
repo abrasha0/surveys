@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 import logging
 import time
@@ -46,7 +46,6 @@ class ProcessingState:
     def __init__(self):
         self.surveys: list[SurveyState] = []
         self.global_state = GlobalState()
-        self.results: dict[int, dict] = {}
         self.page_times: list[float] = []
         self._counted_pages: set[tuple[int, int]] = set()
         self._eta_rolling_window: int = config.processing["eta_rolling_window"]
@@ -118,28 +117,6 @@ class ProcessingState:
             return
         self._build_from_processed(survey_groups)
 
-    def init_from_surveys(self, survey_groups: list[list[Path]]):
-        from data_handler import save_processed_data
-        self.surveys = []
-        total_pages = 0
-        for idx, group in enumerate(survey_groups):
-            self.surveys.append(SurveyState(id=idx, files=group))
-            total_pages += len(group)
-        self.global_state = GlobalState(
-            total=len(survey_groups),
-            total_pages=total_pages,
-            is_running=True,
-            started_at=time.time(),
-        )
-        self.page_times.clear()
-        self._counted_pages.clear()
-        save_processed_data({
-            "session_started_at": self.global_state.started_at,
-            "surveys": {},
-            "total_surveys": len(survey_groups),
-            "total_pages": self.global_state.total_pages,
-        })
-
     def init_batch(self, survey_groups: list[list[Path]], batch_size: int = 0):
         from data_handler import save_processed_data
         self.surveys = []
@@ -178,11 +155,6 @@ class ProcessingState:
             "total_pages": self.global_state.total_pages,
         })
 
-    def reset_batch(self):
-        self.global_state.batch_size = 0
-        self.global_state.batch_remaining = None
-        self.global_state.batch_processed = 0
-
     def get_survey_state(self, survey_id: int) -> SurveyState | None:
         if 0 <= survey_id < len(self.surveys):
             return self.surveys[survey_id]
@@ -206,7 +178,6 @@ class ProcessingState:
         survey.status = status
         if result is not None:
             survey.result = result
-            self.results[survey_id] = result
         if error is not None:
             survey.error_message = error
         if status in ("ready", "error"):
@@ -319,12 +290,8 @@ class ProcessingState:
             avg * remaining_pages if remaining_pages > 0 else 0
         )
 
-    def is_finished(self) -> bool:
-        return all(s.status in ("ready", "error", "verified") for s in self.surveys)
-
     def reset(self):
         self.surveys.clear()
-        self.results.clear()
         self.page_times.clear()
         self._counted_pages.clear()
         self.global_state = GlobalState()

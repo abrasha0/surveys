@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+
 
 @dataclass
 class FieldSpec:
@@ -10,7 +10,6 @@ class FieldSpec:
     choices: list[str] | None = None
     min: int | None = None
     max: int | None = None
-    default: Any = ""
     conditional: str | None = None
     csv_header: str | None = None
 
@@ -263,13 +262,4 @@ PAGE_MAP = {
     2: PAGE3_FIELDS,
     3: PAGE4_FIELDS,
     4: PAGE1_FIELDS,
-}
-
-# Opisy stron — źródło prawdy dla promptów (zakaz hardkodowania w prompts.py)
-PAGE_DESCRIPTIONS: dict[int, str] = {
-    0: "Otrzymasz zdjęcie pierwszej strony ankiety – dane demograficzne, praca, styl życia.",
-    1: "Otrzymasz zdjęcie drugiej strony – Ateńska skala bezsenności.",
-    2: "Otrzymasz zdjęcie trzeciej strony – MFIS (część 1, pozycje 1-15).",
-    3: "Otrzymasz zdjęcie czwartej strony – MFIS (część 2, pozycje 16-21) oraz pytania o zdrowie.",
-    4: "Otrzymasz zdjęcie piątej strony – skala CES-D (odczucia w minionym tygodniu).",
 }

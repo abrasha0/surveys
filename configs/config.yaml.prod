@@ -7,7 +7,6 @@ app:
   page_title: "ankieterAI"        # Tytuł strony w przeglądarce
   password: ""                    # Hasło do logowania — ustaw własne przed uruchomieniem
   csv_results: "working_vault/wyniki.csv"       # Nazwa pliku wynikowego CSV
-  cache_file: "working_vault/cache_results.json"  # Ścieżka do cache wyników AI (nieużywane od Etapu 3)
   surveys_dir: "working_vault/surveys_data"     # Katalog ze zdjęciami ankiet
   processing_dir: "working_vault"                # Katalog dla processed.json i innych danych sesji
   accepted_file_types:            # Dozwolone rozszerzenia plików
@@ -35,7 +34,6 @@ image:
 
 ingestion:
   survey_group_size: 5            # Liczba stron na ankietę (5 = standard)
-  upload_dir_prefix: "ankieter_uploads_"  # Prefiks katalogu tymczasowego (nieużywane przy skanowaniu katalogu)
 
 logging:
   file: "working_vault/logs/ankieter.log"       # Ścieżka do głównego pliku logów

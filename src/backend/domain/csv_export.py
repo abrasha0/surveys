@@ -1,6 +1,7 @@
 import csv
 import logging
 from pathlib import Path
+
 from domain.schemas import MedicalSurvey
 from domain.field_specs import CSV_FIELDS
 
@@ -8,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 # Nagłówek CSV na podstawie field_specs
 CSV_HEADER = ["Sygnatura czasowa"] + [f.get_csv_header() for f in CSV_FIELDS]
+
 
 def save_survey_to_csv(data: MedicalSurvey, csv_path: str):
     filepath = Path(csv_path)

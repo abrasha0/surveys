@@ -4,13 +4,6 @@ from typing import Optional
 from pydantic import BaseModel, field_validator
 from domain.field_specs import FIELD_SPEC_BY_NAME, ALL_FIELDS, CSV_FIELDS
 
-from dataclasses import dataclass
-from pathlib import Path
-
-@dataclass
-class SurveyGroup:
-    id: int
-    files: list[Path]
 
 class MedicalSurvey(BaseModel):
     # A. Demografia

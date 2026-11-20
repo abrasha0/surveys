@@ -3,7 +3,7 @@ import base64
 import json
 import logging
 import time
-from contextlib import asynccontextmanager, nullcontext
+from contextlib import nullcontext
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -15,7 +15,7 @@ from PIL import Image
 from config import config
 from domain.schemas import MedicalSurvey
 from ai.prompts import build_vlm_prompt, build_text_format_prompt
-from domain.field_specs import ALL_FIELDS, PAGE_MAP
+from domain.field_specs import PAGE_MAP
 import logger as _logger_mod
 
 try:
@@ -39,33 +39,6 @@ def _truncate(text: str, limit: int | None = None) -> str:
         return text
     return text[: limit or _MAX_IO_SIZE]
 
-
-@asynccontextmanager
-async def log_ai_call(operation: str, model: str, page_idx: int, survey_idx: int, **extra):
-    t0 = time.perf_counter()
-    extra_str = " | ".join(f"{k}={v}" for k, v in extra.items())
-    header = f"{operation} | model={model} | page={page_idx} | survey={survey_idx}"
-    if extra_str:
-        header += f" | {extra_str}"
-    if _logger_mod.ai_req_logger:
-        _logger_mod.ai_req_logger.info("%s", header)
-    try:
-        yield
-    except Exception as e:
-        elapsed = time.perf_counter() - t0
-        if _logger_mod.ai_req_logger:
-            _logger_mod.ai_req_logger.error(
-                "%s_err | model=%s | page=%d | latency=%.2fs | error_type=%s | error=%s",
-                operation, model, page_idx, elapsed, type(e).__name__, _truncate(str(e)),
-            )
-        raise
-    else:
-        elapsed = time.perf_counter() - t0
-        if _logger_mod.ai_req_logger:
-            _logger_mod.ai_req_logger.info(
-                "%s_ok | model=%s | page=%d | latency=%.2fs",
-                operation, model, page_idx, elapsed,
-            )
 
 @dataclass
 class ProcessingStatus:
@@ -120,18 +93,6 @@ class AIClient:
 
     async def close(self):
         await self._client.aclose()
-
-    async def check_ollama_health(self) -> dict:
-        try:
-            resp = await self._client.get(f"{self.base_url}/api/tags")
-            resp.raise_for_status()
-            data = resp.json()
-            models = [m["name"] for m in data.get("models", [])]
-            logger.info("Ollama health OK – %d model(s)", len(models))
-            return data
-        except Exception as e:
-            logger.warning("Ollama health check failed: %s", e)
-            return {}
 
     async def _extract_text_vlm(
         self,
@@ -572,36 +533,3 @@ class AIClient:
 
         result_dict = validated.model_dump()
         return result_dict
-
-    async def analyze_batch(
-        self,
-        survey_groups: list[list[Path]],
-        progress_callback: Callable[[ProcessingStatus], None] | None = None,
-        survey_done_callback: Callable[[int, dict], None] | None = None,  # survey_idx, result_dict
-    ) -> list[dict]:
-        """Przetwarza wszystkie grupy, wywołując callback po każdej ankiecie."""
-        total = len(survey_groups)
-        results = []
-        for idx, files in enumerate(survey_groups):
-            try:
-                result_dict = await self.analyze_survey(
-                    files, idx, total, progress_callback
-                )
-                results.append(result_dict)
-                if survey_done_callback:
-                    survey_done_callback(idx, result_dict)
-            except Exception as e:
-                logger.error("Survey %d failed: %s", idx, e)
-                # Można dodać pusty wynik z błędem
-                if progress_callback:
-                    progress_callback(ProcessingStatus(
-                        survey_idx=idx,
-                        total_surveys=total,
-                        page_idx=-1,
-                        total_pages=0,
-                        status="survey_error",
-                        message=f"Ankieta {idx+1} – błąd krytyczny: {str(e)[:100]}",
-                    ))
-                # Dodajemy pusty słownik, żeby zachować indeksy
-                results.append({})
-        return results

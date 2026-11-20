@@ -3,7 +3,6 @@ app:
   password: ""
   processing_dir: "working_vault"
   csv_results: "working_vault/wyniki.csv"
-  cache_file: "working_vault/cache_results.json"
   surveys_dir: "working_vault/surveys_data"
   accepted_file_types:
     - jpg
@@ -27,7 +26,6 @@ image:
 
 ingestion:
   survey_group_size: 5
-  upload_dir_prefix: "ankieter_uploads_"
 
 logging:
   file: "working_vault/logs/ankieter.log"

@@ -4,7 +4,7 @@ import secrets
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Response, Cookie, HTTPException, Depends
+from fastapi import APIRouter, Response, Cookie, HTTPException
 from pydantic import BaseModel
 
 from config import config

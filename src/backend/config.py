@@ -1,5 +1,4 @@
 import os
-import re
 from pathlib import Path
 
 import yaml
@@ -20,9 +19,6 @@ class Section(dict):
             return self[name]
         except KeyError:
             raise AttributeError(name)
-
-    def get(self, key, default=None):
-        return super().get(key, default)
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -63,7 +59,7 @@ def _coerce(env_val: str, reference):
 
 def _resolve_config_paths(data: dict) -> None:
     section_map = {
-        "app": ["csv_results", "cache_file", "surveys_dir", "processing_dir"],
+        "app": ["csv_results", "surveys_dir", "processing_dir"],
         "logging": ["file"],
         "processing": ["survey_cache_dir"],
     }
