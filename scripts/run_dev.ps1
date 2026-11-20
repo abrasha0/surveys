@@ -63,18 +63,9 @@ function Wait-UvicornReady {
 # --- development env cleanup ---
 $WorkingDir = Join-Path -Path $ProjectRoot -ChildPath "working_vault"
 $LogsDir = Join-Path -Path $WorkingDir -ChildPath "logs"
-$ProcessedJson = Join-Path -Path $WorkingDir -ChildPath "processed.json"
-if (Test-Path -LiteralPath $WorkingDir) {
-    if (Test-Path -LiteralPath $LogsDir) {
-        Remove-Item -LiteralPath $LogsDir -Recurse -Force
-    }
-
-    # if (Test-Path -LiteralPath $ProcessedJson) {
-    #     Remove-Item -LiteralPath $ProcessedJson -Force
-    # }
+if (Test-Path -LiteralPath $LogsDir) {
+    Remove-Item -LiteralPath $LogsDir -Recurse -Force
 }
-
-
 
 New-Item -Path $LogFile -ItemType File -Force | Out-Null
 Write-Log "=== Run Dev - start ==="

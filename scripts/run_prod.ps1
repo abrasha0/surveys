@@ -1,5 +1,7 @@
 param(
-    [switch]$NoTunnel
+    [switch]$NoTunnel,
+    # Directory where cloudflared.exe is looked up and, if missing, installed.
+    [string]$CloudflaredDir = "C:\tools"
 )
 
 $ErrorActionPreference = "Stop"
@@ -7,7 +9,6 @@ $ProjectRoot = Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath ".."
 $LogFile = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\run_prod.log"
 $VenvPath = Join-Path -Path $ProjectRoot -ChildPath ".venv"
 $TunnelUrlFile = Join-Path -Path $ProjectRoot -ChildPath "working_vault\logs\tunnel_url.txt"
-$CloudflaredDir = "C:\tools"
 $CloudflaredPath = Join-Path -Path $CloudflaredDir -ChildPath "cloudflared.exe"
 
 $activePids = @{}
@@ -64,7 +65,7 @@ function Cleanup {
 
 New-Item -Path $LogFile -ItemType File -Force | Out-Null
 Write-Log "=== Run Prod - start ==="
-Write-Log "Flags: NoTunnel=$NoTunnel"
+Write-Log "Flags: NoTunnel=$NoTunnel CloudflaredDir=$CloudflaredDir"
 
 $config = Read-Config -ConfigPath (Join-Path -Path $ProjectRoot -ChildPath "config.yaml")
 $cfgPassword = ""
@@ -281,8 +282,8 @@ try {
         Write-Log "  Tunel publiczny:   $tunnelUrl"
     }
 
-    $displayPassword = if ($cfgPassword) { $cfgPassword } else { "(brak -- skonfiguruj w config.yaml)" }
-    Write-Log "  Haslo:             $displayPassword"
+    $passwordStatus = if ($env:ANKIETER_APP_PASSWORD) { "ustawione (ANKIETER_APP_PASSWORD)" } elseif ($cfgPassword) { "ustawione (config.yaml)" } else { "brak" }
+    Write-Log "  Haslo:             $passwordStatus"
     Write-Log "  Modele:            VLM=$cfgVlm  Text=$cfgText"
     Write-Log "========================================"
     Write-Log ""
