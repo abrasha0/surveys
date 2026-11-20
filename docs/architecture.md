@@ -180,7 +180,13 @@ React 19, TypeScript, Vite 8, React Router, TanStack Query, Zustand and Tailwind
   the last change. `useDraftSync` sends it to the server 2 seconds after the last
   change, and immediately when the user switches survey.
 - Saving validates the values in the browser first: allowed choices, whole numbers and
-  ranges. Empty fields are allowed.
+  ranges. Empty fields are allowed. Errors from the browser or from a server `422` are
+  shown under the fields and in a banner above the form that lists the pages with
+  errors. The banner has a "Zatwierdź mimo błędów" (save despite errors) button that
+  saves with `force: true`.
+- Conditional fields (see [survey-structure.md](survey-structure.md)) are hidden while
+  their condition is not met. A conditional field that already holds a value stays
+  visible, with a warning that the condition is not met, so no value is hidden.
 - The Space key saves the current survey and moves to the next one, unless the focus is
   in an input.
 - "Zakończ sesję" (finish session) calls `/api/session/finalize` and opens `/complete`.

@@ -139,6 +139,7 @@ export default function VerificationPanel() {
             </div>
           )}
           <DynamicForm
+            key={currentSurveyId}
             ref={formRef}
             surveyId={currentSurveyId}
             fieldSpecs={fieldSpecs ?? []}

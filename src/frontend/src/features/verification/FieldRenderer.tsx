@@ -7,6 +7,7 @@ interface FieldRendererProps {
   error?: string;
   showErrors: boolean;
   disabled?: boolean;
+  hint?: string;
 }
 
 const baseInputClass = 'w-full border rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-[var(--color-info)] focus:outline-none';
@@ -54,7 +55,7 @@ function RadioCardGroup({
   );
 }
 
-export default function FieldRenderer({ field, value, onChange, error, showErrors, disabled = false }: FieldRendererProps) {
+export default function FieldRenderer({ field, value, onChange, error, showErrors, disabled = false, hint }: FieldRendererProps) {
   const inputClass = `${baseInputClass} ${showErrors && error ? errorInputClass : 'border-gray-300'}`;
 
   const handleChange = (val: string) => {
@@ -116,6 +117,7 @@ export default function FieldRenderer({ field, value, onChange, error, showError
         {field.label}
       </label>
       {renderInput()}
+      {hint && <p className="text-amber-700 text-xs mt-0.5">{hint}</p>}
       {showErrors && error && (
         <p className="text-red-600 text-sm mt-0.5">{error}</p>
       )}

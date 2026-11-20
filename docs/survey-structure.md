@@ -17,7 +17,9 @@ Field types:
 
 Some text fields are marked as conditional: they are meant to be filled in only when
 another field has a given answer (for example `p5_inne` when `p5_forma` is `Inne`).
-The condition is informational; the form always shows these fields.
+The form hides such a field while the condition is not met, unless the field already
+holds a value; then it stays visible with a warning. The server does not check the
+condition: a filled field is saved as it is.
 
 ## Summary
 
