@@ -1,6 +1,6 @@
 # ogólne wytyczne dot. kodu i flow pracy
 
-1. trzymasz się planu i wytycznych zdefiniowanych w ./docs
+1. trzymasz się wytycznych z README.md i dokumentacji w ./docs (architecture.md, survey-structure.md)
 
 2. kiedy mówię o rozpoczęciu pracy nad kolejną fazą mam na myśli takie flow:
 
@@ -19,14 +19,14 @@
    wytyczne przygotowania zmian do wbicia:
 
 - przeglądasz i analizujesz zmiany (muszą nadawać się do wbicia i coś znaczyć)
-- tworzysz commit z message z prefiksem chore|fix|feat|refactor: message in english
+- tworzysz commit z message z prefiksem feat|fix|refactor|docs|chore: message in english
 - message ma być krótki, zwięzły i konkretnie mówić co zostało zrobione w ramach tego commita
 - przedstawiasz mi to do akceptacji i ewentualnego wprowadzenia zmian/przeiterowania
 - jak jasno zaakceptuję zmiany to robisz git push
 
 6. kiedy rozwiązujemy konkretne issue masz przygotować kompletne flow jego poprawy
 
-- odczytanie błędu z ./docs/known-issues.md
+- odczytanie opisu błędu (issue albo mój opis)
 - analiza błędu
 - analiza kodu, który realizuje tę część funkcjonalności
 - wskazanie kodu/logiki, która odpowiada za ten błąd
@@ -34,17 +34,29 @@
 - czekasz na moją akceptację/wskazówki dot. planu
 - po mojej akceptacji realizujesz poprawkę zgodnie z planem
 - dajesz mi przestrzeń do testowania
-- NIE zmieniasz niczego w known-issues.md, chyba że jasno i bezpośrednio o to poproszę
 
 7. ogólnie w trakcie implementacji i wprowadzania poprawek starasz się trzymać najnowszych standardów react+vite+fastAPI
 
 # ważne informacje
 
-jeżeli musisz przetestować kawałek kodu to musisz korzystać z wirtualnego środowiska:
+stack: backend FastAPI (`src/backend`), frontend React + Vite + TypeScript (`src/frontend`), modele AI przez Ollamę. konfiguracja w `config.yaml` w katalogu głównym (kopia jednego z profili z `configs/`, `app.password` musi być ustawione).
+
+środowisko przygotowuje `.\scripts\full_setup.ps1`, całość w trybie deweloperskim uruchamia `.\scripts\run_dev.ps1`.
+
+jeżeli musisz przetestować kawałek kodu backendu to musisz korzystać z wirtualnego środowiska:
 
 ```ps1
 .venv\Scripts\Activate.ps1
-streamlit run src/app.py
+cd src\backend
+python -m uvicorn main:app --reload --port 8000
+```
+
+jeżeli musisz sprawdzić zmiany we frontendzie, używasz lintu i builda:
+
+```ps1
+cd src\frontend
+npm run lint
+npm run build
 ```
 
 jeżeli musisz testować modele ollama rób to z poziomu katalogu root aplikacji
