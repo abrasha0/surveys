@@ -1,13 +1,12 @@
+# AnkieterAI light profile: small models (moondream + llama3.2:3b)
+# and re-OCR disabled, for weak hardware and quick tests.
+# Copy to config.yaml in the project root and set app.password.
+
 app:
-  page_title: "surveysApp"
   password: ""
   processing_dir: "working_vault"
   csv_results: "working_vault/wyniki.csv"
   surveys_dir: "working_vault/surveys_data"
-  accepted_file_types:
-    - jpg
-    - png
-    - webp
 
 ai:
   vlm_model: "moondream"
@@ -21,8 +20,6 @@ ai:
 
 image:
   max_dimension: 2000
-  contrast_factor: 1.5
-  jpeg_quality: 80
 
 ingestion:
   survey_group_size: 5
@@ -39,12 +36,9 @@ langsmith:
   tracing_v2: false
   endpoint: ""
   api_key: ""
-  project: "surveysApp"
+  project: "ankieterai"
 
 processing:
-  progress_vlm_weight: 0.3
-  progress_text_weight: 0.6
-  history_display_limit: 8
   worker_max_retries: 3
   eta_rolling_window: 10
   survey_cache_dir: "working_vault/logs/survey_cache"
@@ -63,7 +57,7 @@ prompts:
     6. Jeśli obraz nie zawiera żadnego czytelnego tekstu, zwróć tylko tag: [PUSTA_STRONA].
 
   text_format: |
-    Jesteś bezwzględnym parserem danych. Otrzymasz surowy tekst z systemu OCR oraz ZASADY I DOCELOWY SCHEMAT JSON definiujący strukturę odpowiedzi. 
+    Jesteś bezwzględnym parserem danych. Otrzymasz surowy tekst z systemu OCR oraz ZASADY I DOCELOWY SCHEMAT JSON definiujący strukturę odpowiedzi.
     Twoim zadaniem jest wyciągnięcie danych z tekstu OCR i zwrócenie ich w zwięzłym, płaskim formacie JSON (tylko klucz: wartość).
     RYGOROSTYCZNE ZASADY:
     1. FORMAT: Zwróć WYŁĄCZNIE czysty obiekt JSON bez zagnieżdżeń. Nie używaj znaczników markdown (jak ```json). Brak jakiegokolwiek tekstu przed/po JSON.
@@ -98,9 +92,9 @@ prompts:
 
     OCZEKIWANY FORMAT WYJŚCIOWY:
     {
-      "p1_plec": "", "p2_wiek": "", "p3_miejsce": "", "p4_stan": "", 
-      "p5_forma": "", "p5_inne": "", "p6_stopien": "", "p7_uczelnia": "", 
-      "p8_praca": "", "p9_system": "", "p9_inne": "", "p10_oddzial": "", 
+      "p1_plec": "", "p2_wiek": "", "p3_miejsce": "", "p4_stan": "",
+      "p5_forma": "", "p5_inne": "", "p6_stopien": "", "p7_uczelnia": "",
+      "p8_praca": "", "p9_system": "", "p9_inne": "", "p10_oddzial": "",
       "p10_inne": "", "p11_staz": "", "p12_sen": "", "p13_ekran": "", "p14_kofeina": ""
     }
 
@@ -147,7 +141,7 @@ prompts:
 
   page_5_json_schema: |
     ZASADY DLA PÓL:
-    Skala depresji (pytania 1-20). Dozwolone wartości dla WSZYSTKICH kluczy (od depr_1 do depr_20) to WYŁĄCZNIE: 
+    Skala depresji (pytania 1-20). Dozwolone wartości dla WSZYSTKICH kluczy (od depr_1 do depr_20) to WYŁĄCZNIE:
     ["Rzadko lub wcale (mniej niż 1 dzień)", "Przez niedługi czas (1-2 dni)", "Czasem lub przez umiarkowany okres (3-4 dni)", "Przeważnie lub cały czas (5-7 dni)"]
 
     OCZEKIWANY FORMAT WYJŚCIOWY:

@@ -1,66 +1,57 @@
 # =============================================================
-# AnkieterAI — konfiguracja aplikacji
-# Skopiuj do config.yaml i dostosuj do swojego środowiska
+# AnkieterAI production profile
+# Currently the same settings as config.yaml.example.
+# Copy to config.yaml in the project root and set app.password.
 # =============================================================
 
 app:
-  page_title: "ankieterAI"        # Tytuł strony w przeglądarce
-  password: ""                    # Hasło do logowania — ustaw własne przed uruchomieniem
-  csv_results: "working_vault/wyniki.csv"       # Nazwa pliku wynikowego CSV
-  surveys_dir: "working_vault/surveys_data"     # Katalog ze zdjęciami ankiet
-  processing_dir: "working_vault"                # Katalog dla processed.json i innych danych sesji
-  accepted_file_types:            # Dozwolone rozszerzenia plików
-    - jpg
-    - png
-    - webp
+  password: ""                    # Login password; required, the backend refuses to start without it
+  csv_results: "working_vault/wyniki.csv"       # Output CSV file
+  surveys_dir: "working_vault/surveys_data"     # Directory with survey page images
+  processing_dir: "working_vault"                # Directory for processed.json and other session data
 
 ai:
-  vlm_model: "qwen3-vl:8b"       # Model wizyjny (VLM) do ekstrakcji tekstu
-  # vlm_model: "deepseek-ocr"     # Alternatywny VLM
-  # Na mocnym GPU (>=8GB VRAM): qwen3-vl:8b + llama3.1
-  # Na słabszym sprzęcie / do testów: moondream + llama3.2:3b
-  text_model: "llama3.1"          # Model tekstowy do formatowania JSON
-  ollama_url: "http://localhost:11434"  # URL serwera Ollama
-  max_retries: 3                  # Maksymalna liczba ponawiań przy błędach (per-request)
-  timeout_sec: 120                # Timeout żądania API (sekundy)
-  num_ctx: 8192                   # Rozmiar kontekstu modelu (tokeny)
-  temperature: 0.0                # Temperatura generowania (0.0 = deterministycznie)
-  keep_alive: "5m"                # Czas trzymania modelu w VRAM po żądaniu
+  vlm_model: "qwen3-vl:8b"       # Vision model (VLM) used for text extraction
+  # vlm_model: "deepseek-ocr"     # Alternative VLM
+  # Strong GPU (>=8 GB VRAM): qwen3-vl:8b + llama3.1
+  # Weaker hardware / testing: moondream + llama3.2:3b
+  text_model: "llama3.1"          # Text model that formats OCR output as JSON
+  ollama_url: "http://localhost:11434"  # Ollama server URL
+  max_retries: 3                  # Retries per Ollama request
+  timeout_sec: 120                # Ollama request timeout (seconds)
+  num_ctx: 8192                   # Model context size (tokens)
+  temperature: 0.0                # Sampling temperature (0.0 = deterministic)
+  keep_alive: "5m"                # How long Ollama keeps the model loaded after a request
 
 image:
-  max_dimension: 2000             # Maksymalny rozmiar dłuższego boku obrazu (px)
-  contrast_factor: 1.5            # Współczynnik podbicia kontrastu (1.0 = brak)
-  jpeg_quality: 85                # Jakość kompresji JPEG (1-100) — 85 poprawia czytelność OCR
+  max_dimension: 2000             # Max length of the longer image side sent to the VLM (px)
 
 ingestion:
-  survey_group_size: 5            # Liczba stron na ankietę (5 = standard)
+  survey_group_size: 5            # Pages per survey (5 = standard)
 
 logging:
-  file: "working_vault/logs/ankieter.log"       # Ścieżka do głównego pliku logów
-  level: "DEBUG"                  # Poziom logowania (DEBUG/INFO/WARNING/ERROR)
-  ai_log_max_bytes: 10485760      # Maksymalny rozmiar logu AI (10MB)
-  ai_log_backup_count: 3          # Liczba kopii zapasowych logu AI
-  shorten_models_io: false        # Skracanie I/O modeli w logach (dla czytelności)
-  max_models_io_size: 500         # Maksymalna długość skróconego I/O (znaki)
+  file: "working_vault/logs/ankieter.log"       # Main log file
+  level: "DEBUG"                  # Log level (DEBUG/INFO/WARNING/ERROR)
+  ai_log_max_bytes: 10485760      # Max size of the AI request log before rotation (10 MB)
+  ai_log_backup_count: 3          # Rotated AI request logs to keep
+  shorten_models_io: false        # Truncate model input/output in logs
+  max_models_io_size: 500         # Max length of truncated model input/output (characters)
 
 langsmith:
-  tracing_v2: false               # Włącz/wyłącz tracing LangSmith
-  endpoint: ""                    # URL API LangSmith (wymagane jeśli tracing_v2: true)
-  api_key: ""                     # Klucz API LangSmith (wymagane jeśli tracing_v2: true)
-  project: "ankieterai"           # Nazwa projektu w LangSmith
+  tracing_v2: false               # Enable LangSmith tracing
+  endpoint: ""                    # LangSmith API URL (required when tracing_v2 is true)
+  api_key: ""                     # LangSmith API key (required when tracing_v2 is true)
+  project: "ankieterai"           # LangSmith project name
 
 processing:
-  progress_vlm_weight: 0.3        # Waga postępu VLM w całkowitym progressie
-  progress_text_weight: 0.6       # Waga postępu Text LLM w całkowitym progressie
-  history_display_limit: 8        # Liczba ostatnich kroków w historii przetwarzania
-  worker_max_retries: 3           # Maksymalna liczba powtórzeń przetwarzania ankiety
-  eta_rolling_window: 10          # Liczba ostatnich czasów stron do obliczania ETA
-  survey_cache_dir: "working_vault/logs/survey_cache"  # Katalog cache per-survey
-  re_ocr_threshold: 0.3           # Minimalny współczynnik wypełnienia pól strony (0.0=wyłączone)
-  re_ocr_max_attempts: 2          # Maksymalna liczba re-OCR dla jednej strony
+  worker_max_retries: 3           # Retries for a whole survey
+  eta_rolling_window: 10          # Recent page timings used to estimate ETA
+  survey_cache_dir: "working_vault/logs/survey_cache"  # Per-survey cache and draft directory
+  re_ocr_threshold: 0.3           # Min ratio of filled fields on a page before re-OCR (0.0 = disabled)
+  re_ocr_max_attempts: 2          # Max re-OCR attempts per page
 
 prompts:
-  vlm: |                          # Prompt dla modelu wizyjnego (VLM)
+  vlm: |                          # Prompt for the vision model (VLM)
     Jesteś zaawansowanym i wysoce precyzyjnym systemem OCR do dygitalizacji formularzy medycznych i ankiet. Twoim jedynym zadaniem jest konwersja obrazu na tekst, z zachowaniem sensu strukturalnego.
     RYGOROSTYCZNE ZASADY:
     1. Brak jakichkolwiek wstępów, powitań i komentarzy. Zwróć sam wyekstrahowany tekst.
@@ -70,8 +61,8 @@ prompts:
     5. Kopiuj zwykły tekst linia po linii.
     6. Jeśli obraz nie zawiera żadnego czytelnego tekstu, zwróć tylko tag: [PUSTA_STRONA].
 
-  text_format: |                  # Prompt dla modelu tekstowego (formatowanie do JSON)
-    Jesteś bezwzględnym parserem danych. Otrzymasz surowy tekst z systemu OCR oraz ZASADY I DOCELOWY SCHEMAT JSON definiujący strukturę odpowiedzi. 
+  text_format: |                  # Prompt for the text model (JSON formatting)
+    Jesteś bezwzględnym parserem danych. Otrzymasz surowy tekst z systemu OCR oraz ZASADY I DOCELOWY SCHEMAT JSON definiujący strukturę odpowiedzi.
     Twoim zadaniem jest wyciągnięcie danych z tekstu OCR i zwrócenie ich w zwięzłym, płaskim formacie JSON (tylko klucz: wartość).
     RYGOROSTYCZNE ZASADY:
     1. FORMAT: Zwróć WYŁĄCZNIE czysty obiekt JSON bez zagnieżdżeń. Nie używaj znaczników markdown (jak ```json). Brak jakiegokolwiek tekstu przed/po JSON.
@@ -84,7 +75,7 @@ prompts:
     ZASADY I OCZEKIWANY SCHEMAT:
     {page_json_schema}
 
-  page_1_json_schema: |           # Strona 1: demografia + styl życia
+  page_1_json_schema: |           # Page 1: demographics and lifestyle
     ZASADY DLA PÓL (Dozwolone wartości):
     * p1_plec - Płeć: ["Kobieta", "Mężczyzna", "Nie chcę podawać"]
     * p2_wiek - Wiek: [DOWOLNY_TEKST]
@@ -106,13 +97,13 @@ prompts:
 
     OCZEKIWANY FORMAT WYJŚCIOWY:
     {
-      "p1_plec": "", "p2_wiek": "", "p3_miejsce": "", "p4_stan": "", 
-      "p5_forma": "", "p5_inne": "", "p6_stopien": "", "p7_uczelnia": "", 
-      "p8_praca": "", "p9_system": "", "p9_inne": "", "p10_oddzial": "", 
+      "p1_plec": "", "p2_wiek": "", "p3_miejsce": "", "p4_stan": "",
+      "p5_forma": "", "p5_inne": "", "p6_stopien": "", "p7_uczelnia": "",
+      "p8_praca": "", "p9_system": "", "p9_inne": "", "p10_oddzial": "",
       "p10_inne": "", "p11_staz": "", "p12_sen": "", "p13_ekran": "", "p14_kofeina": ""
     }
 
-  page_2_json_schema: |           # Strona 2: Ateńska skala bezsenności
+  page_2_json_schema: |           # Page 2: Athens Insomnia Scale
     ZASADY DLA PÓL (Dozwolone wartości):
     * sen_1 - Zasypianie: ["szybkie", "nieznacznie opóźnione", "opóźnione", "bardzo opóźnione lub bezsenność przez całą noc"]
     * sen_2 - Budzenie w nocy: ["nie występuje", "sporadycznie", "często", "bardzo często lub bezsenność przez całą noc"]
@@ -129,7 +120,7 @@ prompts:
       "sen_5": "", "sen_6": "", "sen_7": "", "sen_8": ""
     }
 
-  page_3_json_schema: |           # Strona 3: MFIS cz.1 (pozycje 1-15)
+  page_3_json_schema: |           # Page 3: MFIS part 1 (items 1-15)
     ZASADY DLA PÓL:
     Dla wszystkich pytań ze skali zmęczenia (od mfis_1 do mfis_15) dozwolone wartości to WYŁĄCZNIE:
     ["0", "1", "2", "3", "4"]
@@ -141,7 +132,7 @@ prompts:
       "mfis_11": "", "mfis_12": "", "mfis_13": "", "mfis_14": "", "mfis_15": ""
     }
 
-  page_4_json_schema: |           # Strona 4: MFIS cz.2 (pozycje 16-21) + pytania o zdrowie
+  page_4_json_schema: |           # Page 4: MFIS part 2 (items 16-21) and health questions
     ZASADY DLA PÓL:
     * Dla pytań skali zmęczenia (od mfis_16 do mfis_21) dozwolone wartości to WYŁĄCZNIE: ["0", "1", "2", "3", "4"]
     * choroba_anemia oraz choroba_tarczyca - Czy stwierdzono: ["TAK", "NIE"]
@@ -153,7 +144,7 @@ prompts:
       "choroba_anemia": "", "choroba_tarczyca": "", "tarczyca_jakie": "", "choroba_inne": ""
     }
 
-  page_5_json_schema: |           # Strona 5: CES-D (skala depresji)
+  page_5_json_schema: |           # Page 5: CES-D (depression scale)
     ZASADY DLA PÓL:
     Skala depresji (pytania 1-20). Dozwolone wartości dla WSZYSTKICH kluczy (od depr_1 do depr_20) to WYŁĄCZNIE:
     ["Rzadko lub wcale (mniej niż 1 dzień)", "Przez niedługi czas (1-2 dni)", "Czasem lub przez umiarkowany okres (3-4 dni)", "Przeważnie lub cały czas (5-7 dni)"]

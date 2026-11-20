@@ -1,19 +1,20 @@
+# Python
 .venv/
 __pycache__/
 *.pyc
-.streamlit/secrets.toml
+
+# Local configuration (copy from configs/)
+config.yaml
+
+# Runtime data: survey images, results, logs, frontend build
+working_vault/
 logs/
 *.log
 *.err
-tunnel_url.txt
-uploads/
-cache_results.json
-wyniki.csv
+
+# Frontend
 node_modules/
-src_ui/dist/
-src/surveys_data
-dist/*
-config.yaml
-working_vault/
 src/frontend/dist/
+
+# Local scratch files
 .tmp/
