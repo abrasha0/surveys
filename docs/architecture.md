@@ -167,7 +167,7 @@ React 19, TypeScript, Vite 8, React Router, TanStack Query, Zustand and Tailwind
 | `/login` | Password login |
 | `/welcome` | Survey counts, batch size slider with ETA, start / next batch / start over, CSV download |
 | `/app` | Progress bar and verification view |
-| `/complete` | CSV download after finishing the session |
+| `/complete` | CSV download after finishing the session, and "Nowa sesja" (new session) |
 
 - `api/client.ts` wraps `fetch` and redirects to `/login` on `401`. `api/hooks.ts`
   holds the TanStack Query hooks. The survey list is polled every 2 seconds while any
@@ -190,3 +190,7 @@ React 19, TypeScript, Vite 8, React Router, TanStack Query, Zustand and Tailwind
 - The Space key saves the current survey and moves to the next one, unless the focus is
   in an input.
 - "Zakończ sesję" (finish session) calls `/api/session/finalize` and opens `/complete`.
+- "Rozpocznij od nowa" (start over) on `/welcome` and "Nowa sesja" (new session) on
+  `/complete` ask for confirmation, then call `/api/session/clear` and clear the local
+  drafts. "Rozpocznij od nowa" also starts processing again; "Nowa sesja" opens
+  `/welcome`. The clear overwrites the previous `*.old` archive.

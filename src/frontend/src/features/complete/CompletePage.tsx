@@ -1,12 +1,26 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useExportCsv } from '../../api/hooks';
+import { useClearSession, useExportCsv } from '../../api/hooks';
+import { CLEAR_SESSION_CONFIRM } from '../../constants';
+import { useVerificationStore } from '../../store/verificationStore';
 
 export default function CompletePage() {
   const navigate = useNavigate();
   const exportCsv = useExportCsv();
+  const clearSession = useClearSession();
+  const clearCache = useVerificationStore((s) => s.clearAllCache);
+  const [error, setError] = useState('');
 
   const handleNewSession = () => {
-    navigate('/welcome');
+    if (!window.confirm(CLEAR_SESSION_CONFIRM)) return;
+    setError('');
+    clearSession.mutate(undefined, {
+      onSuccess: () => {
+        clearCache();
+        navigate('/welcome');
+      },
+      onError: (err) => setError(err instanceof Error ? err.message : 'Nie udało się wyczyścić sesji'),
+    });
   };
 
   return (
@@ -30,11 +44,18 @@ export default function CompletePage() {
         </button>
         <button
           onClick={handleNewSession}
-          className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          disabled={clearSession.isPending}
+          className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          Nowa sesja
+          {clearSession.isPending ? 'Czyszczenie...' : 'Nowa sesja'}
         </button>
       </div>
+
+      {error && (
+        <div className="text-sm text-[var(--color-error)] bg-red-50 p-2 rounded">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   useStartProcessing,
   useSurveys,
 } from '../../api/hooks';
+import { CLEAR_SESSION_CONFIRM } from '../../constants';
 import { useVerificationStore } from '../../store/verificationStore';
 import { formatEta as sharedFormatEta } from '../../utils/formatEta';
 
@@ -152,6 +153,7 @@ export default function WelcomePage() {
   };
 
   const handleRestart = () => {
+    if (!window.confirm(CLEAR_SESSION_CONFIRM)) return;
     setError('');
     setWaitingForRunning(true);
     setBatchSize(0);
