@@ -70,13 +70,5 @@ def drafts_dir() -> Path:
     return survey_cache_dir() / "drafts"
 
 
-def clear_survey_cache_dir():
-    cache_dir = survey_cache_dir()
-    if cache_dir.exists():
-        for f in cache_dir.glob("survey_*.json"):
-            f.unlink()
-            logger.debug("Removed cache: %s", f.name)
-
-
 def export_csv_path() -> str:
     return config.app["csv_results"]
