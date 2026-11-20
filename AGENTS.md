@@ -41,13 +41,21 @@
 
 stack: backend FastAPI (`src/backend`), frontend React + Vite + TypeScript (`src/frontend`), modele AI przez Ollamę. konfiguracja w `config.yaml` w katalogu głównym (kopia jednego z profili z `configs/`, `app.password` musi być ustawione).
 
-środowisko przygotowuje `.\scripts\full_setup.ps1`, całość w trybie deweloperskim uruchamia `.\scripts\run_dev.ps1`.
+środowisko przygotowuje `.\scripts\full_setup.ps1` (Windows) albo `scripts/full_setup.sh` (macOS, Linux), całość w trybie deweloperskim uruchamia `.\scripts\run_dev.ps1` albo `scripts/run_dev.sh`. skrypty `.ps1` i `.sh` robią te same kroki, więc zmiana w jednym wymaga takiej samej zmiany w drugim.
 
 jeżeli musisz przetestować kawałek kodu backendu to musisz korzystać z wirtualnego środowiska:
 
 ```ps1
 .venv\Scripts\Activate.ps1
 cd src\backend
+python -m uvicorn main:app --reload --port 8000
+```
+
+na macOS i Linuksie:
+
+```bash
+source .venv/bin/activate
+cd src/backend
 python -m uvicorn main:app --reload --port 8000
 ```
 

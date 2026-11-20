@@ -82,10 +82,12 @@ else:
 <div style="text-align:center;padding:2rem;background:white;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-width:520px">
 <h1>AnkieterAI</h1>
 <p>The frontend has not been built yet.</p>
-<p><strong>Run first:</strong></p>
-<pre style="background:#eee;padding:1rem;border-radius:4px;text-align:left;overflow-x:auto">.\\scripts\\full_setup.ps1</pre>
+<p><strong>Build and start it with</strong> (Windows / macOS and Linux):</p>
+<pre style="background:#eee;padding:1rem;border-radius:4px;text-align:left;overflow-x:auto">.\\scripts\\run_prod.ps1
+scripts/run_prod.sh</pre>
 <p style="font-size:0.85rem;color:#666">or, for development:</p>
-<pre style="background:#eee;padding:1rem;border-radius:4px;text-align:left;overflow-x:auto">.\\scripts\\run_dev.ps1</pre>
+<pre style="background:#eee;padding:1rem;border-radius:4px;text-align:left;overflow-x:auto">.\\scripts\\run_dev.ps1
+scripts/run_dev.sh</pre>
 <p style="font-size:0.85rem;color:#666">(the frontend is served at <code>http://localhost:5173</code>)</p>
 </div></body></html>
 """

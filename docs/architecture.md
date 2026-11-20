@@ -16,9 +16,9 @@ survey images are read from a local directory, not uploaded.
                                   CSV, logs, dist/
 ```
 
-In production (`run_prod.ps1`) FastAPI also serves the built frontend from
+In production (`run_prod.ps1` / `run_prod.sh`) FastAPI also serves the built frontend from
 `working_vault/dist` (or `src/frontend/dist`) and falls back to `index.html` for client
-routes. In development (`run_dev.ps1`) the Vite dev server on port 5173 serves the
+routes. In development (`run_dev.ps1` / `run_dev.sh`) the Vite dev server on port 5173 serves the
 frontend and proxies `/api` to port 8000. Without a frontend build, `/` shows a short
 page with setup instructions.
 
@@ -116,7 +116,7 @@ All runtime data lives under `working_vault/` (paths are configurable):
 | `logs/survey_cache/drafts/survey_<id>.json` | Server copy of the form draft of each survey |
 | `wyniki.csv` | Results CSV, rebuilt on finalize and on export |
 | `logs/` | `ankieter.log`, `ai_requests.log`, script and uvicorn logs |
-| `dist/` | Frontend build copied by `run_prod.ps1` |
+| `dist/` | Frontend build copied by `run_prod.ps1` / `run_prod.sh` |
 
 On startup (or on the first `GET /api/surveys`) the state is loaded from
 `processed.json`. A cached survey is reused only if its file names are unchanged; otherwise it goes back to

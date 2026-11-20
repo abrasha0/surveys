@@ -16,8 +16,9 @@ CSV headers are in Polish.
 - Background worker that processes surveys one at a time, with retries, an ETA and
   batches of a chosen size. Surveys can be verified while the next ones are processed.
 - Verification view with the page image next to a form generated from the field
-  definitions. Invalid values are highlighted before saving; the Space key saves and
-  moves to the next survey.
+  definitions. Invalid values are highlighted before saving and a survey can still be
+  approved despite them; follow-up fields (for example "Inne") appear only when they
+  apply. The Space key saves and moves to the next survey.
 - Drafts are kept in the browser and synced to the server, so edits survive
   navigation, reloads and a different browser.
 - CSV export (UTF-8 with BOM, `;` separator) that opens directly in Excel.
@@ -27,15 +28,19 @@ CSV headers are in Polish.
 
 ## Requirements
 
-- Windows with PowerShell (the setup and run scripts are PowerShell scripts)
+- Windows (PowerShell scripts), or macOS / Linux (bash scripts)
 - Python 3.12 or newer
 - Node.js 20.19+ or 22.12+ with npm (required by Vite 8)
-- Ollama; `full_setup.ps1` installs it if it is missing
+- Ollama. On Windows `full_setup.ps1` installs it if it is missing; on macOS and Linux
+  install it first (`brew install ollama` or <https://ollama.com/download>)
+- `curl` (macOS / Linux scripts)
 - A GPU is recommended. The default models (`qwen3-vl:8b` and `llama3.1`) target GPUs
   with at least 8 GB of VRAM; `configs/config.yaml.light` uses `moondream` and
   `llama3.2:3b` for weaker hardware.
 
 ## Quick start
+
+Windows (PowerShell):
 
 ```powershell
 # 1. Create the configuration and set app.password in it
@@ -51,6 +56,22 @@ Copy-Item configs\config.yaml.example config.yaml
 .\scripts\run_prod.ps1 -NoTunnel   # local only
 ```
 
+macOS / Linux (bash):
+
+```bash
+# 1. Create the configuration and set app.password in it
+cp configs/config.yaml.example config.yaml
+
+# 2. One-time setup: .venv, Python and npm packages, Ollama server, AI models
+scripts/full_setup.sh
+
+# 3. Put the survey photos in working_vault/surveys_data
+
+# 4. Start the app
+scripts/run_prod.sh               # production build + public Cloudflare tunnel
+scripts/run_prod.sh --no-tunnel   # local only
+```
+
 Open `http://localhost:8000` and log in with the password from `config.yaml`.
 
 Images are sorted by file name and split into groups of five, one image per page, so
@@ -59,18 +80,30 @@ Supported formats: JPG, PNG and WebP.
 
 ## Scripts
 
+Each script has a PowerShell version (`.ps1`, Windows) and a bash version (`.sh`, macOS
+and Linux) that do the same steps.
+
 | Script | When | What it does |
 |---|---|---|
-| `scripts/full_setup.ps1` | Once (safe to re-run) | Checks Python and Node.js, creates `.venv`, installs Python and npm packages, installs and starts Ollama, pulls and tests the models from the config. `-Force` recreates `.venv`. |
-| `scripts/run_prod.ps1` | Every production run | Builds the frontend into `working_vault/dist`, starts uvicorn on port 8000 and opens a Cloudflare tunnel. |
-| `scripts/run_dev.ps1` | Development | Starts uvicorn with `--reload` on port 8000 and the Vite dev server on port 5173. Restarts the backend when the image directory changes, or when you press `R`. |
+| `scripts/full_setup` | Once (safe to re-run) | Checks Python and Node.js, creates `.venv`, installs Python and npm packages, starts Ollama, pulls and tests the models from the config. `-Force` / `--force` recreates `.venv`. |
+| `scripts/run_prod` | Every production run | Builds the frontend into `working_vault/dist`, starts uvicorn on port 8000 and opens a Cloudflare tunnel. |
+| `scripts/run_dev` | Development | Starts uvicorn with `--reload` on port 8000 and the Vite dev server on port 5173. Restarts the backend when the image directory changes, or when you press `R`. |
 
-`run_prod.ps1` parameters:
+`run_prod` parameters:
 
-- `-NoTunnel` skips the Cloudflare tunnel.
-- `-CloudflaredDir <dir>` (default `C:\tools`): where `cloudflared.exe` is looked up when
-  it is not in `PATH`. If it is not found there either, the script downloads it to this
-  directory and adds the directory to the user `PATH`.
+- `-NoTunnel` / `--no-tunnel` skips the Cloudflare tunnel.
+- `-CloudflaredDir <dir>` / `--cloudflared-dir <dir>`: where `cloudflared` is looked up
+  when it is not in `PATH`.
+  - Windows (default `C:\tools`): if `cloudflared.exe` is not found there either, the
+    script downloads it to this directory and adds the directory to the user `PATH`.
+  - macOS / Linux (default `~/.local/bin`): the script does not download anything and
+    stops with an install hint (`brew install cloudflared` or the Linux packages from
+    Cloudflare).
+
+Differences of the bash scripts: `full_setup.sh` does not install Ollama (the Linux
+installer needs root, and on macOS Ollama is an app or a Homebrew package), but it starts
+`ollama serve` when the server is not running. It looks for Python as `python3.13`,
+`python3.12`, `python3` and `python`; set `PYTHON=/path/to/python3.12` to choose one.
 
 The tunnel URL is printed to the console and saved to `working_vault/logs/tunnel_url.txt`.
 Script logs are written to `working_vault/logs/`.
@@ -138,7 +171,7 @@ for the processing pipeline, the API and the data files, and
 ```
 configs/            configuration profiles (copy one to config.yaml)
 docs/               architecture and survey structure
-scripts/            PowerShell setup and run scripts
+scripts/            setup and run scripts: PowerShell (Windows) and bash (macOS, Linux)
 src/backend/        FastAPI app
   ai/               Ollama client, prompts, LangSmith tracing
   domain/           field definitions, survey model, CSV export
