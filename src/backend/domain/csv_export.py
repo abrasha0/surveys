@@ -11,18 +11,6 @@ logger = logging.getLogger(__name__)
 CSV_HEADER = ["Sygnatura czasowa"] + [f.get_csv_header() for f in CSV_FIELDS]
 
 
-def save_survey_to_csv(data: MedicalSurvey, csv_path: str):
-    filepath = Path(csv_path)
-    exists = filepath.exists()
-    with open(filepath, "a", encoding="utf-8-sig", newline="") as f:
-        writer = csv.writer(f, delimiter=";")
-        if not exists:
-            writer.writerow(CSV_HEADER)
-            logger.info("Utworzono plik CSV: %s", csv_path)
-        writer.writerow(data.to_csv_row())
-    logger.debug("Dodano wiersz do CSV: %s", csv_path)
-
-
 def rebuild_csv_from_processed(processed_data: dict, csv_path: str) -> int:
     """Odbudowuje wyniki.csv w całości z processed.json (ankiety ze statusem 'verified')."""
     filepath = Path(csv_path)

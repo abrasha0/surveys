@@ -15,10 +15,11 @@ from data_handler import (
     archive_csv,
     archive_processed,
     clear_survey_cache_dir,
+    drafts_dir,
     export_csv_path,
     load_processed_data,
 )
-from domain.csv_export import rebuild_csv_from_processed, save_survey_to_csv
+from domain.csv_export import rebuild_csv_from_processed
 from domain.field_specs import ALL_FIELDS, FIELD_SPEC_BY_NAME
 from domain.schemas import MedicalSurvey
 from ingestion.file_grouping import scan_survey_directory
@@ -128,7 +129,6 @@ def get_survey_image(survey_id: int, page_num: int, if_none_match: Optional[str]
 
     return FileResponse(
         path=str(file_path),
-        media_type="image/jpeg",
         headers={
             "Cache-Control": "no-store, private",
             "ETag": f'"{etag}"',
@@ -148,6 +148,7 @@ def get_survey_result(survey_id: int):
         "id": survey_id,
         "status": survey.status,
         "result": survey.result,
+        "draft": survey.draft_values,
         "error": survey.error_message,
     }
 
@@ -207,7 +208,7 @@ def clear_session():
     archive_csv()
     clear_survey_cache_dir()
 
-    draft_dir = Path(config.processing.get("survey_cache_dir", "working_vault/logs/survey_cache")) / "drafts"
+    draft_dir = drafts_dir()
     if draft_dir.exists():
         shutil.rmtree(draft_dir)
 
@@ -239,11 +240,12 @@ def save_draft(survey_id: int, request: DraftRequest):
     survey = worker.state.get_survey_state(survey_id)
     if not survey:
         raise HTTPException(status_code=404, detail="Survey not found")
-    draft_dir = Path(config.processing.get("survey_cache_dir", "working_vault/logs/survey_cache")) / "drafts"
+    draft_dir = drafts_dir()
     draft_dir.mkdir(parents=True, exist_ok=True)
     draft_path = draft_dir / f"survey_{survey_id}.json"
     with open(draft_path, "w", encoding="utf-8") as f:
         json.dump(request.values, f, ensure_ascii=False, indent=2)
+    survey.draft_values = request.values
     return {"status": "saved"}
 
 
@@ -257,21 +259,11 @@ def finalize_session():
     if not verified:
         raise HTTPException(status_code=400, detail="No verified surveys to finalize")
 
+    # Rebuild the whole file, like the CSV export, so re-verified surveys are not appended twice.
     csv_path = export_csv_path()
-    written = 0
-    skipped = 0
+    written = rebuild_csv_from_processed(load_processed_data(), csv_path)
     for survey in verified:
-        if survey.csv_written:
-            skipped += 1
-            continue
-        if survey.result:
-            try:
-                survey_data = MedicalSurvey(**survey.result)
-                save_survey_to_csv(survey_data, csv_path)
-                worker.state.mark_csv_written(survey.id)
-                written += 1
-            except Exception as e:
-                logger.error("Failed to save survey %d to CSV: %s", survey.id, e)
+        worker.state.mark_csv_written(survey.id)
 
     total_errors = sum(1 for s in worker.state.surveys if s.status == "error")
     return {
@@ -279,7 +271,6 @@ def finalize_session():
         "csv_path": csv_path,
         "total_verified": len(verified),
         "written": written,
-        "skipped": skipped,
         "total_errors": total_errors,
     }
 

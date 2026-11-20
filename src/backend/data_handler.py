@@ -4,11 +4,12 @@ import shutil
 import time
 from pathlib import Path
 
-from config import config
+from config import APP_ROOT, config
 
 logger = logging.getLogger(__name__)
 
 PROCESSED_FILE = "processed.json"
+_DEFAULT_SURVEY_CACHE_DIR = "working_vault/logs/survey_cache"
 
 
 def _processed_path() -> Path:
@@ -61,8 +62,16 @@ def archive_csv():
         logger.info("Archived %s -> %s", csv_path.name, archived.name)
 
 
+def survey_cache_dir() -> Path:
+    return Path(config.processing.get("survey_cache_dir") or APP_ROOT / _DEFAULT_SURVEY_CACHE_DIR)
+
+
+def drafts_dir() -> Path:
+    return survey_cache_dir() / "drafts"
+
+
 def clear_survey_cache_dir():
-    cache_dir = Path(config.processing.get("survey_cache_dir", "logs/survey_cache"))
+    cache_dir = survey_cache_dir()
     if cache_dir.exists():
         for f in cache_dir.glob("survey_*.json"):
             f.unlink()

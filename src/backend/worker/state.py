@@ -89,7 +89,8 @@ class ProcessingState:
             total_pages += len(group)
 
         # Load drafts from disk
-        draft_dir = Path(config.processing.get("survey_cache_dir", "working_vault/logs/survey_cache")) / "drafts"
+        from data_handler import drafts_dir
+        draft_dir = drafts_dir()
         if draft_dir.exists():
             import json
             for survey in self.surveys:
