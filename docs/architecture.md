@@ -100,9 +100,10 @@ queued ──▶ processing ──▶ ready ──(save)──▶ verified
 ```
 
 - `ready`, `error` and `verified` surveys can be opened in the verification view.
-- Saving validates the values again on the server. Invalid choices, invalid numbers or
-  numbers out of range return `422` with the list of errors, unless the request sets
-  `force: true`.
+- Saving validates the values again on the server. Empty values (including empty
+  strings) are allowed. Invalid choices, invalid numbers or numbers out of range return
+  `422` with the list of errors, unless the request sets `force: true`. A forced save
+  stores invalid choices and invalid numbers as empty and keeps out-of-range numbers.
 - A verified survey is read-only until it is unverified.
 
 ### Persistence

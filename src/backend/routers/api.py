@@ -292,6 +292,8 @@ def save_survey(survey_id: int, request: SaveRequest):
     validation_errors = {}
     for f in ALL_FIELDS:
         raw = request.values.get(f.name)
+        if isinstance(raw, str) and not raw.strip():
+            raw = None  # A cleared field means "no answer", not an invalid value.
         spec = FIELD_SPEC_BY_NAME.get(f.name)
         if spec and spec.kind == "radio":
             if raw is not None and spec.choices and raw in spec.choices:
