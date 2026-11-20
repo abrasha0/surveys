@@ -123,7 +123,7 @@ Write-Log "Step 4: checking node and npm..."
 $nodePath = (Get-Command "node" -ErrorAction SilentlyContinue).Source
 $npmPath = (Get-Command "npm" -ErrorAction SilentlyContinue).Source
 if (-not $nodePath) {
-    Write-Log "ERROR: Node.js not found in PATH. Install Node.js >= 18: https://nodejs.org/"
+    Write-Log "ERROR: Node.js not found in PATH. Install Node.js 20.19+ or 22.12+: https://nodejs.org/"
     Cleanup
     exit 1
 }

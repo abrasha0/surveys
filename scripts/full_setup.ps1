@@ -129,7 +129,7 @@ $nodePath = (Get-Command "node" -ErrorAction SilentlyContinue).Source
 $npmPath = (Get-Command "npm" -ErrorAction SilentlyContinue).Source
 if (-not $nodePath) {
     Write-Log "ERROR: Node.js not found in PATH."
-    Write-Log "       Install Node.js >= 18 manually: https://nodejs.org/"
+    Write-Log "       Install Node.js 20.19+ or 22.12+ manually: https://nodejs.org/"
     Write-Log "       Then run this script again."
     exit 1
 }
@@ -139,10 +139,13 @@ if (-not $npmPath) {
 }
 try {
     $nodeVersion = & node --version 2>&1
-    if ($nodeVersion -match 'v(\d+)\.') {
+    # Vite 8 requires Node.js ^20.19.0 || >=22.12.0
+    if ($nodeVersion -match 'v(\d+)\.(\d+)\.') {
         $nodeMajor = [int]$Matches[1]
-        if ($nodeMajor -lt 18) {
-            Write-Log "ERROR: Node.js $nodeMajor < 18. Install Node.js >= 18: https://nodejs.org/"
+        $nodeMinor = [int]$Matches[2]
+        $nodeSupported = ($nodeMajor -eq 20 -and $nodeMinor -ge 19) -or ($nodeMajor -eq 22 -and $nodeMinor -ge 12) -or ($nodeMajor -gt 22)
+        if (-not $nodeSupported) {
+            Write-Log "ERROR: Node.js $nodeVersion is not supported. Install Node.js 20.19+ or 22.12+: https://nodejs.org/"
             exit 1
         }
     }
