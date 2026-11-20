@@ -26,7 +26,7 @@ function Read-Config {
     $PythonExe = Join-Path -Path $VenvPath -ChildPath "Scripts\python.exe"
     $script = @"
 import yaml, json, sys
-with open(sys.argv[1], 'r') as f:
+with open(sys.argv[1], 'r', encoding='utf-8') as f:
     cfg = yaml.safe_load(f)
 print(json.dumps(cfg))
 "@
@@ -106,6 +106,11 @@ try {
         exit 1
     }
     Write-Log "OK: .venv istnieje"
+    if (-not $cfgPassword -and -not $env:ANKIETER_APP_PASSWORD) {
+        Write-Log "BLAD: brak hasla (app.password) w config.yaml -- backend nie wystartuje bez hasla."
+        Write-Log "Skopiuj configs\config.yaml.example do config.yaml i ustaw app.password."
+        exit 1
+    }
 
     # ============================================================
     # Krok 3: Budowa frontendu

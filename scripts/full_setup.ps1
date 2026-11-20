@@ -18,21 +18,20 @@ function Write-Log {
 
 function Read-Config {
     param([string]$ConfigPath)
-    if (-not (Test-Path -LiteralPath $ConfigPath)) { return $null }
-    $ConfigExample = Join-Path -Path $ProjectRoot -ChildPath "config.yaml.example"
-    if (-not (Test-Path -LiteralPath $ConfigPath) -and (Test-Path -LiteralPath $ConfigExample)) {
-        $ConfigPath = $ConfigExample
-        Write-Log "config.yaml nie istnieje -- uzywam config.yaml.example"
-    }
     if (-not (Test-Path -LiteralPath $ConfigPath)) {
-        Write-Log "OSTROZNIE: brak config.yaml i config.yaml.example"
-        return $null
+        $ConfigExample = Join-Path -Path $ProjectRoot -ChildPath "configs\config.yaml.example"
+        if (-not (Test-Path -LiteralPath $ConfigExample)) {
+            Write-Log "OSTROZNIE: brak config.yaml i configs\config.yaml.example"
+            return $null
+        }
+        Write-Log "config.yaml nie istnieje -- uzywam configs\config.yaml.example"
+        $ConfigPath = $ConfigExample
     }
     $PythonExe = Join-Path -Path $VenvPath -ChildPath "Scripts\python.exe"
     if (-not (Test-Path -LiteralPath $PythonExe)) { $PythonExe = "python" }
     $script = @"
 import yaml, json, sys
-with open(sys.argv[1], 'r') as f:
+with open(sys.argv[1], 'r', encoding='utf-8') as f:
     cfg = yaml.safe_load(f)
 print(json.dumps(cfg))
 "@

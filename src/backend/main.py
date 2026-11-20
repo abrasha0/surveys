@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from config import config, APP_ROOT
 from logger import setup_logging
-from auth import auth_router
+from auth import auth_router, is_password_configured
 from routers.api import router as api_router
 from worker import get_worker
 
@@ -22,6 +22,13 @@ async def lifespan(app: FastAPI):
         log_file=config.logging["file"],
         level=getattr(logging, config.logging["level"].upper(), logging.DEBUG),
     )
+    if not is_password_configured():
+        message = (
+            "app.password is empty. Set a password in config.yaml "
+            "(or the ANKIETER_APP_PASSWORD environment variable) before starting the server."
+        )
+        logging.getLogger("app").critical(message)
+        raise RuntimeError(message)
     worker = get_worker()
     surveys_dir = config.app.get("surveys_dir")
     if surveys_dir:

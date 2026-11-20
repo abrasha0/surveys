@@ -15,8 +15,14 @@ _SECRET_KEY = secrets.token_hex(32)
 _TOKEN_TTL = 60 * 60 * 8  # 8h — wystarczające dla single-user session
 
 
+def is_password_configured() -> bool:
+    return bool(str(config.app.get("password") or "").strip())
+
+
 def create_session_token(password: str) -> Optional[str]:
-    if not hmac.compare_digest(password, config.app["password"]):
+    expected = str(config.app.get("password") or "")
+    # An empty password must never grant access; compare bytes so non-ASCII passwords work.
+    if not expected.strip() or not hmac.compare_digest(password.encode(), expected.encode()):
         return None
     payload = secrets.token_hex(16)
     sig = hmac.new(

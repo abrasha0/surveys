@@ -6,7 +6,7 @@ import yaml
 
 _ROOT = Path(__file__).resolve().parent.parent.parent
 _CONFIG_YAML = _ROOT / "config.yaml"
-_CONFIG_EXAMPLE = _ROOT / "config.yaml.example"
+_CONFIG_EXAMPLE = _ROOT / "configs" / "config.yaml.example"
 
 _ENV_PREFIX = "ANKIETER_"
 APP_ROOT = _ROOT
