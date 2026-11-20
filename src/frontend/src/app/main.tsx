@@ -15,7 +15,6 @@ const queryClient = new QueryClient({
 });
 
 useVerificationStore.getState().hydrate();
-useVerificationStore.getState().hydrateDrafts();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

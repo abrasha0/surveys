@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { SURVEY_PAGE_COUNT } from '../constants';
 import { apiFetch } from './client';
 
 export interface FieldSpec {
@@ -89,22 +90,23 @@ export function useSurveyImages(surveyId: number | null, surveys?: SurveyListIte
   const dataRef = useRef<Record<number, string | null> | null>(null);
   const cacheBustRef = useRef(Date.now());
   const imageCache = useRef<Map<number, Record<number, string | null>>>(new Map());
-  const prevSurveyId = useRef<number | null>(null);
   const lastStatuses = useRef<Map<number, string>>(new Map());
   const MAX_CACHE_SIZE = 5;
 
   dataRef.current = data;
 
   useEffect(() => {
+    const cache = imageCache.current;
+    const current = dataRef;
     return () => {
-      imageCache.current.forEach((map) => {
+      cache.forEach((map) => {
         Object.values(map).forEach((url) => {
           if (url) URL.revokeObjectURL(url);
         });
       });
-      imageCache.current.clear();
-      if (dataRef.current) {
-        Object.values(dataRef.current).forEach((url) => {
+      cache.clear();
+      if (current.current) {
+        Object.values(current.current).forEach((url) => {
           if (url) URL.revokeObjectURL(url);
         });
       }
@@ -112,28 +114,24 @@ export function useSurveyImages(surveyId: number | null, surveys?: SurveyListIte
   }, []);
 
   useEffect(() => {
-    if (surveyId === null) {
-      prevSurveyId.current = null;
-      return;
-    }
+    if (surveyId === null) return;
 
     if (imageCache.current.has(surveyId)) {
       const cached = imageCache.current.get(surveyId)!;
       setData(cached);
       setIsLoading(false);
       setIsRefetching(false);
-      prevSurveyId.current = surveyId;
       return;
     }
 
-    const wasEmpty = data === null;
+    const wasEmpty = dataRef.current === null;
     if (wasEmpty) setIsLoading(true);
     else setIsRefetching(true);
     let cancelled = false;
 
     const load = async () => {
       cacheBustRef.current = Date.now();
-      const pages = [0, 1, 2, 3, 4];
+      const pages = Array.from({ length: SURVEY_PAGE_COUNT }, (_, i) => i);
       const entries = await Promise.all(
         pages.map(async (page) => {
           try {
@@ -177,8 +175,6 @@ export function useSurveyImages(surveyId: number | null, surveys?: SurveyListIte
     };
 
     load();
-
-    prevSurveyId.current = surveyId;
 
     return () => {
       cancelled = true;
@@ -310,10 +306,6 @@ export function useSaveSurvey() {
       queryClient.invalidateQueries({ queryKey: ['surveys'] });
     },
   });
-}
-
-export function surveyImageUrl(surveyId: number, page: number): string {
-  return `/api/surveys/${surveyId}/pages/${page}/image`;
 }
 
 export function useClearSession() {

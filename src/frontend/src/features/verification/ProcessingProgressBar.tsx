@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import type { ProcessingStatus } from "../../api/hooks";
-import { useSurveys, useFinalizeSession } from "../../api/hooks";
-import { formatEta } from "../../utils/formatEta";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { ProcessingStatus } from '../../api/hooks';
+import { useSurveys, useFinalizeSession } from '../../api/hooks';
+import { formatEta } from '../../utils/formatEta';
+import { SURVEY_PAGE_COUNT } from '../../constants';
 
 interface ProcessingProgressBarProps {
   status: ProcessingStatus | undefined;
@@ -17,16 +18,16 @@ function stageLabel(
   batchIdx: number | null,
   batchSize: number,
 ): string {
-  if (!stage) return "";
-  const stageName = stage === "vlm" ? "Czytanie" : "Formatowanie";
-  const pageStr = page !== null ? `strona ${page + 1}/${pagesPerSurvey}` : "";
+  if (!stage) return '';
+  const stageName = stage === 'vlm' ? 'Czytanie' : 'Formatowanie';
+  const pageStr = page !== null ? `strona ${page + 1}/${pagesPerSurvey}` : '';
   const surveyStr =
     batchIdx !== null
       ? `ankieta ${batchIdx + 1}/${batchSize}`
       : surveyId !== null
         ? `ankieta ${surveyId}`
-        : "";
-  return [stageName, surveyStr, pageStr].filter(Boolean).join(" — ");
+        : '';
+  return [stageName, surveyStr, pageStr].filter(Boolean).join(' — ');
 }
 
 export default function ProcessingProgressBar({
@@ -127,7 +128,7 @@ export default function ProcessingProgressBar({
     );
   }
 
-  const stageProgress = is_running && current_stage === "format" ? 0.5 : 0;
+  const stageProgress = is_running && current_stage === 'format' ? 0.5 : 0;
   const currentPageProgress = (current_page ?? 0) + stageProgress;
   const pagesComplete = batchActive
     ? batch_total_pages > 0
@@ -140,7 +141,7 @@ export default function ProcessingProgressBar({
     current_stage,
     current_page,
     current_survey_id,
-    current_survey_pages > 0 ? current_survey_pages : 5,
+    current_survey_pages > 0 ? current_survey_pages : SURVEY_PAGE_COUNT,
     batchActive ? current_survey_batch_idx : null,
     batch_size,
   );
@@ -165,8 +166,8 @@ export default function ProcessingProgressBar({
               width: `${pagesComplete * 100}%`,
               backgroundColor:
                 errors > 0 && pagesComplete >= 1
-                  ? "var(--color-error)"
-                  : "var(--color-info)",
+                  ? 'var(--color-error)'
+                  : 'var(--color-info)',
             }}
           />
         </div>
@@ -175,10 +176,10 @@ export default function ProcessingProgressBar({
           {activity && <>{activity}<span className="mx-1.5">·</span> </>}
           {errors > 0 && <>Błędy: {errors} · </>}
           {is_running && displayEta === null
-            ? "obliczanie..."
+            ? 'obliczanie...'
             : displayEta !== null && is_running
               ? `zostało ~${formatEta(displayEta)}`
-              : ""}
+              : ''}
         </span>
       </div>
 
@@ -194,7 +195,7 @@ export default function ProcessingProgressBar({
                 disabled={finalizeMutation.isPending}
                 className="px-4 py-1.5 text-sm font-bold text-white bg-[var(--color-info)] rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {finalizeMutation.isPending ? "Finalizowanie..." : "Zakończ sesję"}
+                {finalizeMutation.isPending ? 'Finalizowanie...' : 'Zakończ sesję'}
               </button>
             )}
           </>
@@ -209,7 +210,7 @@ export default function ProcessingProgressBar({
             disabled={finalizeMutation.isPending}
             className="px-4 py-1.5 text-sm font-bold text-white bg-[var(--color-info)] rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {finalizeMutation.isPending ? "Finalizowanie..." : "Zakończ sesję"}
+            {finalizeMutation.isPending ? 'Finalizowanie...' : 'Zakończ sesję'}
           </button>
         ) : pagesComplete >= 1 && showCompletion ? (
           <span

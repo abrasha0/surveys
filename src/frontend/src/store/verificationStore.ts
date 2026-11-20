@@ -1,213 +1,142 @@
 import { create } from 'zustand';
+import { SURVEY_PAGE_COUNT } from '../constants';
 
-const STORAGE_KEY = 'ankieter:verification:v1';
+const PAGES_KEY = 'ankieter:verification:v1';
 const DRAFTS_KEY = 'ankieter:drafts:v1';
-const TOTAL_PAGES = 5;
+const PERSIST_DELAY_MS = 500;
 
-interface SurveyUIState {
+type DraftValues = Record<string, unknown>;
+
+export interface SurveyUIState {
   selectedPage: number;
   showErrors: boolean;
-  draftValues: Record<string, unknown>;
-  lastSaved: number;
+  draftValues: DraftValues;
 }
 
 interface VerificationStore {
   surveysUI: Record<number, SurveyUIState>;
-  draftTimers: Record<number, ReturnType<typeof setTimeout>>;
-  getSurveyUI: (surveyId: number) => SurveyUIState;
   setSelectedPage: (surveyId: number, page: number) => void;
   setShowErrors: (surveyId: number, show: boolean) => void;
-  updateDraft: (surveyId: number, values: Record<string, unknown>) => void;
-  mergeServerDraft: (surveyId: number, values: Record<string, unknown>) => void;
-  saveDraft: (surveyId: number) => void;
-  clearDraft: (surveyId: number) => void;
+  updateDraft: (surveyId: number, values: DraftValues) => void;
+  mergeServerDraft: (surveyId: number, values: DraftValues) => void;
+  persistDraft: (surveyId: number) => void;
   initSurvey: (surveyId: number) => void;
   hydrate: () => void;
   clearAllCache: () => void;
-  hydrateDrafts: () => void;
 }
 
-function defaultUIState(): SurveyUIState {
-  return { selectedPage: 0, showErrors: false, draftValues: {}, lastSaved: 0 };
-}
+export const DEFAULT_SURVEY_UI: SurveyUIState = Object.freeze({
+  selectedPage: 0,
+  showErrors: false,
+  draftValues: Object.freeze({}) as DraftValues,
+});
 
-function readDraftsFromStorage(): Record<string, Record<string, unknown>> {
+const persistTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+function readStorage<T>(key: string): Record<string, T> {
   try {
-    const raw = localStorage.getItem(DRAFTS_KEY);
-    return raw ? JSON.parse(raw) : {};
+    const raw = localStorage.getItem(key);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, T>) : {};
   } catch {
     return {};
   }
 }
 
-function writeDraftsToStorage(drafts: Record<string, Record<string, unknown>>) {
-  localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+function writeStorage(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Storage full or unavailable: the in-memory state still works.
+  }
 }
 
-export const useVerificationStore = create<VerificationStore>((set, get) => ({
-  surveysUI: {},
-  draftTimers: {},
-
-  getSurveyUI: (surveyId: number): SurveyUIState => {
-    const state = get().surveysUI[surveyId];
-    if (!state) {
-      const fresh = defaultUIState();
-      set((s) => ({ surveysUI: { ...s.surveysUI, [surveyId]: fresh } }));
-      return fresh;
-    }
-    return state;
-  },
-
-  setSelectedPage: (surveyId: number, page: number) => {
-    const clamped = Math.max(0, Math.min(TOTAL_PAGES - 1, page));
+export const useVerificationStore = create<VerificationStore>((set, get) => {
+  const patchSurvey = (surveyId: number, patch: Partial<SurveyUIState>) =>
     set((s) => ({
       surveysUI: {
         ...s.surveysUI,
-        [surveyId]: {
-          ...(s.surveysUI[surveyId] ?? defaultUIState()),
-          selectedPage: clamped,
-        },
+        [surveyId]: { ...(s.surveysUI[surveyId] ?? DEFAULT_SURVEY_UI), ...patch },
       },
     }));
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const stored: Record<string, number> = raw ? JSON.parse(raw) : {};
-    stored[String(surveyId)] = clamped;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
-  },
 
-  setShowErrors: (surveyId: number, show: boolean) => {
-    set((s) => ({
-      surveysUI: {
-        ...s.surveysUI,
-        [surveyId]: {
-          ...(s.surveysUI[surveyId] ?? defaultUIState()),
-          showErrors: show,
-        },
-      },
-    }));
-  },
+  return {
+    surveysUI: {},
 
-  updateDraft: (surveyId: number, values: Record<string, unknown>) => {
-    set((s) => {
-      const current = s.surveysUI[surveyId] ?? defaultUIState();
-      return {
-        surveysUI: {
-          ...s.surveysUI,
-          [surveyId]: {
-            ...current,
-            draftValues: { ...current.draftValues, ...values },
-          },
-        },
-      };
-    });
-  },
+    setSelectedPage: (surveyId, page) => {
+      const clamped = Math.max(0, Math.min(SURVEY_PAGE_COUNT - 1, page));
+      patchSurvey(surveyId, { selectedPage: clamped });
+      const pages = readStorage<number>(PAGES_KEY);
+      pages[String(surveyId)] = clamped;
+      writeStorage(PAGES_KEY, pages);
+    },
 
-  // Fills in fields saved on the server (e.g. from another browser) that are
-  // missing locally. Local edits win because they are never older than the
-  // last server sync from this browser.
-  mergeServerDraft: (surveyId: number, values: Record<string, unknown>) => {
-    const current = get().surveysUI[surveyId] ?? defaultUIState();
-    const missing = Object.keys(values).filter((key) => !(key in current.draftValues));
-    if (missing.length === 0) return;
-    set((s) => ({
-      surveysUI: {
-        ...s.surveysUI,
-        [surveyId]: {
-          ...current,
-          draftValues: { ...values, ...current.draftValues },
-        },
-      },
-    }));
-  },
+    setShowErrors: (surveyId, show) => patchSurvey(surveyId, { showErrors: show }),
 
-  saveDraft: (surveyId: number) => {
-    const existing = get().draftTimers[surveyId];
-    if (existing) clearTimeout(existing);
+    updateDraft: (surveyId, values) => {
+      const current = get().surveysUI[surveyId] ?? DEFAULT_SURVEY_UI;
+      patchSurvey(surveyId, { draftValues: { ...current.draftValues, ...values } });
+    },
 
-    const timer = setTimeout(() => {
-      const state = get().surveysUI[surveyId];
-      if (!state) return;
-      const drafts = readDraftsFromStorage();
-      drafts[String(surveyId)] = { ...state.draftValues };
-      writeDraftsToStorage(drafts);
-      set((s) => ({
-        surveysUI: {
-          ...s.surveysUI,
-          [surveyId]: {
-            ...(s.surveysUI[surveyId] ?? defaultUIState()),
-            lastSaved: Date.now(),
-          },
-        },
-      }));
-    }, 500);
+    // Fills in fields saved on the server (e.g. from another browser) that are
+    // missing locally. Local edits win because they are never older than the
+    // last server sync from this browser.
+    mergeServerDraft: (surveyId, values) => {
+      const current = get().surveysUI[surveyId] ?? DEFAULT_SURVEY_UI;
+      const hasMissing = Object.keys(values).some((key) => !(key in current.draftValues));
+      if (!hasMissing) return;
+      patchSurvey(surveyId, { draftValues: { ...values, ...current.draftValues } });
+    },
 
-    set((s) => ({
-      draftTimers: { ...s.draftTimers, [surveyId]: timer },
-    }));
-  },
+    // Writes the draft to localStorage, debounced per survey.
+    persistDraft: (surveyId) => {
+      clearTimeout(persistTimers.get(surveyId));
+      persistTimers.set(
+        surveyId,
+        setTimeout(() => {
+          persistTimers.delete(surveyId);
+          const state = get().surveysUI[surveyId];
+          if (!state) return;
+          const drafts = readStorage<DraftValues>(DRAFTS_KEY);
+          drafts[String(surveyId)] = state.draftValues;
+          writeStorage(DRAFTS_KEY, drafts);
+        }, PERSIST_DELAY_MS)
+      );
+    },
 
-  clearDraft: (surveyId: number) => {
-    const existing = get().draftTimers[surveyId];
-    if (existing) clearTimeout(existing);
-    const drafts = readDraftsFromStorage();
-    delete drafts[String(surveyId)];
-    writeDraftsToStorage(drafts);
-    set((s) => {
-      const current = s.surveysUI[surveyId];
-      if (!current) return s;
-      return {
-        surveysUI: {
-          ...s.surveysUI,
-          [surveyId]: { ...current, draftValues: {}, lastSaved: 0 },
-        },
-        draftTimers: { ...s.draftTimers, [surveyId]: undefined as unknown as ReturnType<typeof setTimeout> },
-      };
-    });
-  },
+    initSurvey: (surveyId) => {
+      if (get().surveysUI[surveyId]) return;
+      const key = String(surveyId);
+      patchSurvey(surveyId, {
+        selectedPage: readStorage<number>(PAGES_KEY)[key] ?? 0,
+        draftValues: readStorage<DraftValues>(DRAFTS_KEY)[key] ?? {},
+      });
+    },
 
-  initSurvey: (surveyId: number) => {
-    const existing = get().surveysUI[surveyId];
-    if (existing) return;
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const stored: Record<string, number> = raw ? JSON.parse(raw) : {};
-    const selectedPage = stored[String(surveyId)] ?? 0;
-    const drafts = readDraftsFromStorage();
-    const draftValues = drafts[String(surveyId)] ?? {};
-    set((s) => ({
-      surveysUI: {
-        ...s.surveysUI,
-        [surveyId]: { selectedPage, showErrors: false, draftValues, lastSaved: 0 },
-      },
-    }));
-  },
+    hydrate: () => {
+      const pages = readStorage<number>(PAGES_KEY);
+      const drafts = readStorage<DraftValues>(DRAFTS_KEY);
+      const surveysUI: Record<number, SurveyUIState> = {};
+      for (const key of new Set([...Object.keys(pages), ...Object.keys(drafts)])) {
+        surveysUI[Number(key)] = {
+          selectedPage: pages[key] ?? 0,
+          showErrors: false,
+          draftValues: drafts[key] ?? {},
+        };
+      }
+      set({ surveysUI });
+    },
 
-  hydrate: () => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const stored: Record<string, number> = JSON.parse(raw);
-    const surveysUI: Record<number, SurveyUIState> = {};
-    const drafts = readDraftsFromStorage();
-    for (const [key, page] of Object.entries(stored)) {
-      const draftValues = drafts[key] ?? {};
-      surveysUI[Number(key)] = { selectedPage: page, showErrors: false, draftValues, lastSaved: 0 };
-    }
-    set({ surveysUI });
-  },
-
-  clearAllCache: () => {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(DRAFTS_KEY);
-    set({ surveysUI: {}, draftTimers: {} });
-  },
-
-  hydrateDrafts: () => {
-    const drafts = readDraftsFromStorage();
-    const surveysUI = { ...get().surveysUI };
-    for (const [key, values] of Object.entries(drafts)) {
-      const surveyId = Number(key);
-      const existing = surveysUI[surveyId] ?? defaultUIState();
-      surveysUI[surveyId] = { ...existing, draftValues: { ...values } };
-    }
-    set({ surveysUI });
-  },
-}));
+    clearAllCache: () => {
+      persistTimers.forEach((timer) => clearTimeout(timer));
+      persistTimers.clear();
+      try {
+        localStorage.removeItem(PAGES_KEY);
+        localStorage.removeItem(DRAFTS_KEY);
+      } catch {
+        // Storage unavailable: nothing to clear.
+      }
+      set({ surveysUI: {} });
+    },
+  };
+});

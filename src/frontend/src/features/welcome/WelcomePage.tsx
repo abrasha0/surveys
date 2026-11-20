@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { apiFetch } from '../../api/client';
 import {
+  type ProcessingStatus,
   useClearSession,
   useExportCsv,
   useProcessingStatus,
@@ -9,6 +11,15 @@ import {
 } from '../../api/hooks';
 import { useVerificationStore } from '../../store/verificationStore';
 import { formatEta as sharedFormatEta } from '../../utils/formatEta';
+
+const START_POLL_INTERVAL_MS = 500;
+
+const primaryButtonClass =
+  'w-full py-3 px-6 text-base bg-[var(--color-info)] text-white ' +
+  'rounded-md hover:opacity-90 disabled:opacity-50 font-medium transition-opacity';
+const secondaryButtonClass =
+  'py-2 px-4 text-sm text-gray-700 bg-white border border-gray-300 ' +
+  'rounded-md hover:bg-gray-50 disabled:opacity-50 font-medium transition-colors';
 
 function formatEta(seconds: number | null | undefined): string {
   if (seconds !== null && seconds !== undefined && seconds <= 0) return 'Zakończono';
@@ -60,10 +71,10 @@ export default function WelcomePage() {
   const maxBatch = remaining > 0 ? remaining : 1;
 
   useEffect(() => {
-    if (maxBatch > 0 && batchSize === 0) {
+    if (batchSize === 0) {
       setBatchSize(maxBatch);
     }
-  }, [maxBatch]);
+  }, [batchSize, maxBatch]);
 
   const isCovered = stats.total > 0 && stats.processed === stats.total;
   const batchDone = useMemo(() => {
@@ -108,31 +119,35 @@ export default function WelcomePage() {
     perSurveyEtaSeconds !== null ? perSurveyEtaSeconds * (batchSize || maxBatch) : null;
   const batchEtaText = formatEta(batchEtaSeconds);
 
-  const handleStart = (batchSize?: number) => {
+  const handleError = (err: unknown) => {
+    setWaitingForRunning(false);
+    if (err instanceof Error) setError(err.message);
+  };
+
+  // The worker starts asynchronously; open the app once it reports running.
+  const navigateWhenRunning = () => {
+    if (waitingIntervalRef.current) clearInterval(waitingIntervalRef.current);
+    waitingIntervalRef.current = setInterval(async () => {
+      try {
+        const status = await apiFetch<ProcessingStatus>('/api/processing/status');
+        if (!status.is_running) return;
+        if (waitingIntervalRef.current) {
+          clearInterval(waitingIntervalRef.current);
+          waitingIntervalRef.current = null;
+        }
+        navigate('/app');
+      } catch {
+        // Transient error: keep polling.
+      }
+    }, START_POLL_INTERVAL_MS);
+  };
+
+  const handleStart = (size?: number) => {
     setError('');
     setWaitingForRunning(true);
-    startProcessing.mutate(batchSize, {
-      onSuccess: () => {
-        waitingIntervalRef.current = setInterval(async () => {
-          try {
-            const res = await fetch('/api/processing/status');
-            const data = await res.json();
-            if (data.is_running) {
-              if (waitingIntervalRef.current) {
-                clearInterval(waitingIntervalRef.current);
-                waitingIntervalRef.current = null;
-              }
-              navigate('/app');
-            }
-          } catch {
-            /* keep polling */
-          }
-        }, 500);
-      },
-      onError: (err) => {
-        setWaitingForRunning(false);
-        if (err instanceof Error) setError(err.message);
-      },
+    startProcessing.mutate(size, {
+      onSuccess: navigateWhenRunning,
+      onError: handleError,
     });
   };
 
@@ -142,35 +157,8 @@ export default function WelcomePage() {
     setBatchSize(0);
     clearCache();
     clearSession.mutate(undefined, {
-      onSuccess: () => {
-        startProcessing.mutate(undefined, {
-          onSuccess: () => {
-            waitingIntervalRef.current = setInterval(async () => {
-              try {
-                const res = await fetch('/api/processing/status');
-                const data = await res.json();
-                if (data.is_running) {
-                  if (waitingIntervalRef.current) {
-                    clearInterval(waitingIntervalRef.current);
-                    waitingIntervalRef.current = null;
-                  }
-                  navigate('/app');
-                }
-              } catch {
-                /* keep polling */
-              }
-            }, 500);
-          },
-          onError: (err) => {
-            setWaitingForRunning(false);
-            if (err instanceof Error) setError(err.message);
-          },
-        });
-      },
-      onError: (err) => {
-        setWaitingForRunning(false);
-        if (err instanceof Error) setError(err.message);
-      },
+      onSuccess: () => handleStart(),
+      onError: handleError,
     });
   };
 
@@ -220,10 +208,6 @@ export default function WelcomePage() {
       <span className="font-medium">{etaText}</span>
     </div>
   );
-
-  const primaryButtonClass =
-    'w-full py-3 px-6 text-base bg-[var(--color-info)] text-white ' +
-    'rounded-md hover:opacity-90 disabled:opacity-50 font-medium transition-opacity mt-6';
 
   return (
     <div className="flex items-center justify-center h-screen bg-gray-50">
@@ -277,7 +261,7 @@ export default function WelcomePage() {
               </div>
             )}
 
-            <button onClick={() => handleStart(batchSize)} disabled={busy} className={primaryButtonClass}>
+            <button onClick={() => handleStart(batchSize)} disabled={busy} className={`${primaryButtonClass} mt-6`}>
               {startProcessing.isPending
                 ? 'Rozpoczynanie...'
                 : stats.processed > 0
@@ -285,13 +269,12 @@ export default function WelcomePage() {
                   : 'Rozpocznij analizę'}
             </button>
             {stats.processed > 0 && (
-            <button
-              onClick={() => navigate('/app')}
-              className="w-full py-2 px-4 text-sm text-gray-700 bg-white border border-gray-300
-                         rounded-md hover:bg-gray-50 font-medium transition-colors mt-3"
-            >
-              Przejdź do weryfikacji
-            </button>
+              <button
+                onClick={() => navigate('/app')}
+                className={`w-full ${secondaryButtonClass} mt-3`}
+              >
+                Przejdź do weryfikacji
+              </button>
             )}
           </>
         )}
@@ -337,15 +320,13 @@ export default function WelcomePage() {
               <button
                 onClick={() => handleStart(batchSize)}
                 disabled={busy}
-                className="w-full py-3 px-6 text-base bg-[var(--color-info)] text-white
-                           rounded-md hover:opacity-90 disabled:opacity-50 font-medium transition-opacity"
+                className={primaryButtonClass}
               >
                 {busy ? 'Uruchamianie...' : 'Następna grupa'}
               </button>
               <button
                 onClick={() => navigate('/app')}
-                className="w-full py-2 px-4 text-sm text-gray-700 bg-white border border-gray-300
-                           rounded-md hover:bg-gray-50 font-medium transition-colors"
+                className={`w-full ${secondaryButtonClass}`}
               >
                 Przejdź do weryfikacji
               </button>
@@ -362,19 +343,11 @@ export default function WelcomePage() {
             {etaBlock}
             <div className="flex flex-col gap-3 mt-6">
               {allVerified || readyCount === 0 ? (
-                <button
-                  onClick={() => navigate('/complete')}
-                  className="w-full py-3 px-6 text-base bg-[var(--color-info)] text-white
-                             rounded-md hover:opacity-90 font-medium transition-opacity"
-                >
+                <button onClick={() => navigate('/complete')} className={primaryButtonClass}>
                   Pobierz wyniki
                 </button>
               ) : (
-                <button
-                  onClick={() => navigate('/app')}
-                  className="w-full py-3 px-6 text-base bg-[var(--color-info)] text-white
-                             rounded-md hover:opacity-90 font-medium transition-opacity"
-                >
+                <button onClick={() => navigate('/app')} className={primaryButtonClass}>
                   Przejdź do weryfikacji
                 </button>
               )}
@@ -382,18 +355,14 @@ export default function WelcomePage() {
                 <button
                   onClick={handleCsv}
                   disabled={exportCsv.isPending}
-                  className="flex-1 py-2 px-4 text-sm text-gray-700 bg-white border border-gray-300
-                             rounded-md hover:bg-gray-50 font-medium transition-colors
-                             disabled:opacity-50"
+                  className={`flex-1 ${secondaryButtonClass}`}
                 >
                   {exportCsv.isPending ? 'Pobieranie...' : 'Pobierz CSV'}
                 </button>
                 <button
                   onClick={handleRestart}
                   disabled={busy}
-                  className="flex-1 py-2 px-4 text-sm text-gray-700 bg-white border border-gray-300
-                             rounded-md hover:bg-gray-50 font-medium transition-colors
-                             disabled:opacity-50"
+                  className={`flex-1 ${secondaryButtonClass}`}
                 >
                   {busy ? 'Uruchamianie...' : 'Rozpocznij od nowa'}
                 </button>

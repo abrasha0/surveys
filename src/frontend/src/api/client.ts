@@ -16,11 +16,11 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
+    ...options,
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
     },
-    ...options,
   });
 
   if (res.status === 401) {

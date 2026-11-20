@@ -99,8 +99,6 @@ export default function VerificationPanel() {
 
   const currentPage = surveyUI?.selectedPage ?? 0;
 
-  const handlePageChange = () => {};
-
   if (currentSurveyId === null) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-50 text-gray-400">
@@ -125,17 +123,13 @@ export default function VerificationPanel() {
 
       <div className="flex-1 flex overflow-hidden">
         <div className="w-[680px] shrink-0 flex flex-col border-r border-gray-200 bg-white">
-          <PageTabs
-            surveyId={currentSurveyId}
-            currentPage={currentPage}
-            onChange={handlePageChange}
-          />
+          <PageTabs surveyId={currentSurveyId} currentPage={currentPage} />
           <div className="flex-1 min-h-0">
             <ImageViewer imageUrl={imageUrls?.[currentPage] ?? null} page={currentPage} isLoading={imagesLoading || imagesRefetching} />
           </div>
         </div>
 
-<div className="flex-1 min-w-0 flex flex-col overflow-y-auto relative">
+        <div className="flex-1 min-w-0 flex flex-col overflow-y-auto relative">
           {formLoading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70">
               <div className="flex flex-col items-center gap-3">

@@ -1,11 +1,11 @@
 import type { FieldSpec } from '../../api/hooks';
 
 const MFIS_LABEL_MAP: Record<string, string> = {
-  "0": "Nigdy",
-  "1": "Rzadko",
-  "2": "Czasami",
-  "3": "Często",
-  "4": "Prawie zawsze",
+  '0': 'Nigdy',
+  '1': 'Rzadko',
+  '2': 'Czasami',
+  '3': 'Często',
+  '4': 'Prawie zawsze',
 };
 
 interface ScaleTableGridProps {

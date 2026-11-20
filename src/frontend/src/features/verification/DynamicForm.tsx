@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useState } from 'react';
 import type { FieldSpec } from '../../api/hooks';
-import { useVerificationStore } from '../../store/verificationStore';
+import { DEFAULT_SURVEY_UI, useVerificationStore } from '../../store/verificationStore';
 import { useSpaceShortcut } from '../../hooks/useSpaceShortcut';
 import FieldRenderer from './FieldRenderer';
 import ScaleTableGrid from './ScaleTableGrid';
@@ -74,11 +74,10 @@ const DynamicForm = forwardRef<{ save: () => void; forceSave: () => void }, Dyna
   disabled = false,
   readOnly = false,
 }, ref) {
-  const selectedPage = useVerificationStore((s) => s.getSurveyUI(surveyId).selectedPage);
-  const showErrors = useVerificationStore((s) => s.getSurveyUI(surveyId).showErrors);
-  const draftValues = useVerificationStore((s) => s.getSurveyUI(surveyId).draftValues);
+  const surveyUI = useVerificationStore((s) => s.surveysUI[surveyId] ?? DEFAULT_SURVEY_UI);
+  const { selectedPage, showErrors, draftValues } = surveyUI;
   const updateDraft = useVerificationStore((s) => s.updateDraft);
-  const saveDraft = useVerificationStore((s) => s.saveDraft);
+  const persistDraft = useVerificationStore((s) => s.persistDraft);
   const setShowErrors = useVerificationStore((s) => s.setShowErrors);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -110,7 +109,7 @@ const DynamicForm = forwardRef<{ save: () => void; forceSave: () => void }, Dyna
     (name: string, value: unknown) => {
       if (readOnly) return;
       updateDraft(surveyId, { [name]: value });
-      saveDraft(surveyId);
+      persistDraft(surveyId);
       const field = fieldSpecs.find((f) => f.name === name);
       if (field) {
         const error = validateField(field, value);
@@ -122,7 +121,7 @@ const DynamicForm = forwardRef<{ save: () => void; forceSave: () => void }, Dyna
         });
       }
     },
-    [surveyId, fieldSpecs, updateDraft, saveDraft, readOnly]
+    [surveyId, fieldSpecs, updateDraft, persistDraft, readOnly]
   );
 
   const handleBlur = useCallback(
