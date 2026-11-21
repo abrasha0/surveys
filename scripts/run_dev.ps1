@@ -17,15 +17,28 @@ function Write-Log {
     Add-Content -Path $LogFile -Value $line
 }
 
+function Stop-ProcessTree {
+    # Process.Kill() stops only the parent (cmd.exe, the uvicorn reloader); taskkill /T
+    # also stops child processes such as node (Vite) and the uvicorn worker.
+    param([System.Diagnostics.Process]$Process)
+    if (-not $Process -or $Process.HasExited) { return }
+    # try/catch: with $ErrorActionPreference = "Stop", stderr from taskkill would end the script
+    try { & taskkill.exe /PID $Process.Id /T /F 2>&1 | Out-Null } catch { }
+    if (-not $Process.HasExited) {
+        try { $Process.Kill() } catch { }
+    }
+    $null = $Process.WaitForExit(5000)
+}
+
 function Cleanup {
     Write-Log "=== Cleanup: stopping processes ==="
     if ($uvicornProcess -and -not $uvicornProcess.HasExited) {
         Write-Log "Stopping uvicorn (PID: $($uvicornProcess.Id))..."
-        $uvicornProcess.Kill()
+        Stop-ProcessTree -Process $uvicornProcess
     }
     if ($npmProcess -and -not $npmProcess.HasExited) {
         Write-Log "Stopping npm dev (PID: $($npmProcess.Id))..."
-        $npmProcess.Kill()
+        Stop-ProcessTree -Process $npmProcess
     }
     Write-Log "=== Cleanup finished ==="
 }
@@ -190,10 +203,7 @@ try {
                 $now = [DateTime]::UtcNow
                 if (($now - $lastRestartTime).TotalSeconds -ge 3) {
                     Write-Log "=== Image directory changed - restarting backend ==="
-                    if ($uvicornProcess -and -not $uvicornProcess.HasExited) {
-                        $uvicornProcess.Kill()
-                        $null = $uvicornProcess.WaitForExit(5000)
-                    }
+                    Stop-ProcessTree -Process $uvicornProcess
                     $uvicornProcess = Start-Process -FilePath $PythonExe -ArgumentList "-m uvicorn main:app --reload --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
                     $lastRestartTime = $now
                     Write-Log "OK: uvicorn restarted (PID: $($uvicornProcess.Id))"
@@ -208,10 +218,7 @@ try {
             $key = [Console]::ReadKey($true)
             if ($key.Key -eq 'R') {
                 Write-Log "=== Manual backend reload (R key) ==="
-                if ($uvicornProcess -and -not $uvicornProcess.HasExited) {
-                    $uvicornProcess.Kill()
-                    $null = $uvicornProcess.WaitForExit(5000)
-                }
+                Stop-ProcessTree -Process $uvicornProcess
                 $uvicornProcess = Start-Process -FilePath $PythonExe -ArgumentList "-m uvicorn main:app --reload --port 8000" -WorkingDirectory $SrcDir -NoNewWindow -PassThru -RedirectStandardOutput $uvicornLog -RedirectStandardError "${uvicornLog}.err"
                 Write-Log "OK: uvicorn restarted (PID: $($uvicornProcess.Id))"
                 Write-Log "Waiting for uvicorn..."
