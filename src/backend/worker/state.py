@@ -17,6 +17,7 @@ class SurveyState:
     error_message: str | None = None
     draft_values: dict | None = None
     csv_written: bool = False
+    verified_at: float | None = None  # Unix time of the last verification; used as the CSV timestamp
 
 
 @dataclass
@@ -75,6 +76,7 @@ class ProcessingState:
                 result = s.get("result")
                 error = s.get("error_message")
                 csv_written = bool(s.get("csv_written", False))
+                verified_at = s.get("verified_at")
                 if status == "ready" and not result:
                     status = "queued"
                     result = None
@@ -85,7 +87,11 @@ class ProcessingState:
                 result = None
                 error = None
                 csv_written = False
-            self.surveys.append(SurveyState(id=idx, files=group, status=status, result=result, error_message=error, csv_written=csv_written))
+                verified_at = None
+            self.surveys.append(SurveyState(
+                id=idx, files=group, status=status, result=result, error_message=error,
+                csv_written=csv_written, verified_at=verified_at,
+            ))
             total_pages += len(group)
 
         # Load drafts from disk
@@ -171,6 +177,7 @@ class ProcessingState:
             "files": [str(p.name) for p in survey.files],
             "survey_id": survey_id,
             "csv_written": survey.csv_written,
+            "verified_at": survey.verified_at,
         }, page_times=self.page_times)
 
     def set_survey_status(self, survey_id: int, status: str,
@@ -206,6 +213,7 @@ class ProcessingState:
         survey.status = "verified"
         survey.result = result
         survey.csv_written = False
+        survey.verified_at = time.time()
         self._persist_survey_to_processed(survey_id)
 
     def mark_csv_written(self, survey_id: int):
@@ -218,6 +226,7 @@ class ProcessingState:
         if survey.status != "verified":
             raise ValueError(f"Cannot unverify survey in status '{survey.status}'")
         survey.status = "ready"
+        survey.verified_at = None
         self._persist_survey_to_processed(survey_id)
 
     def mark_page_processed(self, survey_id: int, page_idx: int):

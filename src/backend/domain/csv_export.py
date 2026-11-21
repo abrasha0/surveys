@@ -1,5 +1,6 @@
 import csv
 import logging
+from datetime import datetime
 from pathlib import Path
 
 from domain.schemas import MedicalSurvey
@@ -39,7 +40,9 @@ def rebuild_csv_from_processed(processed_data: dict, csv_path: str) -> int:
         except Exception as e:
             logger.warning("Skipped survey %s while rebuilding CSV: %s", key, e)
             continue
-        rows.append(survey.to_csv_row())
+        verified_at = entry.get("verified_at")
+        timestamp = datetime.fromtimestamp(verified_at) if isinstance(verified_at, (int, float)) else None
+        rows.append(survey.to_csv_row(timestamp))
 
     with open(filepath, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.writer(f, delimiter=";")

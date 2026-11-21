@@ -126,8 +126,9 @@ class MedicalSurvey(BaseModel):
             return str(v).strip()
         return v
 
-    def to_csv_row(self) -> list:
-        dt = datetime.now()
+    def to_csv_row(self, timestamp: datetime | None = None) -> list:
+        """Build a CSV row; the timestamp defaults to now (entries saved before verified_at existed)."""
+        dt = timestamp or datetime.now()
         ts = f"{dt.month}/{dt.day}/{dt.year} {dt.hour:02d}:{dt.minute:02d}:{dt.second:02d}"
         row = [ts]
         for f in CSV_FIELDS:

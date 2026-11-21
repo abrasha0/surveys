@@ -157,8 +157,8 @@ unless the request is forced.
 
 ## CSV columns
 
-The CSV has 71 columns: a timestamp (`Sygnatura czasowa`, format `M/D/YYYY HH:MM:SS`, the time the CSV was
-rebuilt) followed by the 70 fields. The column order differs from the page order:
+The CSV has 71 columns: a timestamp (`Sygnatura czasowa`, format `M/D/YYYY HH:MM:SS`, the time the survey was
+verified) followed by the 70 fields. The column order differs from the page order:
 
 1. Page 1 fields (17)
 2. MFIS items 1-21 (21)

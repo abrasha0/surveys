@@ -112,7 +112,7 @@ All runtime data lives under `working_vault/` (paths are configurable):
 
 | Path | Content |
 |---|---|
-| `processed.json` | Session state: status, AI result (replaced by the verified values on save) and error of each survey, plus recent page times |
+| `processed.json` | Session state: status, AI result (replaced by the verified values on save), error and verification time of each survey, plus recent page times |
 | `survey_cache/drafts/survey_<id>.json` | Server copy of the form draft of each survey |
 | `wyniki.csv` | Results CSV, rebuilt on finalize and on export |
 | `archive/<YYYYMMDD-HHMMSS>/` | `processed.json` and the CSV of each cleared session |
@@ -129,7 +129,7 @@ deletes the drafts and resets the state. Older archives are never overwritten or
 
 `rebuild_csv_from_processed()` writes every verified survey from `processed.json`, in
 survey order, to the results CSV: UTF-8 with BOM, `;` as the separator. The first
-column is a timestamp (`M/D/YYYY HH:MM:SS`, the time the CSV was rebuilt), followed by the 70 fields in this order:
+column is a timestamp (`M/D/YYYY HH:MM:SS`, the time the survey was verified, stored as `verified_at` in `processed.json`; for older entries without it, the time the CSV was rebuilt), followed by the 70 fields in this order:
 demographics, MFIS 1-21, health, Athens Insomnia Scale, CES-D. Headers are the Polish
 question texts from `field_specs.py`.
 
