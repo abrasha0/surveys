@@ -395,6 +395,10 @@ class AIClient:
             page_fields = PAGE_MAP.get(page_idx, [])
             page_field_names = {f.name for f in page_fields}
 
+            # The first pass and every re-OCR pass produce a candidate result;
+            # the one with the highest fill ratio wins (later passes win ties).
+            best_result: dict | None = None
+            best_ratio = -1.0
             re_ocr_attempt = 0
             while True:
                 if progress_callback:
@@ -408,48 +412,13 @@ class AIClient:
                     result = await self._format_json_llm(
                         raw_text, page_idx, progress_callback, survey_idx, total_surveys, total_pages
                     )
-                    page_elapsed = time.perf_counter() - page_start
-
-                    if re_ocr_threshold > 0.0 and re_ocr_attempt < re_ocr_max_attempts:
-                        fill_ratio = self._compute_page_fill_ratio(result, page_field_names)
-                        if fill_ratio < re_ocr_threshold:
-                            re_ocr_attempt += 1
-                            logger.info(
-                                "Page %d fill ratio %.0f%% below threshold %.0f%% — re-OCR attempt %d/%d",
-                                page_idx, fill_ratio * 100, re_ocr_threshold * 100,
-                                re_ocr_attempt, re_ocr_max_attempts,
-                            )
-                            if progress_callback:
-                                progress_callback(ProcessingStatus(
-                                    survey_idx=survey_idx, total_surveys=total_surveys,
-                                    page_idx=page_idx, total_pages=total_pages,
-                                    status="vlm_reocr",
-                                    message=f"Survey {survey_idx+1}, page {page_idx+1}: VLM re-OCR ({re_ocr_attempt}/{re_ocr_max_attempts})",
-                                ))
-                            raw_text = await self._extract_text_vlm(
-                                file_path, page_idx, progress_callback, survey_idx, total_surveys, total_pages
-                            )
-                            stripped_text = raw_text.strip()
-                            if stripped_text == "" or stripped_text == "[PUSTA_STRONA]" or len(stripped_text) < 10:
-                                logger.info(
-                                    "Empty VLM output on re-OCR for page %d of survey %d — skipping (length=%d)",
-                                    page_idx + 1, survey_idx + 1, len(stripped_text),
-                                )
-                                page_results.append({})
-                                break
-                            continue
-
-                    if progress_callback:
-                        progress_callback(ProcessingStatus(
-                            survey_idx=survey_idx, total_surveys=total_surveys,
-                            page_idx=page_idx, total_pages=total_pages,
-                            status="page_done",
-                            message="",
-                            extra={"elapsed_s": f"{page_elapsed:.1f}"},
-                        ))
-                    page_results.append(result)
-                    break
                 except Exception as e:
+                    if best_result is not None:
+                        logger.warning(
+                            "Text LLM failed on re-OCR attempt %d for page %d of survey %d: %s — keeping the previous result",
+                            re_ocr_attempt, page_idx + 1, survey_idx + 1, e,
+                        )
+                        break
                     page_elapsed = time.perf_counter() - page_start
                     logger.error("Text LLM failed for page %d of survey %d: %s", page_idx + 1, survey_idx + 1, e)
                     if _logger_mod.ai_req_logger:
@@ -465,8 +434,61 @@ class AIClient:
                             message=f"Survey {survey_idx+1}, page {page_idx+1}: text LLM error, page skipped",
                             extra={"elapsed_s": f"{page_elapsed:.1f}"},
                         ))
-                    page_results.append({})
                     break
+
+                fill_ratio = self._compute_page_fill_ratio(result, page_field_names)
+                if fill_ratio >= best_ratio:
+                    best_result, best_ratio = result, fill_ratio
+
+                if not (re_ocr_threshold > 0.0 and re_ocr_attempt < re_ocr_max_attempts
+                        and best_ratio < re_ocr_threshold):
+                    break
+
+                re_ocr_attempt += 1
+                logger.info(
+                    "Page %d fill ratio %.0f%% below threshold %.0f%% — re-OCR attempt %d/%d",
+                    page_idx, best_ratio * 100, re_ocr_threshold * 100,
+                    re_ocr_attempt, re_ocr_max_attempts,
+                )
+                if progress_callback:
+                    progress_callback(ProcessingStatus(
+                        survey_idx=survey_idx, total_surveys=total_surveys,
+                        page_idx=page_idx, total_pages=total_pages,
+                        status="vlm_reocr",
+                        message=f"Survey {survey_idx+1}, page {page_idx+1}: VLM re-OCR ({re_ocr_attempt}/{re_ocr_max_attempts})",
+                    ))
+                try:
+                    raw_text = await self._extract_text_vlm(
+                        file_path, page_idx, progress_callback, survey_idx, total_surveys, total_pages
+                    )
+                except RuntimeError as e:  # _extract_text_vlm wraps every failure in RuntimeError
+                    logger.warning(
+                        "VLM re-OCR attempt %d failed for page %d of survey %d: %s — keeping the previous result",
+                        re_ocr_attempt, page_idx + 1, survey_idx + 1, e,
+                    )
+                    break
+                stripped_text = raw_text.strip()
+                if stripped_text == "" or stripped_text == "[PUSTA_STRONA]" or len(stripped_text) < 10:
+                    logger.info(
+                        "Empty VLM output on re-OCR for page %d of survey %d — keeping the previous result (length=%d)",
+                        page_idx + 1, survey_idx + 1, len(stripped_text),
+                    )
+                    break
+
+            if best_result is None:
+                page_results.append({})
+                continue
+
+            page_elapsed = time.perf_counter() - page_start
+            if progress_callback:
+                progress_callback(ProcessingStatus(
+                    survey_idx=survey_idx, total_surveys=total_surveys,
+                    page_idx=page_idx, total_pages=total_pages,
+                    status="page_done",
+                    message="",
+                    extra={"elapsed_s": f"{page_elapsed:.1f}"},
+                ))
+            page_results.append(best_result)
 
         if page_done_callback:
             page_done_callback(survey_idx, total_pages - 1)
