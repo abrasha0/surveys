@@ -55,7 +55,7 @@ langsmith:
 processing:
   worker_max_retries: 3           # Attempts per survey before it is marked as error
   eta_rolling_window: 10          # Recent page timings used to estimate ETA
-  survey_cache_dir: "working_vault/logs/survey_cache"  # Server-side form drafts are kept in its drafts/ subdirectory
+  survey_cache_dir: "working_vault/survey_cache"  # Server-side form drafts are kept in its drafts/ subdirectory
   re_ocr_threshold: 0.3           # Min ratio of filled fields on a page before re-OCR (0.0 = disabled)
   re_ocr_max_attempts: 2          # Max re-OCR attempts per page
 

@@ -113,7 +113,7 @@ All runtime data lives under `working_vault/` (paths are configurable):
 | Path | Content |
 |---|---|
 | `processed.json` | Session state: status, AI result (replaced by the verified values on save) and error of each survey, plus recent page times |
-| `logs/survey_cache/drafts/survey_<id>.json` | Server copy of the form draft of each survey (deleted by `run_dev`, which clears `logs/` on start) |
+| `survey_cache/drafts/survey_<id>.json` | Server copy of the form draft of each survey |
 | `wyniki.csv` | Results CSV, rebuilt on finalize and on export |
 | `archive/<YYYYMMDD-HHMMSS>/` | `processed.json` and the CSV of each cleared session |
 | `logs/` | `ankieter.log`, `ai_requests.log`, script and uvicorn logs |

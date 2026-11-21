@@ -43,7 +43,7 @@ langsmith:
 processing:
   worker_max_retries: 3
   eta_rolling_window: 10
-  survey_cache_dir: "working_vault/logs/survey_cache"
+  survey_cache_dir: "working_vault/survey_cache"
   re_ocr_threshold: 0.0
   re_ocr_max_attempts: 0
 

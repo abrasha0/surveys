@@ -9,7 +9,7 @@ from config import APP_ROOT, config
 logger = logging.getLogger(__name__)
 
 PROCESSED_FILE = "processed.json"
-_DEFAULT_SURVEY_CACHE_DIR = "working_vault/logs/survey_cache"
+_DEFAULT_SURVEY_CACHE_DIR = "working_vault/survey_cache"
 
 
 def _processed_path() -> Path:

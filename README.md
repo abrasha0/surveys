@@ -87,7 +87,7 @@ and Linux) that do the same steps.
 |---|---|---|
 | `scripts/full_setup` | Once (safe to re-run) | Checks Python and Node.js, creates `.venv`, installs Python and npm packages, starts Ollama, pulls and tests the models from the config. `-Force` / `--force` recreates `.venv`. |
 | `scripts/run_prod` | Every production run | Builds the frontend into `working_vault/dist`, starts uvicorn on port 8000 and opens a Cloudflare tunnel. |
-| `scripts/run_dev` | Development | Deletes `working_vault/logs` (including the server-side drafts in `logs/survey_cache`), then starts uvicorn with `--reload` on port 8000 and the Vite dev server on port 5173. Restarts the backend when the image directory changes, or when you press `R`. |
+| `scripts/run_dev` | Development | Deletes `working_vault/logs`, then starts uvicorn with `--reload` on port 8000 and the Vite dev server on port 5173. Restarts the backend when the image directory changes, or when you press `R`. |
 
 `run_prod` parameters:
 
