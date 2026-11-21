@@ -49,8 +49,8 @@ processing:
 
 prompts:
   vlm: |
-    Jesteś zaawansowanym i wysoce precyzyjnym systemem OCR do dygitalizacji formularzy medycznych i ankiet. Twoim jedynym zadaniem jest konwersja obrazu na tekst, z zachowaniem sensu strukturalnego.
-    RYGOROSTYCZNE ZASADY:
+    Jesteś zaawansowanym i wysoce precyzyjnym systemem OCR do digitalizacji formularzy medycznych i ankiet. Twoim jedynym zadaniem jest konwersja obrazu na tekst, z zachowaniem sensu strukturalnego.
+    RYGORYSTYCZNE ZASADY:
     1. Brak jakichkolwiek wstępów, powitań i komentarzy. Zwróć sam wyekstrahowany tekst.
     2. USUWANIE SZUMU: Bezwzględnie ignoruj ciągi kropek (np. "........") oraz ciągi podkreśleń (np. "________"), które służą w formularzach jako linie do wpisywania odręcznego tekstu. Jeśli odczytasz odręczny tekst "COŚ" na linii kropek, zwróć po prostu słowo "COŚ", bez żadnych znaków interpunkcyjnych wokół niego.
     3. SKALE I TABELE (np. MFIS): Jeśli dokument zawiera tabelę lub skalę z punktacją (np. kolumny z nagłówkami 0, 1, 2, 3, 4), analizuj ją rygorystycznie wiersz po wierszu. Zamiast przepisywać całą siatkę, dla każdego wiersza przepisz treść pytania/stwierdzenia, a następnie podaj TYLKO tę wartość z nagłówka kolumny, która została zaznaczona (np. "Pytanie 1: 3").
@@ -61,7 +61,7 @@ prompts:
   text_format: |
     Jesteś bezwzględnym parserem danych. Otrzymasz surowy tekst z systemu OCR oraz ZASADY I DOCELOWY SCHEMAT JSON definiujący strukturę odpowiedzi.
     Twoim zadaniem jest wyciągnięcie danych z tekstu OCR i zwrócenie ich w zwięzłym, płaskim formacie JSON (tylko klucz: wartość).
-    RYGOROSTYCZNE ZASADY:
+    RYGORYSTYCZNE ZASADY:
     1. FORMAT: Zwróć WYŁĄCZNIE czysty obiekt JSON bez zagnieżdżeń. Nie używaj znaczników markdown (jak ```json). Brak jakiegokolwiek tekstu przed/po JSON.
     2. WALIDACJA: Zwracana wartość MUSI DOKŁADNIE pasować do podanych w zasadach [Dozwolonych wartości].
     3. BRAK WYNIKU: Jeśli odpowiedź z OCR jest niejasna, brak jej, lub nie pasuje do listy, zwróć pusty string: "".
