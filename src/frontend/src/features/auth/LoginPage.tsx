@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ApiError } from '../../api/client';
 import { useLogin } from '../../api/hooks';
 
 export default function LoginPage() {
@@ -14,9 +15,11 @@ export default function LoginPage() {
     login.mutate(password, {
       onSuccess: () => navigate('/welcome'),
       onError: (err) => {
-        if (err instanceof Error) {
-          setError(err.message);
-        }
+        setError(
+          err instanceof ApiError && err.status === 401
+            ? 'Nieprawidłowe hasło.'
+            : 'Nie udało się zalogować. Spróbuj ponownie.'
+        );
       },
     });
   };

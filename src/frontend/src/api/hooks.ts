@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { SURVEY_PAGE_COUNT } from '../constants';
-import { apiFetch } from './client';
+import { apiFetch, LOGIN_PATH } from './client';
 
 export interface FieldSpec {
   name: string;
@@ -214,7 +214,7 @@ export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (password: string) =>
-      apiFetch<{ status: string }>('/api/auth/login', {
+      apiFetch<{ status: string }>(LOGIN_PATH, {
         method: 'POST',
         body: JSON.stringify({ password }),
       }),

@@ -1,4 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+export const LOGIN_PATH = '/api/auth/login';
 
 export class ApiError extends Error {
   status: number;
@@ -33,7 +34,8 @@ export async function apiFetch<T>(
     },
   });
 
-  if (res.status === 401) {
+  // A 401 from the login endpoint means a wrong password; let the caller show it.
+  if (res.status === 401 && path !== LOGIN_PATH) {
     window.location.href = '/login';
     throw new ApiError(401, 'Not authenticated');
   }
