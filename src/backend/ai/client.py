@@ -34,6 +34,15 @@ _SHORTEN_IO = config.logging["shorten_models_io"]
 _MAX_IO_SIZE = config.logging["max_models_io_size"]
 
 
+def _ollama_options(num_predict_key: str) -> dict:
+    """Build Ollama request options; the token cap is sent only when configured."""
+    options = {"num_ctx": _OLLAMA_NUM_CTX, "temperature": _OLLAMA_TEMPERATURE}
+    num_predict = config.ai.get(num_predict_key)
+    if num_predict not in (None, ""):
+        options["num_predict"] = int(num_predict)
+    return options
+
+
 def _truncate(text: str, limit: int | None = None) -> str:
     if not _SHORTEN_IO:
         return text
@@ -151,11 +160,7 @@ class AIClient:
                             "stream": False,
                             "keep_alive": _OLLAMA_KEEP_ALIVE,
                             "think": False,
-                            "options": {
-                                "num_ctx": _OLLAMA_NUM_CTX,
-                                "temperature": _OLLAMA_TEMPERATURE,
-                                "num_predict": config.ai["num_predict_vlm"],
-                            },
+                            "options": _ollama_options("num_predict_vlm"),
                         },
                     )
                     elapsed = time.perf_counter() - t0
@@ -261,11 +266,7 @@ class AIClient:
                             "format": "json",
                             "stream": False,
                             "keep_alive": _OLLAMA_KEEP_ALIVE,
-                            "options": {
-                                "num_ctx": _OLLAMA_NUM_CTX,
-                                "temperature": _OLLAMA_TEMPERATURE,
-                                "num_predict": config.ai["num_predict_text"],
-                            },
+                            "options": _ollama_options("num_predict_text"),
                         },
                     )
                     elapsed = time.perf_counter() - t0
