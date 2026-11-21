@@ -297,7 +297,8 @@ def save_survey(survey_id: int, request: SaveRequest):
             elif raw is not None and spec.choices:
                 matched = False
                 for choice in spec.choices:
-                    if raw.lower().strip() == choice.lower().strip():
+                    # Non-text values (numbers, lists) never match and end up as invalid choices.
+                    if isinstance(raw, str) and raw.lower().strip() == choice.lower().strip():
                         normalized[f.name] = choice
                         matched = True
                         break
