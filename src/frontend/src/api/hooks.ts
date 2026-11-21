@@ -323,7 +323,7 @@ export function useExportCsv() {
   return useMutation({
     mutationFn: async () => {
       const res = await fetch('/api/surveys/export/csv', { credentials: 'include' });
-      if (!res.ok) throw new Error('CSV not available yet');
+      if (!res.ok) throw new Error('Nie udało się pobrać pliku CSV');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
