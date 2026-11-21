@@ -45,7 +45,7 @@ page with setup instructions.
 
 A single password (`app.password`) protects the app. The backend refuses to start when
 it is empty. A successful login sets an HTTP-only `session_token` cookie, signed with
-HMAC-SHA256 and valid for 8 hours. The signing key is generated at startup, so a server
+HMAC-SHA256, with an 8-hour cookie lifetime. The signing key is generated at startup, so a server
 restart logs everyone out. All `/api` routes except `/api/auth/*` require the cookie.
 
 ### Survey discovery
@@ -73,7 +73,7 @@ each page of a survey, `AIClient` does the following:
    `processing.re_ocr_threshold`, the page goes through steps 2-3 again, up to
    `processing.re_ocr_max_attempts` times.
 
-Each Ollama request is retried up to `ai.max_retries` times with exponential backoff. A
+Each Ollama request is tried up to `ai.max_retries` times, with exponential backoff between attempts. A
 page that still fails is left empty. The page results are then merged (the first
 non-null value of each field wins) and validated with `MedicalSurvey.from_ai_json()`:
 
@@ -83,9 +83,9 @@ non-null value of each field wins) and validated with `MedicalSurvey.from_ai_jso
   is dropped so the reviewer fills it in;
 - free text is trimmed.
 
-If a survey fails as a whole, the worker retries it up to
-`processing.worker_max_retries` times with exponential backoff and then marks it
-`error`. `POST /api/processing/stop` stops the worker after the current survey.
+If a survey fails as a whole, the worker tries it up to
+`processing.worker_max_retries` times, with exponential backoff between attempts, and
+then marks it `error`. `POST /api/processing/stop` stops the worker after the current survey.
 
 The worker updates progress after every step. The ETA is the average of the last
 `processing.eta_rolling_window` page times multiplied by the remaining pages, for the
@@ -113,7 +113,7 @@ All runtime data lives under `working_vault/` (paths are configurable):
 | Path | Content |
 |---|---|
 | `processed.json` | Session state: status, AI result (replaced by the verified values on save) and error of each survey, plus recent page times |
-| `logs/survey_cache/drafts/survey_<id>.json` | Server copy of the form draft of each survey |
+| `logs/survey_cache/drafts/survey_<id>.json` | Server copy of the form draft of each survey (deleted by `run_dev`, which clears `logs/` on start) |
 | `wyniki.csv` | Results CSV, rebuilt on finalize and on export |
 | `archive/<YYYYMMDD-HHMMSS>/` | `processed.json` and the CSV of each cleared session |
 | `logs/` | `ankieter.log`, `ai_requests.log`, script and uvicorn logs |
@@ -129,7 +129,7 @@ deletes the drafts and resets the state. Older archives are never overwritten or
 
 `rebuild_csv_from_processed()` writes every verified survey from `processed.json`, in
 survey order, to the results CSV: UTF-8 with BOM, `;` as the separator. The first
-column is a timestamp (`M/D/YYYY HH:MM:SS`), followed by the 70 fields in this order:
+column is a timestamp (`M/D/YYYY HH:MM:SS`, the time the CSV was rebuilt), followed by the 70 fields in this order:
 demographics, MFIS 1-21, health, Athens Insomnia Scale, CES-D. Headers are the Polish
 question texts from `field_specs.py`.
 

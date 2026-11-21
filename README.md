@@ -87,7 +87,7 @@ and Linux) that do the same steps.
 |---|---|---|
 | `scripts/full_setup` | Once (safe to re-run) | Checks Python and Node.js, creates `.venv`, installs Python and npm packages, starts Ollama, pulls and tests the models from the config. `-Force` / `--force` recreates `.venv`. |
 | `scripts/run_prod` | Every production run | Builds the frontend into `working_vault/dist`, starts uvicorn on port 8000 and opens a Cloudflare tunnel. |
-| `scripts/run_dev` | Development | Starts uvicorn with `--reload` on port 8000 and the Vite dev server on port 5173. Restarts the backend when the image directory changes, or when you press `R`. |
+| `scripts/run_dev` | Development | Deletes `working_vault/logs` (including the server-side drafts in `logs/survey_cache`), then starts uvicorn with `--reload` on port 8000 and the Vite dev server on port 5173. Restarts the backend when the image directory changes, or when you press `R`. |
 
 `run_prod` parameters:
 
@@ -123,8 +123,8 @@ Any key can be overridden with an environment variable named
 `ANKIETER_<SECTION>_<KEY>`, for example `ANKIETER_APP_PASSWORD` or
 `ANKIETER_AI_VLM_MODEL`. Only keys present in the YAML file can be overridden.
 
-Two retry levels are configurable: `ai.max_retries` retries a single Ollama request, and
-`processing.worker_max_retries` retries a whole survey.
+Two retry levels are configurable: `ai.max_retries` is the number of attempts for a single
+Ollama request, and `processing.worker_max_retries` the number of attempts for a whole survey.
 
 The prompts and the per-page JSON schemas live in the `prompts` section of the config.
 When you change the survey fields, update both `src/backend/domain/field_specs.py` and

@@ -47,7 +47,7 @@ class ProcessingStatus:
     page_idx: int
     total_pages: int
     status: str          # "survey_start", "vlm_extracting", "vlm_retrying", "vlm_reocr", "text_formatting", "text_retrying",
-                         # "page_error", "survey_done", "batch_done", "survey_error"
+                         # "page_done", "page_error", "survey_done"
     message: str
     extra: dict[str, Any] | None = None
 

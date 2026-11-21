@@ -1,7 +1,9 @@
 # =============================================================
 # AnkieterAI configuration template
 #
-# 1. Copy to the project root:  Copy-Item configs\config.yaml.example config.yaml
+# 1. Copy to the project root:
+#      Windows:        Copy-Item configs\config.yaml.example config.yaml
+#      macOS / Linux:  cp configs/config.yaml.example config.yaml
 # 2. Adjust it to your environment:
 #    - set app.password (the backend refuses to start without it)
 #    - pick AI models for your hardware (see the ai section)
@@ -22,7 +24,7 @@ ai:
   # Weaker hardware / testing: moondream + llama3.2:3b
   text_model: "llama3.1"          # Text model that formats OCR output as JSON
   ollama_url: "http://localhost:11434"  # Ollama server URL
-  max_retries: 3                  # Retries per Ollama request
+  max_retries: 3                  # Attempts per Ollama request
   timeout_sec: 120                # Ollama request timeout (seconds)
   num_ctx: 8192                   # Model context size (tokens)
   temperature: 0.0                # Sampling temperature (0.0 = deterministic)
@@ -49,7 +51,7 @@ langsmith:
   project: "ankieterai"           # LangSmith project name
 
 processing:
-  worker_max_retries: 3           # Retries for a whole survey
+  worker_max_retries: 3           # Attempts per survey before it is marked as error
   eta_rolling_window: 10          # Recent page timings used to estimate ETA
   survey_cache_dir: "working_vault/logs/survey_cache"  # Server-side form drafts are kept in its drafts/ subdirectory
   re_ocr_threshold: 0.3           # Min ratio of filled fields on a page before re-OCR (0.0 = disabled)
